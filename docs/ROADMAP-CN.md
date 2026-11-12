@@ -16,7 +16,7 @@
 | M3 完整 Lua IDE 基础 | DONE（Windows CI PASS，2026-11-13；桌面手工验收待执行） | 高亮、行号、补全、参数提示、诊断、查找/替换、多标签、错误行导航 |
 | M4 调试器 | DONE（基础能力 Windows CI PASS；桌面实机验收 NOT RUN） | 文件/行号断点、单步、运行到光标、变量快照、调用栈 |
 | M5 可视化录制/动作列表 | DONE（Windows CI PASS；桌面手工验收 NOT RUN） | 结构化原始事件/动作、虚拟化动作编辑器、参数/延时/分组/注释/启用状态、Lua 区块同步保护、sidecar 和单步试运行 |
-| M6 坐标系统与窗口自动化 | TODO | screen/window/client/anchor/ratio、坐标转换、窗口查找/布局/对齐/等待 |
+| M6 坐标系统与窗口自动化 | IN_PROGRESS（代码已进入 main；Windows CI Build PASS；函数手册同步后待完整复测；桌面验收 NOT RUN） | screen/window/client/anchor/ratio、双向坐标转换、安全窗口引用/枚举/属性/操作/等待 |
 | M7 控件与前后台能力适配 | TODO | UI Automation/标准控件能力探测、后台输入适配、失败回退和边界说明 |
 | M8 截图、图色与模板资源 | TODO | 截图区域、找色、多点找色、找图、阈值/多结果和资源管理 |
 | M9 OCR 与文本识别 | TODO | 本地 OCR、语言/字库配置、文字区域/置信度与等待文本 |
@@ -141,6 +141,30 @@ M3/M4/M5 自动化代码与 Windows CI 均已完成；M1/M3/M4/M5 的 Windows �
 M5 不代表 Hook 在 Windows 桌面已完成可靠性验收，不代表多坐标空间、窗口绑定或后台输入已实现（属于后续 M6/M7）。M5 也不实现任意 Lua 回读动作表；generated block 由动作模型单向生成。
 
 Windows CI 最终结果：run 43295924472 SUCCESS；37/37 tests、Release Build 0 warnings/0 errors、API handbook check、self-contained win-x64 publish、ZIP/SHA256 和 artifact upload 全部 PASS。Artifact ID 13979855824；内部 ZIP SHA256 `ddc08cfd78503d9e5e5c7995ff1202e3bc36abfcf1de6fa3ae9cc35a5baf531f`。所有 M5 桌面场景仍为 NOT RUN。
+
+## M6 — 坐标系统与窗口自动化（代码已接入 main，完整 CI 待手册同步复测）
+
+### 已实现代码范围
+- Core 坐标系统：screen/window/client/anchor/ratio 五种空间、双向屏幕转换、九宫格窗口锚点、归一化客户区坐标、物理像素取整和窗口工作区对齐算法。
+- 保持既有 MoveTo(x, y) 为虚拟桌面绝对物理像素；未改变旧 API 签名、输入消息或录制文件既有坐标含义。
+- Worker/Main IPC 新增窗口命令；窗口 API 通过不透明 GUID 引用传递，不向 Lua 暴露 HWND。
+- Win32 窗口枚举支持标题包含、类名精确、进程名、PID、可见性筛选；可枚举顶层窗口和最多 512 个子窗口后代。
+- 属性包括标题、类名、进程、外框、客户区、可见/最小化/最大化、前台/键盘焦点；支持激活、显示/隐藏、最小化/最大化/还原、置顶、移动、尺寸和工作区锚点对齐。
+- WindowWait 超时返回 nil；WindowWaitClosed 超时返回 false；两者都响应 Stop 取消。窗口引用在每轮 worker 结束时清除。
+- SetWinEventHook 跟踪 EVENT_OBJECT_DESTROY，并在每次调用前校验窗口句柄、PID、线程 ID、类名和进程启动时间；事件跟踪安装失败则拒绝创建引用，失效引用抛错，不重用旧句柄。
+- 不新增后台输入、控件读写、UI Automation、图像识别或 OCR；不绕过 UIPI/UAC/安全桌面。
+
+### 自动化测试与初轮 CI
+- 新增 CoordinateSystemTests，覆盖负屏幕坐标、window/client 原点差异、九宫格锚点、ratio 正反向和越界、物理像素取整、工作区对齐及无效几何。
+- Lua API 注册表新增 18 个窗口/坐标 API，API version 0.3；旧 22 个函数不变。Lua API 测试检查公开全局绑定、隐藏内部桥接名和 Lua 表返回。
+- 初轮 Windows Actions run 43299445160（commit 3479491d3e9f3c16dcab8f78399a5811f73f9fe1）：Restore PASS；Release Build PASS（0 warnings / 0 errors）；Tests 60 passed / 1 failed / 0 skipped。唯一失败是 ManualGeneratedRegionMatchesCatalog：代码注册表已升级为 40 个函数，而本次代码提交尚未包含同步更新的函数手册生成区块；并非编译或坐标/窗口测试失败。API handbook check、publish 和打包步骤因 Test 失败而跳过，须在手册同步提交后重新跑完整 workflow。
+- 当前执行容器未安装 .NET SDK，本地 Restore/Build/Test 均 NOT RUN。Windows 桌面 DPI、多显示器、UIPI、窗口销毁和窗口实际操作验收也均 NOT RUN。
+
+### 当前限制与完成门槛
+- M5 录制数据模型尚未自动把窗口引用/坐标空间写入新动作，M6 不擅自重写录制器。
+- 当前使用 Win32 顶层/子窗口枚举和基本窗口元数据；不读取或设置标准控件内容，也不执行后台输入。
+- 完整 CI（Build/Test/API handbook check/win-x64 publish/ZIP/SHA256/artifact）通过后，M6 代码阶段才记为 DONE；Windows 桌面手工验收继续单独保留 NOT RUN。
+- 预览版 v0.1.0-preview.4 未更新，本阶段不创建 Release。
 
 ## M3–M7 — IDE、调试、录制、坐标与窗口
 

@@ -467,6 +467,398 @@ RandomDelay(100, 300)
 Log("本轮完成")
 ```
 
+### 2.4 窗口与坐标
+
+#### `WindowFind(titleContains?, className?, processName?, processId?, visibleOnly?)` — 查找窗口
+
+- **稳定 ID：** `anjian.window.window-find`
+- **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
+- **说明：** 按标题包含、窗口类名精确值、进程名、PID 和可见状态筛选顶层窗口，返回第一个匹配的安全窗口引用；未命中返回 nil。
+
+| 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
+|---|---|---|---|---|---|
+| `titleContains` | `string` | 否 | `` | — | 标题包含匹配；空字符串表示不筛选。 |
+| `className` | `string` | 否 | `` | — | 窗口类名精确匹配；空字符串表示不筛选。 |
+| `processName` | `string` | 否 | `` | — | 进程名匹配，可省略 .exe；空字符串表示不筛选。 |
+| `processId` | `integer` | 否 | `0` | 0–2147483647 | Windows 进程 ID；0 表示不筛选。 |
+| `visibleOnly` | `boolean` | 否 | `true` | — | true 仅返回可见窗口；false 同时包括隐藏窗口。 |
+
+**返回值：** `table\|nil` — 窗口信息表；未在超时内找到时返回 nil。id 是本次脚本运行内有效的不透明字符串引用。
+**错误：** 筛选参数、ID、超时或坐标不合法时产生 Lua 错误。；无法访问或窗口在调用期间销毁时返回可定位错误；不会重用失效引用。
+**执行/取消语义：** 在执行器命令边界遵循暂停状态；等待操作期间响应暂停/停止。 等待操作响应统一停止令牌；停止会终止 worker，窗口等待取消后不保留后台任务。
+**坐标/权限：** 坐标空间：none。仅枚举当前交互桌面可见的 Win32 顶层窗口；不绕过 UIPI/UAC/安全桌面。
+
+**示例：**
+```lua
+local w = WindowFind("记事本", "", "", 0, true)\nif w then WindowActivate(w.id) end
+```
+
+#### `WindowEnumerate(titleContains?, className?, processName?, processId?, visibleOnly?)` — 枚举窗口
+
+- **稳定 ID：** `anjian.window.window-enumerate`
+- **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
+- **说明：** 按筛选条件返回最多 512 个匹配的顶层窗口信息表，每项包含不透明 ID、标题、类名、进程、显示状态、前台/焦点标志和外框/客户区矩形。
+
+| 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
+|---|---|---|---|---|---|
+| `titleContains` | `string` | 否 | `` | — | 标题包含匹配；空字符串表示不筛选。 |
+| `className` | `string` | 否 | `` | — | 窗口类名精确匹配；空字符串表示不筛选。 |
+| `processName` | `string` | 否 | `` | — | 进程名匹配，可省略 .exe；空字符串表示不筛选。 |
+| `processId` | `integer` | 否 | `0` | 0–2147483647 | Windows 进程 ID；0 表示不筛选。 |
+| `visibleOnly` | `boolean` | 否 | `true` | — | true 仅返回可见窗口；false 同时包括隐藏窗口。 |
+
+**返回值：** `table` — 从 1 开始索引的窗口信息数组；无匹配时为空表。
+**错误：** 筛选参数、ID、超时或坐标不合法时产生 Lua 错误。；无法访问或窗口在调用期间销毁时返回可定位错误；不会重用失效引用。
+**执行/取消语义：** 在执行器命令边界遵循暂停状态；等待操作期间响应暂停/停止。 等待操作响应统一停止令牌；停止会终止 worker，窗口等待取消后不保留后台任务。
+**坐标/权限：** 坐标空间：none。只查询顶层窗口元数据；不读取或操作控件内容。枚举上限 512。
+
+**示例：**
+```lua
+local windows = WindowEnumerate("", "", "notepad", 0, true)\nfor i, w in ipairs(windows) do Log(w.title) end
+```
+
+#### `WindowEnumerateChildren(id)` — 枚举子窗口
+
+- **稳定 ID：** `anjian.window.window-enumerate-children`
+- **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
+- **说明：** 枚举指定窗口下的全部子窗口后代（包括多层嵌套），最多 512 个；不提供控件读写或后台输入能力。
+
+| 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
+|---|---|---|---|---|---|
+| `id` | `string` | 是 | — | — | 由 WindowFind/WindowEnumerate 返回的窗口引用 ID。 |
+
+**返回值：** `table` — 子窗口信息数组；不包含父窗口本身。
+**错误：** 窗口 ID 无效、过期或父窗口已关闭时产生 Lua 错误。；子窗口在枚举期间销毁时跳过该条目。
+**执行/取消语义：** 在执行器命令边界遵循暂停状态；等待操作期间响应暂停/停止。 等待操作响应统一停止令牌；停止会终止 worker，窗口等待取消后不保留后台任务。
+**坐标/权限：** 坐标空间：none。仅枚举 Win32 子窗口层级与基本属性；不操作控件值，不绕过 UIPI/UAC。
+
+**示例：**
+```lua
+local w = WindowFind("记事本")\nif w then\n  local children = WindowEnumerateChildren(w.id)\nend
+```
+
+#### `WindowGetInfo(id)` — 读取窗口属性
+
+- **稳定 ID：** `anjian.window.window-get-info`
+- **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
+- **说明：** 读取当前安全窗口引用的实时元数据、外框与客户区物理矩形、显示状态、前台和键盘焦点状态。
+
+| 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
+|---|---|---|---|---|---|
+| `id` | `string` | 是 | — | — | 由窗口查找/枚举 API 返回的窗口引用 ID。 |
+
+**返回值：** `table` — 包含 id/title/className/processId/processName/visible/minimized/maximized/foreground/focused/windowRect/clientRect/destroyTracking 的信息表。
+**错误：** 窗口 ID 无效、过期或句柄已销毁时产生 Lua 错误。
+**执行/取消语义：** 在执行器命令边界遵循暂停状态；等待操作期间响应暂停/停止。 等待操作响应统一停止令牌；停止会终止 worker，窗口等待取消后不保留后台任务。
+**坐标/权限：** 坐标空间：screen（矩形均为虚拟桌面物理像素）。只读取窗口基本元数据；窗口矩形为右/下边界不包含的矩形。
+
+**示例：**
+```lua
+local w = WindowFind("记事本")\nif w then local info = WindowGetInfo(w.id); Log(info.title) end
+```
+
+#### `WindowActivate(id)` — 激活窗口
+
+- **稳定 ID：** `anjian.window.window-activate`
+- **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
+- **说明：** 恢复并请求将目标窗口置于前台；Windows 可能基于前台锁定策略拒绝。
+
+| 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
+|---|---|---|---|---|---|
+| `id` | `string` | 是 | — | — | 窗口引用 ID。 |
+
+**返回值：** `boolean` — 操作请求成功返回 true；Windows 拒绝或窗口已失效时产生错误。
+**错误：** 参数类型、整数性或范围不合法时产生 Lua 错误。；目标窗口关闭、权限不足或 Windows API 调用失败时报告执行错误。
+**执行/取消语义：** 在执行器命令边界遵循暂停状态；等待操作期间响应暂停/停止。 等待操作响应统一停止令牌；停止会终止 worker，窗口等待取消后不保留后台任务。
+**坐标/权限：** 坐标空间：none。通过标准 Win32 窗口 API 请求操作；不保证应用接受激活请求，不提升权限、不绕过安全桌面。
+
+**示例：**
+```lua
+local w = WindowFind("目标窗口")\nif w then WindowActivate(w.id) end
+```
+
+#### `WindowShow(id)` — 显示窗口
+
+- **稳定 ID：** `anjian.window.window-show`
+- **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
+- **说明：** 显示目标窗口。
+
+| 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
+|---|---|---|---|---|---|
+| `id` | `string` | 是 | — | — | 窗口引用 ID。 |
+
+**返回值：** `boolean` — 操作请求成功返回 true；Windows 拒绝或窗口已失效时产生错误。
+**错误：** 参数类型、整数性或范围不合法时产生 Lua 错误。；目标窗口关闭、权限不足或 Windows API 调用失败时报告执行错误。
+**执行/取消语义：** 在执行器命令边界遵循暂停状态；等待操作期间响应暂停/停止。 等待操作响应统一停止令牌；停止会终止 worker，窗口等待取消后不保留后台任务。
+**坐标/权限：** 坐标空间：none。通过标准 Win32 窗口 API 请求操作；不保证应用接受激活请求，不提升权限、不绕过安全桌面。
+
+**示例：**
+```lua
+local w = WindowFind("目标窗口")\nif w then WindowShow(w.id) end
+```
+
+#### `WindowHide(id)` — 隐藏窗口
+
+- **稳定 ID：** `anjian.window.window-hide`
+- **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
+- **说明：** 隐藏目标窗口。
+
+| 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
+|---|---|---|---|---|---|
+| `id` | `string` | 是 | — | — | 窗口引用 ID。 |
+
+**返回值：** `boolean` — 操作请求成功返回 true；Windows 拒绝或窗口已失效时产生错误。
+**错误：** 参数类型、整数性或范围不合法时产生 Lua 错误。；目标窗口关闭、权限不足或 Windows API 调用失败时报告执行错误。
+**执行/取消语义：** 在执行器命令边界遵循暂停状态；等待操作期间响应暂停/停止。 等待操作响应统一停止令牌；停止会终止 worker，窗口等待取消后不保留后台任务。
+**坐标/权限：** 坐标空间：none。通过标准 Win32 窗口 API 请求操作；不保证应用接受激活请求，不提升权限、不绕过安全桌面。
+
+**示例：**
+```lua
+local w = WindowFind("目标窗口")\nif w then WindowHide(w.id) end
+```
+
+#### `WindowMinimize(id)` — 最小化窗口
+
+- **稳定 ID：** `anjian.window.window-minimize`
+- **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
+- **说明：** 最小化目标窗口。
+
+| 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
+|---|---|---|---|---|---|
+| `id` | `string` | 是 | — | — | 窗口引用 ID。 |
+
+**返回值：** `boolean` — 操作请求成功返回 true；Windows 拒绝或窗口已失效时产生错误。
+**错误：** 参数类型、整数性或范围不合法时产生 Lua 错误。；目标窗口关闭、权限不足或 Windows API 调用失败时报告执行错误。
+**执行/取消语义：** 在执行器命令边界遵循暂停状态；等待操作期间响应暂停/停止。 等待操作响应统一停止令牌；停止会终止 worker，窗口等待取消后不保留后台任务。
+**坐标/权限：** 坐标空间：none。通过标准 Win32 窗口 API 请求操作；不保证应用接受激活请求，不提升权限、不绕过安全桌面。
+
+**示例：**
+```lua
+local w = WindowFind("目标窗口")\nif w then WindowMinimize(w.id) end
+```
+
+#### `WindowMaximize(id)` — 最大化窗口
+
+- **稳定 ID：** `anjian.window.window-maximize`
+- **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
+- **说明：** 最大化目标窗口。
+
+| 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
+|---|---|---|---|---|---|
+| `id` | `string` | 是 | — | — | 窗口引用 ID。 |
+
+**返回值：** `boolean` — 操作请求成功返回 true；Windows 拒绝或窗口已失效时产生错误。
+**错误：** 参数类型、整数性或范围不合法时产生 Lua 错误。；目标窗口关闭、权限不足或 Windows API 调用失败时报告执行错误。
+**执行/取消语义：** 在执行器命令边界遵循暂停状态；等待操作期间响应暂停/停止。 等待操作响应统一停止令牌；停止会终止 worker，窗口等待取消后不保留后台任务。
+**坐标/权限：** 坐标空间：none。通过标准 Win32 窗口 API 请求操作；不保证应用接受激活请求，不提升权限、不绕过安全桌面。
+
+**示例：**
+```lua
+local w = WindowFind("目标窗口")\nif w then WindowMaximize(w.id) end
+```
+
+#### `WindowRestore(id)` — 还原窗口
+
+- **稳定 ID：** `anjian.window.window-restore`
+- **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
+- **说明：** 将目标窗口还原为非最小化/最大化状态。
+
+| 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
+|---|---|---|---|---|---|
+| `id` | `string` | 是 | — | — | 窗口引用 ID。 |
+
+**返回值：** `boolean` — 操作请求成功返回 true；Windows 拒绝或窗口已失效时产生错误。
+**错误：** 参数类型、整数性或范围不合法时产生 Lua 错误。；目标窗口关闭、权限不足或 Windows API 调用失败时报告执行错误。
+**执行/取消语义：** 在执行器命令边界遵循暂停状态；等待操作期间响应暂停/停止。 等待操作响应统一停止令牌；停止会终止 worker，窗口等待取消后不保留后台任务。
+**坐标/权限：** 坐标空间：none。通过标准 Win32 窗口 API 请求操作；不保证应用接受激活请求，不提升权限、不绕过安全桌面。
+
+**示例：**
+```lua
+local w = WindowFind("目标窗口")\nif w then WindowRestore(w.id) end
+```
+
+#### `WindowSetTopmost(id, enabled?)` — 设置窗口置顶
+
+- **稳定 ID：** `anjian.window.window-set-topmost`
+- **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
+- **说明：** 将目标窗口设为置顶或取消置顶。
+
+| 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
+|---|---|---|---|---|---|
+| `id` | `string` | 是 | — | — | 窗口引用 ID。 |
+| `enabled` | `boolean` | 否 | `true` | — | true 为置顶，false 为取消置顶。 |
+
+**返回值：** `boolean` — 操作请求成功返回 true；Windows API 调用失败时产生错误。
+**错误：** 参数类型、整数性或范围不合法时产生 Lua 错误。；目标窗口关闭、权限不足或 Windows API 调用失败时报告执行错误。
+**执行/取消语义：** 在执行器命令边界遵循暂停状态；等待操作期间响应暂停/停止。 等待操作响应统一停止令牌；停止会终止 worker，窗口等待取消后不保留后台任务。
+**坐标/权限：** 坐标空间：none。只调整窗口 Z 顺序，不改变权限或桌面隔离。
+
+**示例：**
+```lua
+local w = WindowFind("目标窗口")\nif w then WindowSetTopmost(w.id, true) end
+```
+
+#### `WindowMove(id, x, y)` — 移动窗口
+
+- **稳定 ID：** `anjian.window.window-move`
+- **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
+- **说明：** 将目标窗口外框左上角移动到虚拟桌面屏幕绝对物理像素坐标；允许负坐标。
+
+| 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
+|---|---|---|---|---|---|
+| `id` | `string` | 是 | — | — | 窗口引用 ID。 |
+| `x` | `integer` | 是 | — | -2147483648–2147483647 物理像素 | 屏幕物理像素 X 坐标；允许负值。 |
+| `y` | `integer` | 是 | — | -2147483648–2147483647 物理像素 | 屏幕物理像素 Y 坐标；允许负值。 |
+
+**返回值：** `boolean` — 操作请求成功返回 true。
+**错误：** 参数类型、整数性或范围不合法时产生 Lua 错误。；目标窗口关闭、权限不足或 Windows API 调用失败时报告执行错误。
+**执行/取消语义：** 在执行器命令边界遵循暂停状态；等待操作期间响应暂停/停止。 等待操作响应统一停止令牌；停止会终止 worker，窗口等待取消后不保留后台任务。
+**坐标/权限：** 坐标空间：screen（窗口外框左上角的虚拟桌面绝对物理像素）。使用标准 SetWindowPos；目标窗口可拒绝/约束位置，系统权限和桌面会话受 Windows 限制。
+
+**示例：**
+```lua
+local w = WindowFind("目标窗口")\nif w then WindowMove(w.id, -1200, 100) end
+```
+
+#### `WindowResize(id, width, height)` — 调整窗口大小
+
+- **稳定 ID：** `anjian.window.window-resize`
+- **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
+- **说明：** 调整目标窗口外框宽度和高度，单位为物理像素。
+
+| 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
+|---|---|---|---|---|---|
+| `id` | `string` | 是 | — | — | 窗口引用 ID。 |
+| `width` | `integer` | 是 | — | 1–32768 物理像素 | 外框宽度，1 到 32768 物理像素。 |
+| `height` | `integer` | 是 | — | 1–32768 物理像素 | 外框高度，1 到 32768 物理像素。 |
+
+**返回值：** `boolean` — 操作请求成功返回 true。
+**错误：** 参数类型、整数性或范围不合法时产生 Lua 错误。；目标窗口关闭、权限不足或 Windows API 调用失败时报告执行错误。
+**执行/取消语义：** 在执行器命令边界遵循暂停状态；等待操作期间响应暂停/停止。 等待操作响应统一停止令牌；停止会终止 worker，窗口等待取消后不保留后台任务。
+**坐标/权限：** 坐标空间：screen（物理像素尺寸）。使用标准 SetWindowPos；目标窗口可能具有最小/最大尺寸约束。
+
+**示例：**
+```lua
+local w = WindowFind("目标窗口")\nif w then WindowResize(w.id, 1280, 800) end
+```
+
+#### `WindowAlign(id, anchor?, offsetX?, offsetY?)` — 窗口锚点对齐
+
+- **稳定 ID：** `anjian.window.window-align`
+- **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
+- **说明：** 将窗口指定锚点对齐到窗口所在显示器的工作区同名锚点，可叠加物理像素偏移。
+
+| 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
+|---|---|---|---|---|---|
+| `id` | `string` | 是 | — | — | 窗口引用 ID。 |
+| `anchor` | `string` | 否 | `center` | — | top-left/top-center/top-right/center-left/center/center-right/bottom-left/bottom-center/bottom-right。 |
+| `offsetX` | `integer` | 否 | `0` | -2147483648–2147483647 物理像素 | 水平物理像素偏移。 |
+| `offsetY` | `integer` | 否 | `0` | -2147483648–2147483647 物理像素 | 垂直物理像素偏移。 |
+
+**返回值：** `boolean` — 操作请求成功返回 true。
+**错误：** 参数类型、整数性或范围不合法时产生 Lua 错误。；目标窗口关闭、权限不足或 Windows API 调用失败时报告执行错误。
+**执行/取消语义：** 在执行器命令边界遵循暂停状态；等待操作期间响应暂停/停止。 等待操作响应统一停止令牌；停止会终止 worker，窗口等待取消后不保留后台任务。
+**坐标/权限：** 坐标空间：screen（显示器工作区物理像素）。依据目标窗口所在显示器的工作区，不遮挡系统任务栏；多显示器使用目标窗口最近显示器。
+
+**示例：**
+```lua
+local w = WindowFind("目标窗口")\nif w then WindowAlign(w.id, "center", 0, 0) end
+```
+
+#### `WindowWait(titleContains?, className?, processName?, processId?, visibleOnly?, timeoutMs?)` — 等待窗口出现
+
+- **稳定 ID：** `anjian.window.window-wait`
+- **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
+- **说明：** 按筛选条件轮询等待窗口出现，使用单调时钟计算超时；返回匹配信息表，超时返回 nil，停止请求抛出取消结果。
+
+| 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
+|---|---|---|---|---|---|
+| `titleContains` | `string` | 否 | `` | — | 标题包含匹配；空字符串表示不筛选。 |
+| `className` | `string` | 否 | `` | — | 窗口类名精确匹配；空字符串表示不筛选。 |
+| `processName` | `string` | 否 | `` | — | 进程名匹配，可省略 .exe；空字符串表示不筛选。 |
+| `processId` | `integer` | 否 | `0` | 0–2147483647 | Windows 进程 ID；0 表示不筛选。 |
+| `visibleOnly` | `boolean` | 否 | `true` | — | true 仅返回可见窗口；false 同时包括隐藏窗口。 |
+| `timeoutMs` | `integer` | 否 | `30000` | 0–600000 毫秒 | 等待超时，0 立即检查一次，最大 600000 毫秒。 |
+
+**返回值：** `table\|nil` — 出现时返回窗口信息表；超时返回 nil；取消会终止当前脚本。
+**错误：** 超时超出 0 到 600000 毫秒或筛选参数非法时产生 Lua 错误。；停止操作返回 Cancelled，不吞掉为 nil。
+**执行/取消语义：** 在执行器命令边界遵循暂停状态；等待操作期间响应暂停/停止。 等待操作响应统一停止令牌；停止会终止 worker，窗口等待取消后不保留后台任务。
+**坐标/权限：** 坐标空间：none。轮询当前交互桌面顶层窗口；不等待安全桌面或其他用户会话。
+
+**示例：**
+```lua
+local w = WindowWait("记事本", "", "", 0, true, 10000)\nif w then Log(w.title) end
+```
+
+#### `WindowWaitClosed(id, timeoutMs?)` — 等待窗口关闭
+
+- **稳定 ID：** `anjian.window.window-wait-closed`
+- **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
+- **说明：** 等待指定窗口引用所指窗口关闭；关闭/销毁返回 true，超时返回 false，停止请求抛出取消结果。
+
+| 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
+|---|---|---|---|---|---|
+| `id` | `string` | 是 | — | — | 窗口引用 ID。 |
+| `timeoutMs` | `integer` | 否 | `30000` | 0–600000 毫秒 | 等待超时，最大 600000 毫秒。 |
+
+**返回值：** `boolean` — 窗口关闭返回 true；超时仍存在返回 false。
+**错误：** 窗口引用不存在时产生 Lua 错误。；停止操作返回 Cancelled，不吞掉为 false。
+**执行/取消语义：** 在执行器命令边界遵循暂停状态；等待操作期间响应暂停/停止。 等待操作响应统一停止令牌；停止会终止 worker，窗口等待取消后不保留后台任务。
+**坐标/权限：** 坐标空间：none。只检测本次运行所引用的窗口，不尝试关闭窗口。
+
+**示例：**
+```lua
+local w = WindowFind("记事本")\nif w then WindowWaitClosed(w.id, 30000) end
+```
+
+#### `CoordinateToScreen(id, space, x, y, anchor?)` — 转换到屏幕坐标
+
+- **稳定 ID：** `anjian.window.coordinate-to-screen`
+- **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
+- **说明：** 将指定窗口/客户区/锚点/归一化坐标转换为虚拟桌面物理像素坐标。
+
+| 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
+|---|---|---|---|---|---|
+| `id` | `string` | 是 | — | — | 窗口引用 ID；screen 模式亦要求有效引用以保证调用窗口状态明确。 |
+| `space` | `string` | 是 | — | 固定值：screen、window、client、anchor、ratio | screen/window/client/anchor/ratio。 |
+| `x` | `number` | 是 | — | — | X 坐标；物理空间为像素，ratio 空间为 0 到 1。 |
+| `y` | `number` | 是 | — | — | Y 坐标；物理空间为像素，ratio 空间为 0 到 1。 |
+| `anchor` | `string` | 否 | `top-left` | — | anchor 模式采用的窗口锚点。 |
+
+**返回值：** `table` — 返回包含 x、y 的坐标表，坐标以物理屏幕像素或所选空间单位表示。
+**错误：** 窗口引用失效、空间名称非法、坐标非有限数值或 ratio 输入超出 0 到 1 时产生 Lua 错误。
+**执行/取消语义：** 在执行器命令边界遵循暂停状态；等待操作期间响应暂停/停止。 等待操作响应统一停止令牌；停止会终止 worker，窗口等待取消后不保留后台任务。
+**坐标/权限：** 坐标空间：screen/window/client/anchor/ratio；window 使用外框左上；client/ratio 使用客户区；anchor 使用窗口外框九宫格。只执行物理坐标转换，不发送鼠标/键盘输入。窗口矩形来自当前 DPI-aware Win32 查询。
+
+**示例：**
+```lua
+local w = WindowFind("目标窗口")\nif w then\n  local p = CoordinateToScreen(w.id, "client", 100, 80)\n  Log(p.x .. "," .. p.y)\nend
+```
+
+#### `CoordinateFromScreen(id, space, x, y, anchor?)` — 从屏幕坐标转换
+
+- **稳定 ID：** `anjian.window.coordinate-from-screen`
+- **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
+- **说明：** 将虚拟桌面物理像素坐标反向转换为指定坐标空间。
+
+| 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
+|---|---|---|---|---|---|
+| `id` | `string` | 是 | — | — | 窗口引用 ID；screen 模式亦要求有效引用以保证调用窗口状态明确。 |
+| `space` | `string` | 是 | — | 固定值：screen、window、client、anchor、ratio | screen/window/client/anchor/ratio。 |
+| `x` | `number` | 是 | — | — | X 坐标；物理空间为像素，ratio 空间为 0 到 1。 |
+| `y` | `number` | 是 | — | — | Y 坐标；物理空间为像素，ratio 空间为 0 到 1。 |
+| `anchor` | `string` | 否 | `top-left` | — | anchor 模式采用的窗口锚点。 |
+
+**返回值：** `table` — 返回包含 x、y 的坐标表，坐标以物理屏幕像素或所选空间单位表示。
+**错误：** 窗口引用失效、空间名称非法、坐标非有限数值或 ratio 输入超出 0 到 1 时产生 Lua 错误。
+**执行/取消语义：** 在执行器命令边界遵循暂停状态；等待操作期间响应暂停/停止。 等待操作响应统一停止令牌；停止会终止 worker，窗口等待取消后不保留后台任务。
+**坐标/权限：** 坐标空间：screen/window/client/anchor/ratio；window 使用外框左上；client/ratio 使用客户区；anchor 使用窗口外框九宫格。只执行物理坐标转换，不发送鼠标/键盘输入。窗口矩形来自当前 DPI-aware Win32 查询。
+
+**示例：**
+```lua
+local w = WindowFind("目标窗口")\nif w then\n  local p = CoordinateFromScreen(w.id, "client", 100, 80)\n  Log(p.x .. "," .. p.y)\nend
+```
+
 <!-- END GENERATED API REFERENCE -->
 
 ## 3. 当前参数约定

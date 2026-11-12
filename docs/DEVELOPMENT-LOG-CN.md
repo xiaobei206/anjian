@@ -457,3 +457,21 @@ M4 基础调试器与 M5 可视化录制/动作列表均已完成 Windows CI 验
 - 本地执行容器没有 .NET SDK（dotnet --info 返回 command not found），本地 Restore/Build/Test：NOT RUN；Windows GitHub Actions 是实际构建/测试环境。
 - M1 Hook 实机可靠性，以及 M3/M4/M5 WinForms 桌面手工验收均 NOT RUN。Windows CI 不代表实机验收通过。
 
+## 2026-11-13 — M6 — 坐标系统与窗口自动化（代码已提交 main；完整 CI 待文档同步复测）
+
+### 实现内容
+- Core 新增 CoordinateSpace / WindowAnchor / PixelRect / WindowGeometry / CoordinateConverter：screen/window/client/anchor/ratio 五种空间、双向屏幕换算、九宫格锚点、客户区 ratio、物理像素取整及显示器工作区对齐算法。window 外框取 Win32 GetWindowRect（含标题栏/非客户区）；client 先经 ClientToScreen 取物理屏幕原点。
+- 保持旧 MoveTo(x, y) 完全不变：仍为虚拟桌面绝对物理像素，副屏负坐标合法；不把窗口相对坐标隐式注入旧 API。
+- 新增 WindowsWindowManager：顶层及全部子窗口后代枚举；标题包含、类名精确、进程名、PID、可见性筛选；元数据包括标题/类名/进程/外框/客户区/可见/最小化/最大化/前台/焦点。
+- 窗口操作支持激活、显示/隐藏、最小化/最大化/还原、置顶、Move、Resize、工作区九宫格 Align、等待出现/等待关闭；Find/Wait 命中返回表，Wait 超时 nil，WaitClosed 超时 false，Stop 可取消等待。
+- Worker IPC 对窗口命令使用 JSON；Lua API 返回 Lua 表而非裸 HWND。随机 GUID 引用只在本轮脚本运行有效；每轮 worker 结束清空引用。WinEvent destroy hook 标记句柄销毁，每次使用还校验 IsWindow、PID、线程 ID、类名与进程启动时间；hook 不可安装时拒绝引用，失效引用抛错。不绕过 UIPI/UAC/安全桌面。
+- API 注册表新增 18 项；公开 Lua API 从 22 项增至 40 项，API version 从 0.2 升到 0.3；原有 API 定义不变。新增 CoordinateSystemTests 和窗口 Lua API contract test。
+- 新增 M6-01 至 M6-10 桌面验收清单；当前全部 NOT RUN。
+
+### 提交与 Windows CI
+- M6 代码主体提交 main：3479491d3e9f3c16dcab8f78399a5811f73f9fe1（feat: add coordinate and window automation APIs）。
+- Windows Actions run 43299445160：[run 43299445160](https://github.com/xiaobei206/anjian/actions/runs/43299445160)。Restore PASS；Release Build PASS（0 warnings / 0 errors）；Core Tests 60 passed / 1 failed / 0 skipped。失败项唯一为 ManualGeneratedRegionMatchesCatalog：代码 registry 已登记 40 个函数，而代码提交时文档的生成区域还保留 22 个函数；这是在提交代码后单独同步文档之前发生的预期文档漂移。API handbook --check、win-x64 publish、ZIP/SHA256 和 artifact upload 由于 Test 失败被 workflow 跳过；手册同步后必须再跑完整 CI。
+- 上述 run 未报告坐标纯算法或 Lua API contract test 失败；60 项测试通过。但这不能证明 Win32 窗口管理的桌面行为正确。
+- 本地容器没有 .NET SDK，Restore/Build/Test：NOT RUN。Windows 桌面 M6-01..M6-10：NOT RUN；M1 Hook 与 M3/M4/M5 的桌面验收状态不变。
+- 未更新 VERSION/csproj 预览版本，未创建 Release；v0.1.0-preview.4 官方资产保持不变。
+

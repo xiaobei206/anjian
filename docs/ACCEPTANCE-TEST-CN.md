@@ -204,3 +204,27 @@ CI 自动化测试只验证数据模型、转换、生成、持久化和代码�
 ### M5 自动化测试范围
 
 tests/Anjian.Core.Tests/RecorderDocumentTests.cs 覆盖：原始事件排序与稳定 ID、保守 Down/Up 配对、hold/delay 分离、Move 造成的配对中断、重叠按键、滚轮/负坐标/source/flags、溢出计数、sidecar 文件名与 round-trip、未知 schema 原文件保护、超长延时拒绝、Lua 区块生成/执行、CRLF/LF 哈希、块外代码保留、手工改动/删除区块需要预览确认、取消不改脚本和 actionId 代码映射。自动化测试结果见 DEVELOPMENT-LOG-CN.md 与 SESSION-HANDOFF.md。
+
+## 12. M6 坐标系统与窗口自动化验收（main 开发版，尚未随 preview.4 发布）
+
+M6 自动化测试可以验证坐标纯计算、API 注册/包装和 IPC 数据契约；Windows 桌面窗口枚举、DPI、多屏、权限、WinEvent 销毁事件以及真实窗口操作必须在 Windows 10/11 实机执行。初始状态全部 NOT RUN；CI PASS 不得自动改为桌面 PASS。
+
+| ID | 场景 | 操作 | 通过标准 | 当前状态 |
+|---|---|---|---|---|
+| M6-01 | screen/window/client 双向转换 | 选定窗口，分别输入 screen/window/client 坐标，执行 CoordinateToScreen 与 CoordinateFromScreen | 结果互逆；window 原点为含标题栏/边框的外框左上；client 原点为客户区左上；屏幕负坐标保留 | NOT RUN（桌面） |
+| M6-02 | 九宫格锚点 | 分别使用 9 个 anchor，叠加正/负 offset | 锚点位置与窗口外框几何一致；移动/缩放窗口后重新查询矩形再转换，结果与新几何一致 | NOT RUN（桌面） |
+| M6-03 | ratio 归一化 | 用客户区 0/0、0.5/0.5、1/1 转换，再反向转换 | 左上、中心、右下边界一致；窗口外屏幕点反向转换可得到小于 0 或大于 1 的比例；ToScreen 越界输入报错 | NOT RUN（桌面） |
+| M6-04 | 混合 DPI / 多显示器 | 在 100/125/150/200% 缩放和横纵排列多屏环境下，包含副屏位于左侧/上方，移动、缩放、再换算 | 以物理像素为统一单位；无 DPI 虚拟化重复换算；窗口/客户区/屏幕往返误差不超过 1 px | NOT RUN（桌面） |
+| M6-05 | 窗口过滤与枚举 | 用标题片段、类名、进程名、PID、可见性分别筛选；枚举父窗口子窗口 | 过滤规则按文档执行；最多 512 项；标题/类名/进程/PID、显示状态、外框/客户区和前台/焦点字段准确 | NOT RUN（桌面） |
+| M6-06 | 窗口生命周期与布局操作 | 对测试窗口执行激活、显示/隐藏、最小化/最大化/还原、置顶开关、Move、Resize、九宫格 Align | 目标窗口正确变化；前台策略拒绝时 WindowActivate 返回 false；不抢占或关闭其他窗口 | NOT RUN（桌面） |
+| M6-07 | 等待/超时/取消 | 等待一个即将出现和一个不会出现的窗口；分别等待一个关闭/不关闭窗口；在等待过程中按 F12 | WindowWait 命中返回信息表、超时返回 nil；WindowWaitClosed 关闭返回 true、超时返回 false；停止及时取消且无遗留 worker | NOT RUN（桌面） |
+| M6-08 | HWND 销毁与复用保护 | 查找目标后关闭；再打开窗口触发系统句柄复用压力，尝试旧 ID 调用 | 旧 ID 一旦失效就报明确错误；不向新窗口发送操作；重新查找才可继续 | NOT RUN（桌面） |
+| M6-09 | 权限边界 | 普通权限控制普通权限窗口；尝试操作高完整性级别窗口及 UAC 安全桌面 | 如系统拒绝，返回真实失败/受限状态；不提权、不绕过 UIPI/UAC 或安全桌面 | NOT RUN（桌面） |
+| M6-10 | 旧 API / 录制回归 | 运行旧脚本 MoveTo(-120,450)，再移动窗口并运行 M5 已录制脚本 | MoveTo 始终按虚拟桌面绝对物理像素执行；M5 原始事件的 screen 坐标不被静默改写；旧函数名、参数、默认值不变 | NOT RUN（桌面） |
+
+### M6 自动化测试范围
+
+- CoordinateSystemTests：负坐标、window/client 不同原点、9 锚点、ratio 正反向与越界、浮点转物理像素、显示器工作区对齐、无效矩形。
+- LuaApiRegistryTests：18 个新函数注册、内部桥接隐藏、旧 MoveTo 绝对坐标语义、窗口数据表转 Lua 表、40 个函数生成手册一致性。
+- WindowsWindowManager 的实际 Win32 行为仍要求本节桌面测试；不能用跨平台 Core 单测或 GitHub Actions 构建替代。
+

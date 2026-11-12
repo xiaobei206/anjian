@@ -3,7 +3,7 @@
 > 这是当前运行时 API 契约与完整目标 API 设计的技术规格。当前函数与目标函数的状态以 [中文函数/参数参考手册](FUNCTION-REFERENCE-CN.md) 和 [完整功能矩阵](FEATURE-MATRIX-CN.md) 为准。
 
 - Lua 版本：5.4
-- API 版本：0.2（首版实现已接入；Lua 5.4 / 全局绑定 / 指令钩子已由 Windows CI 测试）
+- API 版本：0.3（M6 新增坐标与窗口管理函数；以 main 开发版为准，尚未发布到 preview.4）
 - 命令风格：全局英文函数名 + 标准 Lua 函数调用语法
 - 时间单位：毫秒
 - 坐标单位：虚拟桌面物理像素
@@ -115,25 +115,49 @@ end
 
 ### 5.1 当前已实现语义
 
-当前 preview.4 的 MoveTo(x, y) 只采用虚拟桌面绝对物理像素坐标。主屏左上角通常为 (0,0)；位于主屏左侧或上方的副屏允许出现负坐标。当前版本没有完整的窗口相对坐标 API。
+MoveTo(x, y) 的既有契约始终是虚拟桌面绝对物理像素。主屏左上角通常为 (0,0)；位于主屏左侧或上方的副屏允许出现负坐标。M6 新增的窗口与坐标函数不改变 MoveTo 的签名、参数或语义。
 
 录制、生成和回放必须使用一致的坐标语义；不得混用逻辑 DPI 坐标、单屏客户区坐标和虚拟桌面物理像素。
 
-### 5.2 完整产品目标坐标模型
+### 5.2 当前实现的坐标空间
 
-完整产品必须提供下列显式坐标空间：
+M6 已在 main 开发版提供以下显式坐标空间：
 
-- screen：虚拟桌面绝对物理像素，允许负坐标。
-- window：相对目标窗口外框左上角的偏移，外框是否包含标题栏/边框按规范固定。
-- client：相对目标窗口客户区左上角的偏移。
-- anchor：相对窗口指定锚点（左上、上中、右上、左中、中心、右中、左下、下中、右下）的偏移。
-- ratio：相对目标窗口客户区宽高归一化的比例坐标。
+- `screen`：虚拟桌面绝对物理像素，允许副屏负坐标。
+- `window`：相对目标窗口外框左上角；外框采用 Win32 GetWindowRect，包含标题栏与非客户区。
+- `client`：相对客户区左上角；通过 ClientToScreen 转为屏幕物理像素，不含标题栏和边框。
+- `anchor`：相对窗口外框九宫格锚点（top-left、top-center、top-right、center-left、center、center-right、bottom-left、bottom-center、bottom-right）的偏移。
+- `ratio`：相对客户区宽高的归一化坐标，(0,0) 到 (1,1) 对应客户区左上至右下边界。
 
-目标 API 应提供窗口/客户区/屏幕的双向换算、窗口移动/缩放后的重新定位和显示 DPI 感知。实现时可采用明确的独立函数或每次调用显式坐标空间；默认 MoveTo(x, y) 的现有 screen 语义必须保持不变。
+统一转换单位为 Windows Per-Monitor-V2 感知进程下的物理像素。矩形采用左/上包含、右/下不包含约定；比率 ToScreen 输入限制在闭区间 0–1，反向转换保留窗口外的负数或大于 1 的比例，便于判断越界。物理像素转换最终取整时使用四舍五入、半值远离 0。
 
-### 5.3 录制与回放要求
+通过 `CoordinateToScreen(id, space, x, y, anchor?)` 与 `CoordinateFromScreen(id, space, x, y, anchor?)` 执行双向转换；`id` 必须是当前运行内有效的安全窗口引用。`anchor` 只在 `space="anchor"` 时使用。
 
-录制动作应记录坐标空间、目标窗口引用（如适用）、窗口/显示器快照和必要的 DPI 信息。重放时若窗口关闭或目标丢失，必须报告可定位的错误或按脚本设置的失败策略处理，不得将旧窗口坐标直接应用到不相关窗口。坐标换算成功并不意味着后台输入也一定成功；后台输入有独立的后端能力与权限契约。
+### 5.3 当前实现的窗口 API
+
+窗口引用是随机不透明字符串，不向 Lua 暴露原始 HWND。`WindowFind` / `WindowEnumerate` 支持标题包含匹配、类名精确匹配、进程名、PID 和可见性筛选；`WindowEnumerateChildren(id)` 枚举目标窗口的所有子窗口后代（最多 512 项）。`WindowGetInfo(id)` 返回标题、类名、进程、可见/最小化/最大化、前台/焦点标志、外框矩形、客户区屏幕矩形和销毁跟踪状态。
+
+窗口操作函数：
+
+| API | 行为 |
+|---|---|
+| `WindowActivate(id)` | 还原并请求前台激活；Windows 前台锁定策略可能拒绝，返回 false |
+| `WindowShow(id)` / `WindowHide(id)` | 显示/隐藏 |
+| `WindowMinimize(id)` / `WindowMaximize(id)` / `WindowRestore(id)` | 最小化、最大化、还原 |
+| `WindowSetTopmost(id, enabled?)` | 置顶或取消置顶 |
+| `WindowMove(id, x, y)` | 按屏幕物理像素移动窗口外框左上角，允许负坐标 |
+| `WindowResize(id, width, height)` | 调整窗口外框物理像素宽高（1–32768） |
+| `WindowAlign(id, anchor?, offsetX?, offsetY?)` | 在目标窗口所在显示器的工作区按九宫格锚点对齐，可加偏移 |
+| `WindowWait(..., timeoutMs?)` | 等待窗口出现；超时返回 nil，默认 30000ms，最大 600000ms |
+| `WindowWaitClosed(id, timeoutMs?)` | 等待窗口关闭；关闭返回 true，超时返回 false |
+
+`WindowFind`/`WindowWait` 未命中返回 `nil`。窗口枚举最多 512 个结果。窗口引用只在当前脚本运行期间有效；每轮脚本结束均清空引用。目标窗口销毁事件由 `SetWinEventHook(EVENT_OBJECT_DESTROY)` 跟踪，并在每次操作前再校验 HWND、PID、线程 ID、类名和进程启动时间。若销毁事件跟踪无法安装则拒绝建立引用；引用失效时抛出错误，要求重新查找，避免旧 HWND 被复用后误操作。`WindowWait` 的取消由脚本停止令牌终止，不会把取消伪装成超时。
+
+这些函数仅处理当前交互桌面的 Win32 窗口元数据与窗口布局；不读取/设置控件值、不提供后台输入、不绕过 UIPI/UAC 或安全桌面，也不承诺跨用户会话访问。Windows 实机 DPI、多显示器和权限验收仍需单独进行。
+
+### 5.4 录制与回放要求
+
+录制动作可保留坐标空间、目标窗口引用和必要的几何快照；当前 M6 未把 M5 原始录制器自动转换成窗口相对动作。窗口坐标转换成功并不意味着后台输入也一定成功；后台输入是后续阶段的独立能力和权限契约。
 
 ## 6. 返回值与错误契约
 
@@ -154,7 +178,7 @@ end
 
 ## 8. API 注册与兼容
 
-- 唯一机器可读来源：`src/Anjian.Core/Api/lua-api-registry.json`，登记 22 个当前公开函数的稳定 ID、分类、签名、参数 schema、默认值/范围、返回值/错误、暂停/取消、坐标/权限、示例、实现状态和版本。
+- 唯一机器可读来源：`src/Anjian.Core/Api/lua-api-registry.json`，登记 40 个当前公开函数的稳定 ID、分类、签名、参数 schema、默认值/范围、返回值/错误、暂停/取消、坐标/权限、示例、实现状态和版本。
 - `Anjian.Core.Api.LuaApiRuntime` 从该注册表生成 Lua 全局包装；内部 `__...` 桥接绑定在包装闭包建立后隐藏。
 - `docs/FUNCTION-REFERENCE-CN.md` 第 2 节由 `tools/Anjian.ApiDocsGenerator` 生成；使用 `--write` 更新，`--check` 验证是否漂移。
 - 注册表只包含真实当前实现。窗口、图色、OCR 等候选仍在目标设计区，不会被标记为当前可用。
