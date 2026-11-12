@@ -18,10 +18,15 @@ internal sealed class LuaEditorControl : UserControl
     private bool _formatting;
     private int _textVersion;
     private IReadOnlyList<LuaApiCompletion> _completions = [];
+    private readonly HashSet<int> _breakpointLines = [];
+    private int? _currentExecutionLine;
 
     public RichTextBox TextBox => _editor;
+    public int CaretLine => _editor.GetLineFromCharIndex(_editor.SelectionStart) + 1;
+    public IReadOnlyCollection<int> BreakpointLines => _breakpointLines.Order().ToArray();
 
     public event EventHandler? ContentChanged;
+    public event Action<int>? BreakpointToggled;
 
     public LuaEditorControl(LuaApiRegistry registry)
     {
@@ -29,9 +34,10 @@ internal sealed class LuaEditorControl : UserControl
         BackColor = Color.White;
 
         _gutter.Dock = DockStyle.Left;
-        _gutter.Width = 48;
+        _gutter.Width = 58;
         _gutter.BackColor = Color.FromArgb(245, 247, 250);
         _gutter.Paint += PaintLineNumbers;
+        _gutter.MouseClick += ToggleBreakpointAtPoint;
 
         _editor.Dock = DockStyle.Fill;
         _editor.Font = new Font("Consolas", 10.5F);
@@ -310,6 +316,38 @@ internal sealed class LuaEditorControl : UserControl
         _gutter.Invalidate();
     }
 
+    public void SetBreakpoints(IEnumerable<int> lines)
+    {
+        ArgumentNullException.ThrowIfNull(lines);
+        _breakpointLines.Clear();
+        foreach (var line in lines.Where(line => line > 0))
+            _breakpointLines.Add(line);
+        _gutter.Invalidate();
+    }
+
+    public void SetCurrentExecutionLine(int? line)
+    {
+        _currentExecutionLine = line is > 0 ? line : null;
+        _gutter.Invalidate();
+    }
+
+    private void ToggleBreakpointAtPoint(object? sender, MouseEventArgs e)
+    {
+        if (e.Button != MouseButtons.Left || e.X >= 20)
+            return;
+
+        var charIndex = _editor.GetCharIndexFromPosition(new Point(0, e.Y));
+        if (charIndex < 0)
+            return;
+
+        var line = _editor.GetLineFromCharIndex(charIndex) + 1;
+        if (!_breakpointLines.Add(line))
+            _breakpointLines.Remove(line);
+
+        _gutter.Invalidate();
+        BreakpointToggled?.Invoke(line);
+    }
+
     private void PaintLineNumbers(object? sender, PaintEventArgs e)
     {
         var firstChar = _editor.GetCharIndexFromPosition(new Point(0, 0));
@@ -325,9 +363,27 @@ internal sealed class LuaEditorControl : UserControl
                 break;
 
             var point = _editor.GetPositionFromCharIndex(charIndex);
-            var text = (line + 1).ToString(System.Globalization.CultureInfo.InvariantCulture);
+            var lineNumber = line + 1;
+            if (_breakpointLines.Contains(lineNumber))
+            {
+                using var breakpointBrush = new SolidBrush(Color.FromArgb(190, 48, 55));
+                e.Graphics.FillEllipse(breakpointBrush, 4, point.Y + 5, 11, 11);
+            }
+
+            if (_currentExecutionLine == lineNumber)
+            {
+                using var currentBrush = new SolidBrush(Color.FromArgb(225, 145, 35));
+                e.Graphics.FillPolygon(currentBrush,
+                [
+                    new Point(3, point.Y + 3),
+                    new Point(14, point.Y + 9),
+                    new Point(3, point.Y + 15)
+                ]);
+            }
+
+            var text = lineNumber.ToString(System.Globalization.CultureInfo.InvariantCulture);
             TextRenderer.DrawText(e.Graphics, text, _editor.Font,
-                new Rectangle(0, point.Y, _gutter.Width - 8, _editor.Font.Height),
+                new Rectangle(18, point.Y, _gutter.Width - 23, _editor.Font.Height),
                 brush.Color, TextFormatFlags.Right | TextFormatFlags.NoPadding);
         }
     }
