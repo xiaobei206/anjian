@@ -83,6 +83,15 @@ public sealed class LuaEditorServiceTests
     }
 
     [Fact]
+    public void CompletionContextDetectsCommentsAndQuotedStrings()
+    {
+        Assert.True(LuaEditorService.IsCaretInCommentOrString("-- LeftClick", 11));
+        Assert.True(LuaEditorService.IsCaretInCommentOrString("Log(\"LeftClick", 14));
+        Assert.False(LuaEditorService.IsCaretInCommentOrString("Log(Left", 8));
+        Assert.False(LuaEditorService.IsCaretInCommentOrString("Log(\"Left\") -- tail", 10));
+    }
+
+    [Fact]
     public void PrefixExtractionStopsAtIdentifierBoundary()
     {
         Assert.Equal("MoveT", LuaEditorService.GetIdentifierPrefix("MoveT(1, 2)", 5));
