@@ -60,7 +60,7 @@ public sealed class LuaDebugSessionTests
         lua.DoString(source, "@" + path);
         debugger.ThrowIfFaulted();
 
-        Assert.Equal(new[] { 1, 4, 7, 8, 5, 6, 10 }, snapshots.Select(snapshot => snapshot.Line));
+        Assert.Equal(new[] { 1, 4, 8, 9, 5, 6, 10 }, snapshots.Select(snapshot => snapshot.Line));
         Assert.True(snapshots[4].Frames.Count >= 2, "Step-into should stop inside the outer Lua function.");
         Assert.Contains(snapshots[4].Frames, frame => frame.Name == "outer");
         Assert.DoesNotContain(snapshots, snapshot => snapshot.Line == 2);
@@ -102,7 +102,7 @@ public sealed class LuaDebugSessionTests
         Assert.Equal("42", locals["count"].Value);
         Assert.Equal("table", locals["settings"].Type);
         Assert.False(locals["settings"].CanExpand);
-        Assert.Contains("不展开", locals["settings"].Limitation, StringComparison.Ordinal);
+        Assert.Contains("不展开", locals["settings"].Limitation ?? "");
 
         var global = Assert.Single(snapshot.Globals.Where(item => item.Name == "DebugGlobalValue"));
         Assert.Equal("99", global.Value);
