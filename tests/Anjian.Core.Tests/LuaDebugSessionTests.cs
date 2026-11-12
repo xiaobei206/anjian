@@ -35,18 +35,22 @@ public sealed class LuaDebugSessionTests
         var commands = new Queue<LuaDebugCommand>([
             LuaDebugCommand.Continue,
             LuaDebugCommand.Continue,
+            LuaDebugCommand.Continue,
             LuaDebugCommand.StepInto,
             LuaDebugCommand.StepOver,
             LuaDebugCommand.StepOut,
             LuaDebugCommand.Continue
         ]);
         const string source = """
-            local function twice(value)
-                local doubled = value * 2
-                return doubled
+            local function inner(value)
+                return value + 1
+            end
+            local function outer(value)
+                local innerResult = inner(value)
+                return innerResult
             end
             local input = 21
-            local result = twice(input)
+            local result = outer(input)
             local final = result + 1
             """;
 
@@ -56,11 +60,12 @@ public sealed class LuaDebugSessionTests
         lua.DoString(source, "@" + path);
         debugger.ThrowIfFaulted();
 
-        Assert.Equal(new[] { 1, 5, 6, 2, 3, 7 }, snapshots.Select(snapshot => snapshot.Line));
-        Assert.True(snapshots[3].Frames.Count >= 2, "Step-into should stop inside the nested Lua function.");
-        Assert.Contains(snapshots[3].Frames, frame => frame.Name == "twice");
-        Assert.Equal(1, snapshots[4].Frames.Count);
-        Assert.Equal(1, snapshots[5].Frames.Count);
+        Assert.Equal(new[] { 1, 4, 7, 8, 5, 6, 10 }, snapshots.Select(snapshot => snapshot.Line));
+        Assert.True(snapshots[4].Frames.Count >= 2, "Step-into should stop inside the outer Lua function.");
+        Assert.Contains(snapshots[4].Frames, frame => frame.Name == "outer");
+        Assert.DoesNotContain(snapshots, snapshot => snapshot.Line == 2);
+        Assert.Equal(2, snapshots[5].Frames.Count);
+        Assert.Single(snapshots[6].Frames);
     }
 
     [Fact]
