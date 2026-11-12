@@ -298,9 +298,9 @@ public static class LuaEditorService
             if (token.Kind != LuaEditorTokenKind.Operator)
                 continue;
 
-            if (text == "(")
+            if (text is "(" or "[" or "{")
                 nestedDepth++;
-            else if (text == ")")
+            else if (text is ")" or "]" or "}")
                 nestedDepth = Math.Max(0, nestedDepth - 1);
             else if (text == "," && nestedDepth == 0)
                 argumentIndex++;
