@@ -563,6 +563,17 @@ internal sealed class MainForm : Form
         if (_suppressTabSelection)
             return;
 
+        if (_recordSessionActive && _activeTab is not null &&
+            _editorTabs.SelectedTab?.Tag is ScriptTab recordingAlternative &&
+            !ReferenceEquals(recordingAlternative, _activeTab))
+        {
+            _suppressTabSelection = true;
+            _editorTabs.SelectedTab = _activeTab.Page;
+            _suppressTabSelection = false;
+            AppendLog("录制期间不能切换脚本标签，请先结束录制。");
+            return;
+        }
+
         if (_editorTabs.SelectedTab?.Tag is ScriptTab selected)
         {
             ActivateTab(selected);
@@ -624,6 +635,12 @@ internal sealed class MainForm : Form
 
     private void CloseCurrentTab()
     {
+        if (_recordSessionActive)
+        {
+            AppendLog("录制期间不能关闭脚本标签，请先结束录制。");
+            return;
+        }
+
         if (_activeTab is null || !SaveCurrent())
             return;
 
