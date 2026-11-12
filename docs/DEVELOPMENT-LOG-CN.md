@@ -258,7 +258,10 @@ TV-01：Lua 5.4 / .NET 10 绑定与中断机制 PoC。
 - 悬浮窗增加循环次数和轮间隔控件，并与主窗口 NumericUpDown 双向同步。
 - 自定义多尺寸 ICO 已提交到 `src/Anjian.App/Resources/Anjian2026.ico`；`ApplicationIcon` 已嵌入 EXE，主窗体、悬浮窗和 NotifyIcon 使用同一图标。
 - Windows CI run `43252971971` 和最新代码 run `43253075450` 均 SUCCESS；Restore/Build/7 项测试/Publish/ZIP/SHA256/Artifact upload 全部完成。
-- 正式 prerelease 尚待 release: commit；Windows 10/11 实机窗口、托盘和图标验收仍为 NOT RUN。
+- Release：<https://github.com/xiaobei206/anjian/releases/tag/v0.1.0-preview.4>。
+- Release workflow run `43253611158`：SUCCESS；Restore/Build/7 项测试/Publish/ZIP/SHA256/Upload/Release creation 全部成功。
+- ZIP：`Anjian2026-0.1.0-preview.4-win-x64.zip`，51,910,925 bytes；SHA256 `6b59ab27f825aa48b2ec5343cec826ad8b0ded759e9989af02d51f8b949f09aa`。
+- Windows 10/11 实机窗口、托盘和图标验收仍为 NOT RUN。
 
 ### 验证
 - 源码结构检查：已完成。

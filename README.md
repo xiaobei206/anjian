@@ -4,9 +4,10 @@ Windows 10/11 x64 桌面自动化工具，首版使用 WinForms + .NET 10 + Lua 
 
 ## 当前进度
 
-v0.1.0-preview.4 候选代码已通过 Windows CI（Build、7 项测试、自包含发布、ZIP/SHA256 均成功），正在执行正式 Release 发布流程。新版本修复了窗口互相替换的问题，并加入独立悬浮窗、系统托盘、自定义 EXE/托盘图标。Windows 实机手工验收仍待完成。
+v0.1.0-preview.4 已正式发布。Windows CI 的 Restore、Build、7 项测试、自包含发布、ZIP/SHA256 和 GitHub Release 创建全部成功。preview.4 加入独立悬浮窗、系统托盘生命周期、悬浮窗循环设置和自定义 EXE/托盘图标。注意：窗口/托盘功能仍需 Windows 10/11 实机手工验收。
 
-下载入口：[v0.1.0-preview.3 正式预览版](https://github.com/xiaobei206/anjian/releases/tag/v0.1.0-preview.3)，或直接下载 [Windows x64 ZIP](https://github.com/xiaobei206/anjian/releases/download/v0.1.0-preview.3/Anjian2026-0.1.0-preview.3-win-x64.zip) 和 [SHA256](https://github.com/xiaobei206/anjian/releases/download/v0.1.0-preview.3/Anjian2026-0.1.0-preview.3-win-x64.zip.sha256)。
+下载入口：[v0.1.0-preview.4 Release](https://github.com/xiaobei206/anjian/releases/tag/v0.1.0-preview.4)，[Windows x64 ZIP](https://github.com/xiaobei206/anjian/releases/download/v0.1.0-preview.4/Anjian2026-0.1.0-preview.4-win-x64.zip)，[SHA256 sidecar](https://github.com/xiaobei206/anjian/releases/download/v0.1.0-preview.4/Anjian2026-0.1.0-preview.4-win-x64.zip.sha256)。
+ZIP SHA256：`6b59ab27f825aa48b2ec5343cec826ad8b0ded759e9989af02d51f8b949f09aa`。
 使用说明：[首版使用说明](docs/USER-GUIDE-CN.md)。
 
 ## 首版目标
