@@ -25,6 +25,7 @@ internal sealed class MainForm : Form
     private readonly Panel _fullModePanel = new() { Dock = DockStyle.Fill };
     private readonly Panel _miniModePanel = new() { Dock = DockStyle.Fill, BackColor = Color.FromArgb(245, 247, 250) };
     private readonly CheckBox _clickOnlyCheck = new() { Text = "只记录点击坐标", AutoSize = true, Checked = true };
+    private readonly CheckBox _miniClickOnlyCheck = new() { Text = "只录点击", AutoSize = true, Checked = true, Margin = new Padding(4, 5, 8, 0) };
     private readonly CheckBox _alwaysOnTopCheck = new() { Text = "始终置顶", AutoSize = true };
     private readonly Button _miniRecordButton = new();
     private readonly Button _miniStopRecordButton = new();
@@ -73,7 +74,11 @@ internal sealed class MainForm : Form
         _editor.TextChanged += (_, _) => { if (!_loading) { _dirty = true; UpdateTitle(); } };
         _repeatCount.ValueChanged += (_, _) => SaveSettings();
         _repeatInterval.ValueChanged += (_, _) => SaveSettings();
-        _clickOnlyCheck.CheckedChanged += (_, _) => SaveSettings();
+        _clickOnlyCheck.CheckedChanged += (_, _) =>
+        {
+            if (_miniClickOnlyCheck.Checked != _clickOnlyCheck.Checked) _miniClickOnlyCheck.Checked = _clickOnlyCheck.Checked;
+            SaveSettings();
+        };
         _alwaysOnTopCheck.CheckedChanged += (_, _) => SetAlwaysOnTop(_alwaysOnTopCheck.Checked);
         _coordinateTimer.Tick += (_, _) => UpdateMiniStatus();
 
@@ -295,6 +300,11 @@ internal sealed class MainForm : Form
         var header = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false, FlowDirection = FlowDirection.LeftToRight, Margin = Padding.Empty };
         var brand = new Label { Text = "按键精灵 2026", AutoSize = true, Font = new Font("Microsoft YaHei UI", 10F, FontStyle.Bold), ForeColor = Color.FromArgb(35, 48, 66), Margin = new Padding(1, 4, 12, 0) };
         header.Controls.Add(brand);
+        header.Controls.Add(_miniClickOnlyCheck);
+        _miniClickOnlyCheck.CheckedChanged += (_, _) =>
+        {
+            if (_clickOnlyCheck.Checked != _miniClickOnlyCheck.Checked) _clickOnlyCheck.Checked = _miniClickOnlyCheck.Checked;
+        };
         _miniTopmostButton.Text = "置顶";
         header.Controls.Add(_miniTopmostButton);
         _miniTopmostButton.Click += (_, _) => _alwaysOnTopCheck.Checked = !_alwaysOnTopCheck.Checked;
@@ -700,6 +710,8 @@ internal sealed class MainForm : Form
         _miniStopRecordButton.Enabled = _recordSessionActive;
         _recordButton.Enabled = !_playback.IsRunning;
         _miniRecordButton.Enabled = !_playback.IsRunning;
+        _clickOnlyCheck.Enabled = !_recordSessionActive;
+        _miniClickOnlyCheck.Enabled = !_recordSessionActive;
         _playButton.Enabled = !_recordSessionActive && !_playback.IsRunning;
         _miniPlayButton.Enabled = _playButton.Enabled;
         _status.Text = !_recordSessionActive ? "未运行" : _recordingPaused ? "录制已暂停" : "正在录制…";
