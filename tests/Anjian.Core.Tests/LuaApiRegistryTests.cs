@@ -5,16 +5,36 @@ namespace Anjian.Core.Tests;
 public sealed class LuaApiRegistryTests
 {
  private static readonly string[] Expected=["MoveTo","LeftClick","RightClick","MiddleClick","LeftDoubleClick","RightDoubleClick","MiddleDoubleClick","LeftDown","LeftUp","RightDown","RightUp","MiddleDown","MiddleUp","MouseWheel","KeyPress","KeyDown","KeyUp","TypeText","Hotkey","Delay","RandomDelay","Log"];
- [Fact] public void RegistryContainsOnlyImplementedPublicFunctions(){var r=LuaApiRegistry.Load();Assert.Equal(1,r.SchemaVersion);Assert.Equal(Expected.Order(StringComparer.Ordinal),r.PublicFunctionNames.Order(StringComparer.Ordinal));Assert.All(r.Apis,a=>{Assert.Equal("implemented",a.ImplementationStatus);Assert.NotEmpty(a.Id);Assert.NotEmpty(a.Signature);Assert.NotEmpty(a.Example);Assert.NotEmpty(a.Errors);Assert.NotEmpty(a.Behavior.PauseBehavior);Assert.NotEmpty(a.Behavior.CancellationBehavior);Assert.NotEmpty(a.Behavior.CoordinateSpace);Assert.NotEmpty(a.Behavior.PermissionNotes);});Assert.DoesNotContain(r.Apis,a=>a.Name is "FindWindow" or "FindImage" or "OCR" or "CaptureScreen" or "MoveToWindow");}
+ [Fact] public void RegistryContainsOnlyImplementedPublicFunctions(){var r=LuaApiRegistry.Load();Assert.Equal(1,r.SchemaVersion);Assert.Equal(Expected.Order(StringComparer.Ordinal),r.PublicFunctionNames.Order(StringComparer.Ordinal));Assert.All(r.Apis,a=>{Assert.Equal("implemented",a.ImplementationStatus);Assert.NotEmpty(a.Id);Assert.NotEmpty(a.Signature);Assert.NotEmpty(a.Example);Assert.NotEmpty(a.Errors);Assert.NotEmpty(a.Behavior.PauseBehavior);Assert.NotEmpty(a.Behavior.CancellationBehavior);Assert.NotEmpty(a.Behavior.CoordinateSpace);Assert.NotEmpty(a.Behavior.PermissionNotes);});Assert.DoesNotContain(r.Apis,a=>a.Name is "FindWindow" or "FindImage" or "OCR" or "CaptureScreen" or "MoveToWindow");var keys=r.Apis.Single(a=>a.Name=="KeyPress").Parameters.Single(p=>p.Name=="key").AllowedValues;Assert.Contains("NUMPAD0",keys);Assert.Contains("NUMPAD9",keys);Assert.DoesNotContain("NUMPAD0-9",keys);}
  [Fact] public void RuntimeCreatesCatalogGlobalsAndHidesBridgeNames(){var r=LuaApiRegistry.Load();using var lua=new Lua(openLibs:true);LuaApiRuntime.Register(lua,new WorkerLuaApi(new Recorder()));foreach(var a in r.Apis)Assert.Equal("function",lua.DoString($"return type({a.Name})")[0]?.ToString());foreach(var b in r.Apis.SelectMany(a=>a.Runtime.Bindings))Assert.Equal("nil",lua.DoString($"return type({b.Name})")[0]?.ToString());Assert.Equal("nil",lua.DoString("return type(FindWindow)")[0]?.ToString());Assert.Equal("nil",lua.DoString("return type(FindImage)")[0]?.ToString());Assert.Equal("nil",lua.DoString("return type(OCR)")[0]?.ToString());Assert.Equal("nil",lua.DoString("return type(os)")[0]?.ToString());Assert.Equal("nil",lua.DoString("return type(io)")[0]?.ToString());}
- [Fact] public void LuaCallsAndDefaultsMatchCatalog(){var pipe=new Recorder();using var lua=new Lua(openLibs:true);LuaApiRuntime.Register(lua,new WorkerLuaApi(pipe));lua.DoString("""
- MoveTo(-120,450);LeftClick();RightClick(0);MiddleClick(12)
- LeftDoubleClick();RightDoubleClick(1,2);MiddleDoubleClick(0,0)
- LeftDown();LeftUp();RightDown();RightUp();MiddleDown();MiddleUp()
- MouseWheel(-120);KeyPress("ENTER");KeyPress("F24",600000);KeyDown("CTRL");KeyUp("CTRL")
- TypeText("按键精灵 2026");Log("before-hotkey");Hotkey("CTRL","SHIFT","S");Log("after-hotkey")
- Delay(0);RandomDelay(0,0);Log("测试完成")
- """);Assert.Contains(pipe.Items,m=>m.Type=="move"&&m.X==-120&&m.Y==450);Assert.Contains(pipe.Items,m=>m.Type=="click"&&m.Name=="left"&&m.Ms==50);Assert.Contains(pipe.Items,m=>m.Type=="click"&&m.Name=="right"&&m.Ms==0);Assert.Contains(pipe.Items,m=>m.Type=="click"&&m.Name=="middle"&&m.Ms==12);Assert.Contains(pipe.Items,m=>m.Type=="delay"&&m.Ms==100);Assert.Contains(pipe.Items,m=>m.Type=="key-press"&&m.Name=="ENTER"&&m.Ms==50);Assert.Contains(pipe.Items,m=>m.Type=="key-press"&&m.Name=="F24"&&m.Ms==600000);Assert.Contains(pipe.Items,m=>m.Type=="type-text"&&m.Text=="按键精灵 2026");var i=pipe.Items.FindIndex(m=>m.Type=="log"&&m.Text=="before-hotkey");Assert.Equal(new (string Type,string? Name)[]{("key-down","CTRL"),("key-down","SHIFT"),("key-down","S"),("key-up","S"),("key-up","SHIFT"),("key-up","CTRL")},pipe.Items.Skip(i+1).Take(6).Select(m=>(m.Type,m.Name)).ToArray());}
+ [Fact]
+ public void LuaCallsAndDefaultsMatchCatalog()
+ {
+  var pipe=new Recorder();
+  using var lua=new Lua(openLibs:true);
+  LuaApiRuntime.Register(lua,new WorkerLuaApi(pipe));
+  lua.DoString("""
+  MoveTo(-120,450);LeftClick();RightClick(0);MiddleClick(12)
+  LeftDoubleClick();RightDoubleClick(1,2);MiddleDoubleClick(0,0)
+  LeftDown();LeftUp();RightDown();RightUp();MiddleDown();MiddleUp()
+  MouseWheel(-120);KeyPress("ENTER");KeyPress("F24",600000);KeyDown("CTRL");KeyUp("CTRL")
+  TypeText("按键精灵 2026");Log("before-hotkey");Hotkey("CTRL","SHIFT","S");Log("after-hotkey")
+  Delay(0);RandomDelay(0,0);Log("测试完成")
+  """);
+  Assert.True(pipe.Items.Any(m=>m.Type=="move"&&m.X==-120&&m.Y==450),"MoveTo should pass absolute coordinates.");
+  Assert.True(pipe.Items.Any(m=>m.Type=="click"&&m.Name=="left"&&m.Ms==50),"LeftClick default duration should be 50ms.");
+  Assert.True(pipe.Items.Any(m=>m.Type=="click"&&m.Name=="right"&&m.Ms==0),"RightClick(0) should preserve zero.");
+  Assert.True(pipe.Items.Any(m=>m.Type=="click"&&m.Name=="middle"&&m.Ms==12),"MiddleClick should preserve explicit duration.");
+  Assert.True(pipe.Items.Any(m=>m.Type=="click"&&m.Name=="right"&&m.Ms==1),"RightDoubleClick should preserve explicit duration.");
+  Assert.True(pipe.Items.Any(m=>m.Type=="delay"&&m.Ms==100),"Default double-click gap expected Delay(100); actual commands: "+string.Join(" | ",pipe.Items.Select(m=>$"{m.Type}:{m.Name}:{m.Ms}:{m.Text}")));
+  Assert.True(pipe.Items.Any(m=>m.Type=="key-press"&&m.Name=="ENTER"&&m.Ms==50),"KeyPress default duration should be 50ms.");
+  Assert.True(pipe.Items.Any(m=>m.Type=="key-press"&&m.Name=="F24"&&m.Ms==600000),"KeyPress should accept the documented maximum duration.");
+  Assert.True(pipe.Items.Any(m=>m.Type=="type-text"&&m.Text=="按键精灵 2026"),"TypeText should preserve Unicode text.");
+  Assert.True(pipe.Items.Any(m=>m.Type=="log"&&m.Text=="测试完成"),"Log should reach the runtime pipe.");
+  var i=pipe.Items.FindIndex(m=>m.Type=="log"&&m.Text=="before-hotkey");
+  Assert.True(i>=0,"Hotkey diagnostic marker was not recorded.");
+  Assert.Equal(new[]{("key-down","CTRL"),("key-down","SHIFT"),("key-down","S"),("key-up","S"),("key-up","SHIFT"),("key-up","CTRL")},pipe.Items.Skip(i+1).Take(6).Select(m=>(m.Type,m.Name)).ToArray());
+ }
  [Fact] public void InvalidRangeFractionalWheelAndEmptyHotkeyFail(){using var lua=new Lua(openLibs:true);LuaApiRuntime.Register(lua,new WorkerLuaApi(new Recorder()));var r=lua.DoString("""local a=pcall(LeftClick,600001);local b=pcall(KeyPress,"ENTER",600001);local c=pcall(MouseWheel,1.5);local d=pcall(Hotkey);local e=pcall(RandomDelay,300,100);return a,b,c,d,e""");Assert.Equal(5,r.Length);Assert.All(r,x=>Assert.False(Convert.ToBoolean(x)));}
  [Fact] public void ManualGeneratedRegionMatchesCatalog(){var root=FindRoot();var m=File.ReadAllText(Path.Combine(root,"docs","FUNCTION-REFERENCE-CN.md"));Assert.Equal(LuaApiRegistry.NormalizeNewlines(m),LuaApiRegistry.NormalizeNewlines(LuaApiRegistry.Load().UpdateGeneratedReferenceSection(m)));Assert.Contains("MoveTo(x, y)",m,StringComparison.Ordinal);Assert.Contains("600000",m,StringComparison.Ordinal);Assert.Contains("完整产品目标中的函数类别",m,StringComparison.Ordinal);Assert.Contains("目标设计",m,StringComparison.Ordinal);}
  private static string FindRoot(){foreach(var s in new[]{Environment.CurrentDirectory,AppContext.BaseDirectory}){var d=new DirectoryInfo(s);while(d is not null){if(File.Exists(Path.Combine(d.FullName,"docs","FUNCTION-REFERENCE-CN.md")))return d.FullName;d=d.Parent;}}throw new DirectoryNotFoundException();}
