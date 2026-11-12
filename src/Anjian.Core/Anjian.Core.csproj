@@ -5,4 +5,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="NLua" Version="1.7.9" />
+    <EmbeddedResource Include="Api\lua-api-registry.json" LogicalName="Anjian.Core.Api.lua-api-registry.json" />
+  </ItemGroup>
 </Project>

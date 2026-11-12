@@ -1,0 +1,1297 @@
+{
+  "schemaVersion": 1,
+  "apiVersion": "0.2",
+  "product": "按键精灵 2026",
+  "categories": [
+    {
+      "id": "mouse",
+      "title": "鼠标",
+      "description": "鼠标移动、按钮、滚轮与双击。"
+    },
+    {
+      "id": "keyboard",
+      "title": "键盘",
+      "description": "键盘按键、组合键与 Unicode 文本。"
+    },
+    {
+      "id": "runtime",
+      "title": "运行时与日志",
+      "description": "延时、随机延时与日志。"
+    }
+  ],
+  "apis": [
+    {
+      "id": "anjian.mouse.move-to",
+      "name": "MoveTo",
+      "category": "mouse",
+      "title": "移动鼠标",
+      "description": "移动到虚拟桌面绝对物理像素坐标；副屏可使用负坐标。",
+      "signature": "MoveTo(x, y)",
+      "parameters": [
+        {
+          "name": "x",
+          "type": "integer",
+          "required": true,
+          "description": "虚拟桌面物理像素 X 坐标；允许负值。",
+          "minimum": -2147483648,
+          "maximum": 2147483647,
+          "unit": "物理像素"
+        },
+        {
+          "name": "y",
+          "type": "integer",
+          "required": true,
+          "description": "虚拟桌面物理像素 Y 坐标；允许负值。",
+          "minimum": -2147483648,
+          "maximum": 2147483647,
+          "unit": "物理像素"
+        }
+      ],
+      "returns": {
+        "type": "nil",
+        "description": "无显式返回值；成功后继续执行后续 Lua 语句。"
+      },
+      "errors": [
+        "参数类型、整数性或范围不合法时产生 Lua 错误。",
+        "输入调用失败、权限不足或目标程序拒绝输入时会报告执行错误。"
+      ],
+      "behavior": {
+        "pauseBehavior": "在执行器命令检查点遵循暂停状态。",
+        "cancellationBehavior": "停止会终止 worker；主进程清理本程序持有的键鼠状态。",
+        "sideEffects": [
+          "改变系统鼠标指针位置。"
+        ],
+        "coordinateSpace": "screen（虚拟桌面绝对物理像素）",
+        "permissionNotes": "使用 SetCursorPos；坐标为物理像素，允许负值。权限和桌面会话受 Windows 约束。"
+      },
+      "example": "MoveTo(-120, 450)",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.1.0-preview.1",
+      "runtime": {
+        "definition": "function(x, y) __AnjianBridge_MoveTo(x, y) end",
+        "bindings": [
+          {
+            "name": "__MoveTo",
+            "method": "MoveTo",
+            "localName": "__AnjianBridge_MoveTo"
+          }
+        ]
+      }
+    },
+    {
+      "id": "anjian.mouse.left-click",
+      "name": "LeftClick",
+      "category": "mouse",
+      "title": "左键单击",
+      "description": "左键单击并在指定时间后释放；省略时长默认 50 毫秒。",
+      "signature": "LeftClick(holdMs?)",
+      "parameters": [
+        {
+          "name": "holdMs",
+          "type": "integer",
+          "required": false,
+          "description": "按钮按下持续时间；0 表示不增加人为等待。",
+          "defaultValue": 50,
+          "minimum": 0,
+          "maximum": 600000,
+          "unit": "毫秒"
+        }
+      ],
+      "returns": {
+        "type": "nil",
+        "description": "无显式返回值；成功后继续执行后续 Lua 语句。"
+      },
+      "errors": [
+        "参数类型、整数性或范围不合法时产生 Lua 错误。",
+        "输入调用失败、权限不足或目标程序拒绝输入时会报告执行错误。"
+      ],
+      "behavior": {
+        "pauseBehavior": "在执行器命令检查点遵循暂停状态。",
+        "cancellationBehavior": "点击等待可被停止取消；正常结束、错误或取消时尝试释放，worker 退出时主进程再清理。",
+        "sideEffects": [
+          "按下并释放鼠标左键。"
+        ],
+        "coordinateSpace": "none",
+        "permissionNotes": "使用 Windows SendInput；目标程序可能因权限、桌面或自身输入处理而拒绝。"
+      },
+      "example": "LeftClick()",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.1.0-preview.1",
+      "runtime": {
+        "definition": "function(ms) __AnjianBridge_LeftClick(ms == nil and 50 or ms) end",
+        "bindings": [
+          {
+            "name": "__LeftClick",
+            "method": "LeftClick",
+            "localName": "__AnjianBridge_LeftClick"
+          }
+        ]
+      }
+    },
+    {
+      "id": "anjian.mouse.right-click",
+      "name": "RightClick",
+      "category": "mouse",
+      "title": "右键单击",
+      "description": "右键单击并在指定时间后释放；省略时长默认 50 毫秒。",
+      "signature": "RightClick(holdMs?)",
+      "parameters": [
+        {
+          "name": "holdMs",
+          "type": "integer",
+          "required": false,
+          "description": "按钮按下持续时间；0 表示不增加人为等待。",
+          "defaultValue": 50,
+          "minimum": 0,
+          "maximum": 600000,
+          "unit": "毫秒"
+        }
+      ],
+      "returns": {
+        "type": "nil",
+        "description": "无显式返回值；成功后继续执行后续 Lua 语句。"
+      },
+      "errors": [
+        "参数类型、整数性或范围不合法时产生 Lua 错误。",
+        "输入调用失败、权限不足或目标程序拒绝输入时会报告执行错误。"
+      ],
+      "behavior": {
+        "pauseBehavior": "在执行器命令检查点遵循暂停状态。",
+        "cancellationBehavior": "点击等待可被停止取消；正常结束、错误或取消时尝试释放，worker 退出时主进程再清理。",
+        "sideEffects": [
+          "按下并释放鼠标右键。"
+        ],
+        "coordinateSpace": "none",
+        "permissionNotes": "使用 Windows SendInput；目标程序可能因权限、桌面或自身输入处理而拒绝。"
+      },
+      "example": "RightClick()",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.1.0-preview.1",
+      "runtime": {
+        "definition": "function(ms) __AnjianBridge_RightClick(ms == nil and 50 or ms) end",
+        "bindings": [
+          {
+            "name": "__RightClick",
+            "method": "RightClick",
+            "localName": "__AnjianBridge_RightClick"
+          }
+        ]
+      }
+    },
+    {
+      "id": "anjian.mouse.middle-click",
+      "name": "MiddleClick",
+      "category": "mouse",
+      "title": "中键单击",
+      "description": "中键单击并在指定时间后释放；省略时长默认 50 毫秒。",
+      "signature": "MiddleClick(holdMs?)",
+      "parameters": [
+        {
+          "name": "holdMs",
+          "type": "integer",
+          "required": false,
+          "description": "按钮按下持续时间；0 表示不增加人为等待。",
+          "defaultValue": 50,
+          "minimum": 0,
+          "maximum": 600000,
+          "unit": "毫秒"
+        }
+      ],
+      "returns": {
+        "type": "nil",
+        "description": "无显式返回值；成功后继续执行后续 Lua 语句。"
+      },
+      "errors": [
+        "参数类型、整数性或范围不合法时产生 Lua 错误。",
+        "输入调用失败、权限不足或目标程序拒绝输入时会报告执行错误。"
+      ],
+      "behavior": {
+        "pauseBehavior": "在执行器命令检查点遵循暂停状态。",
+        "cancellationBehavior": "点击等待可被停止取消；正常结束、错误或取消时尝试释放，worker 退出时主进程再清理。",
+        "sideEffects": [
+          "按下并释放鼠标中键。"
+        ],
+        "coordinateSpace": "none",
+        "permissionNotes": "使用 Windows SendInput；目标程序可能因权限、桌面或自身输入处理而拒绝。"
+      },
+      "example": "MiddleClick()",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.1.0-preview.1",
+      "runtime": {
+        "definition": "function(ms) __AnjianBridge_MiddleClick(ms == nil and 50 or ms) end",
+        "bindings": [
+          {
+            "name": "__MiddleClick",
+            "method": "MiddleClick",
+            "localName": "__AnjianBridge_MiddleClick"
+          }
+        ]
+      }
+    },
+    {
+      "id": "anjian.mouse.left-double-click",
+      "name": "LeftDoubleClick",
+      "category": "mouse",
+      "title": "左键双击",
+      "description": "左键双击；可指定单次按下持续时间和两次点击间隔。",
+      "signature": "LeftDoubleClick(holdMs?, gapMs?)",
+      "parameters": [
+        {
+          "name": "holdMs",
+          "type": "integer",
+          "required": false,
+          "description": "每次单击的按下持续时间。",
+          "defaultValue": 50,
+          "minimum": 0,
+          "maximum": 600000,
+          "unit": "毫秒"
+        },
+        {
+          "name": "gapMs",
+          "type": "integer",
+          "required": false,
+          "description": "两次单击之间的延时。",
+          "defaultValue": 100,
+          "minimum": 0,
+          "maximum": 600000,
+          "unit": "毫秒"
+        }
+      ],
+      "returns": {
+        "type": "nil",
+        "description": "无显式返回值；成功后继续执行后续 Lua 语句。"
+      },
+      "errors": [
+        "参数类型、整数性或范围不合法时产生 Lua 错误。",
+        "输入调用失败、权限不足或目标程序拒绝输入时会报告执行错误。"
+      ],
+      "behavior": {
+        "pauseBehavior": "在执行器命令检查点遵循暂停状态。",
+        "cancellationBehavior": "停止会终止 worker 并清理仍按下的鼠标按钮。",
+        "sideEffects": [
+          "执行两次相同按钮单击。"
+        ],
+        "coordinateSpace": "none",
+        "permissionNotes": "双击识别受 Windows 双击速度和目标程序行为影响。"
+      },
+      "example": "LeftDoubleClick(50, 100)",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.1.0-preview.1",
+      "runtime": {
+        "definition": "function(holdMs, gapMs) __AnjianDoubleClick(LeftClick, holdMs, gapMs) end",
+        "bindings": []
+      }
+    },
+    {
+      "id": "anjian.mouse.right-double-click",
+      "name": "RightDoubleClick",
+      "category": "mouse",
+      "title": "右键双击",
+      "description": "右键双击；可指定单次按下持续时间和两次点击间隔。",
+      "signature": "RightDoubleClick(holdMs?, gapMs?)",
+      "parameters": [
+        {
+          "name": "holdMs",
+          "type": "integer",
+          "required": false,
+          "description": "每次单击的按下持续时间。",
+          "defaultValue": 50,
+          "minimum": 0,
+          "maximum": 600000,
+          "unit": "毫秒"
+        },
+        {
+          "name": "gapMs",
+          "type": "integer",
+          "required": false,
+          "description": "两次单击之间的延时。",
+          "defaultValue": 100,
+          "minimum": 0,
+          "maximum": 600000,
+          "unit": "毫秒"
+        }
+      ],
+      "returns": {
+        "type": "nil",
+        "description": "无显式返回值；成功后继续执行后续 Lua 语句。"
+      },
+      "errors": [
+        "参数类型、整数性或范围不合法时产生 Lua 错误。",
+        "输入调用失败、权限不足或目标程序拒绝输入时会报告执行错误。"
+      ],
+      "behavior": {
+        "pauseBehavior": "在执行器命令检查点遵循暂停状态。",
+        "cancellationBehavior": "停止会终止 worker 并清理仍按下的鼠标按钮。",
+        "sideEffects": [
+          "执行两次相同按钮单击。"
+        ],
+        "coordinateSpace": "none",
+        "permissionNotes": "双击识别受 Windows 双击速度和目标程序行为影响。"
+      },
+      "example": "RightDoubleClick(50, 100)",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.1.0-preview.1",
+      "runtime": {
+        "definition": "function(holdMs, gapMs) __AnjianDoubleClick(RightClick, holdMs, gapMs) end",
+        "bindings": []
+      }
+    },
+    {
+      "id": "anjian.mouse.middle-double-click",
+      "name": "MiddleDoubleClick",
+      "category": "mouse",
+      "title": "中键双击",
+      "description": "中键双击；可指定单次按下持续时间和两次点击间隔。",
+      "signature": "MiddleDoubleClick(holdMs?, gapMs?)",
+      "parameters": [
+        {
+          "name": "holdMs",
+          "type": "integer",
+          "required": false,
+          "description": "每次单击的按下持续时间。",
+          "defaultValue": 50,
+          "minimum": 0,
+          "maximum": 600000,
+          "unit": "毫秒"
+        },
+        {
+          "name": "gapMs",
+          "type": "integer",
+          "required": false,
+          "description": "两次单击之间的延时。",
+          "defaultValue": 100,
+          "minimum": 0,
+          "maximum": 600000,
+          "unit": "毫秒"
+        }
+      ],
+      "returns": {
+        "type": "nil",
+        "description": "无显式返回值；成功后继续执行后续 Lua 语句。"
+      },
+      "errors": [
+        "参数类型、整数性或范围不合法时产生 Lua 错误。",
+        "输入调用失败、权限不足或目标程序拒绝输入时会报告执行错误。"
+      ],
+      "behavior": {
+        "pauseBehavior": "在执行器命令检查点遵循暂停状态。",
+        "cancellationBehavior": "停止会终止 worker 并清理仍按下的鼠标按钮。",
+        "sideEffects": [
+          "执行两次相同按钮单击。"
+        ],
+        "coordinateSpace": "none",
+        "permissionNotes": "双击识别受 Windows 双击速度和目标程序行为影响。"
+      },
+      "example": "MiddleDoubleClick(50, 100)",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.1.0-preview.1",
+      "runtime": {
+        "definition": "function(holdMs, gapMs) __AnjianDoubleClick(MiddleClick, holdMs, gapMs) end",
+        "bindings": []
+      }
+    },
+    {
+      "id": "anjian.mouse.left-down",
+      "name": "LeftDown",
+      "category": "mouse",
+      "title": "左键按下",
+      "description": "左键按下并保持到对应 Up 或统一清理。",
+      "signature": "LeftDown()",
+      "parameters": [],
+      "returns": {
+        "type": "nil",
+        "description": "无显式返回值；成功后继续执行后续 Lua 语句。"
+      },
+      "errors": [
+        "参数类型、整数性或范围不合法时产生 Lua 错误。",
+        "输入调用失败、权限不足或目标程序拒绝输入时会报告执行错误。"
+      ],
+      "behavior": {
+        "pauseBehavior": "命令检查点遵循暂停状态。",
+        "cancellationBehavior": "停止会终止 worker；主进程清理本程序持有的键鼠状态。",
+        "sideEffects": [
+          "按下并保持鼠标左键。"
+        ],
+        "coordinateSpace": "none",
+        "permissionNotes": "受 Windows 权限级别和目标程序能力约束；不会绕过 UIPI 或受保护桌面。"
+      },
+      "example": "LeftDown()",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.1.0-preview.1",
+      "runtime": {
+        "definition": "function() __AnjianBridge_LeftDown() end",
+        "bindings": [
+          {
+            "name": "__LeftDown",
+            "method": "LeftDown",
+            "localName": "__AnjianBridge_LeftDown"
+          }
+        ]
+      }
+    },
+    {
+      "id": "anjian.mouse.left-up",
+      "name": "LeftUp",
+      "category": "mouse",
+      "title": "左键释放",
+      "description": "左键释放并释放程序跟踪的该按钮。",
+      "signature": "LeftUp()",
+      "parameters": [],
+      "returns": {
+        "type": "nil",
+        "description": "无显式返回值；成功后继续执行后续 Lua 语句。"
+      },
+      "errors": [
+        "参数类型、整数性或范围不合法时产生 Lua 错误。",
+        "输入调用失败、权限不足或目标程序拒绝输入时会报告执行错误。"
+      ],
+      "behavior": {
+        "pauseBehavior": "允许暂停期间释放按钮，避免遗留按下状态。",
+        "cancellationBehavior": "停止会终止 worker；主进程清理本程序持有的键鼠状态。",
+        "sideEffects": [
+          "释放鼠标左键。"
+        ],
+        "coordinateSpace": "none",
+        "permissionNotes": "受 Windows 权限级别和目标程序能力约束；不会绕过 UIPI 或受保护桌面。"
+      },
+      "example": "LeftUp()",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.1.0-preview.1",
+      "runtime": {
+        "definition": "function() __AnjianBridge_LeftUp() end",
+        "bindings": [
+          {
+            "name": "__LeftUp",
+            "method": "LeftUp",
+            "localName": "__AnjianBridge_LeftUp"
+          }
+        ]
+      }
+    },
+    {
+      "id": "anjian.mouse.right-down",
+      "name": "RightDown",
+      "category": "mouse",
+      "title": "右键按下",
+      "description": "右键按下并保持到对应 Up 或统一清理。",
+      "signature": "RightDown()",
+      "parameters": [],
+      "returns": {
+        "type": "nil",
+        "description": "无显式返回值；成功后继续执行后续 Lua 语句。"
+      },
+      "errors": [
+        "参数类型、整数性或范围不合法时产生 Lua 错误。",
+        "输入调用失败、权限不足或目标程序拒绝输入时会报告执行错误。"
+      ],
+      "behavior": {
+        "pauseBehavior": "命令检查点遵循暂停状态。",
+        "cancellationBehavior": "停止会终止 worker；主进程清理本程序持有的键鼠状态。",
+        "sideEffects": [
+          "按下并保持鼠标右键。"
+        ],
+        "coordinateSpace": "none",
+        "permissionNotes": "受 Windows 权限级别和目标程序能力约束；不会绕过 UIPI 或受保护桌面。"
+      },
+      "example": "RightDown()",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.1.0-preview.1",
+      "runtime": {
+        "definition": "function() __AnjianBridge_RightDown() end",
+        "bindings": [
+          {
+            "name": "__RightDown",
+            "method": "RightDown",
+            "localName": "__AnjianBridge_RightDown"
+          }
+        ]
+      }
+    },
+    {
+      "id": "anjian.mouse.right-up",
+      "name": "RightUp",
+      "category": "mouse",
+      "title": "右键释放",
+      "description": "右键释放并释放程序跟踪的该按钮。",
+      "signature": "RightUp()",
+      "parameters": [],
+      "returns": {
+        "type": "nil",
+        "description": "无显式返回值；成功后继续执行后续 Lua 语句。"
+      },
+      "errors": [
+        "参数类型、整数性或范围不合法时产生 Lua 错误。",
+        "输入调用失败、权限不足或目标程序拒绝输入时会报告执行错误。"
+      ],
+      "behavior": {
+        "pauseBehavior": "允许暂停期间释放按钮，避免遗留按下状态。",
+        "cancellationBehavior": "停止会终止 worker；主进程清理本程序持有的键鼠状态。",
+        "sideEffects": [
+          "释放鼠标右键。"
+        ],
+        "coordinateSpace": "none",
+        "permissionNotes": "受 Windows 权限级别和目标程序能力约束；不会绕过 UIPI 或受保护桌面。"
+      },
+      "example": "RightUp()",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.1.0-preview.1",
+      "runtime": {
+        "definition": "function() __AnjianBridge_RightUp() end",
+        "bindings": [
+          {
+            "name": "__RightUp",
+            "method": "RightUp",
+            "localName": "__AnjianBridge_RightUp"
+          }
+        ]
+      }
+    },
+    {
+      "id": "anjian.mouse.middle-down",
+      "name": "MiddleDown",
+      "category": "mouse",
+      "title": "中键按下",
+      "description": "中键按下并保持到对应 Up 或统一清理。",
+      "signature": "MiddleDown()",
+      "parameters": [],
+      "returns": {
+        "type": "nil",
+        "description": "无显式返回值；成功后继续执行后续 Lua 语句。"
+      },
+      "errors": [
+        "参数类型、整数性或范围不合法时产生 Lua 错误。",
+        "输入调用失败、权限不足或目标程序拒绝输入时会报告执行错误。"
+      ],
+      "behavior": {
+        "pauseBehavior": "命令检查点遵循暂停状态。",
+        "cancellationBehavior": "停止会终止 worker；主进程清理本程序持有的键鼠状态。",
+        "sideEffects": [
+          "按下并保持鼠标中键。"
+        ],
+        "coordinateSpace": "none",
+        "permissionNotes": "受 Windows 权限级别和目标程序能力约束；不会绕过 UIPI 或受保护桌面。"
+      },
+      "example": "MiddleDown()",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.1.0-preview.1",
+      "runtime": {
+        "definition": "function() __AnjianBridge_MiddleDown() end",
+        "bindings": [
+          {
+            "name": "__MiddleDown",
+            "method": "MiddleDown",
+            "localName": "__AnjianBridge_MiddleDown"
+          }
+        ]
+      }
+    },
+    {
+      "id": "anjian.mouse.middle-up",
+      "name": "MiddleUp",
+      "category": "mouse",
+      "title": "中键释放",
+      "description": "中键释放并释放程序跟踪的该按钮。",
+      "signature": "MiddleUp()",
+      "parameters": [],
+      "returns": {
+        "type": "nil",
+        "description": "无显式返回值；成功后继续执行后续 Lua 语句。"
+      },
+      "errors": [
+        "参数类型、整数性或范围不合法时产生 Lua 错误。",
+        "输入调用失败、权限不足或目标程序拒绝输入时会报告执行错误。"
+      ],
+      "behavior": {
+        "pauseBehavior": "允许暂停期间释放按钮，避免遗留按下状态。",
+        "cancellationBehavior": "停止会终止 worker；主进程清理本程序持有的键鼠状态。",
+        "sideEffects": [
+          "释放鼠标中键。"
+        ],
+        "coordinateSpace": "none",
+        "permissionNotes": "受 Windows 权限级别和目标程序能力约束；不会绕过 UIPI 或受保护桌面。"
+      },
+      "example": "MiddleUp()",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.1.0-preview.1",
+      "runtime": {
+        "definition": "function() __AnjianBridge_MiddleUp() end",
+        "bindings": [
+          {
+            "name": "__MiddleUp",
+            "method": "MiddleUp",
+            "localName": "__AnjianBridge_MiddleUp"
+          }
+        ]
+      }
+    },
+    {
+      "id": "anjian.mouse.mouse-wheel",
+      "name": "MouseWheel",
+      "category": "mouse",
+      "title": "滚动鼠标滚轮",
+      "description": "发送整数滚轮增量；正数向上、负数向下，120 通常是一个标准刻度。",
+      "signature": "MouseWheel(delta)",
+      "parameters": [
+        {
+          "name": "delta",
+          "type": "integer",
+          "required": true,
+          "description": "滚轮增量；正数向上、负数向下。",
+          "minimum": -2147483648,
+          "maximum": 2147483647,
+          "unit": "滚轮增量"
+        }
+      ],
+      "returns": {
+        "type": "nil",
+        "description": "无显式返回值；成功后继续执行后续 Lua 语句。"
+      },
+      "errors": [
+        "参数类型、整数性或范围不合法时产生 Lua 错误。",
+        "输入调用失败、权限不足或目标程序拒绝输入时会报告执行错误。"
+      ],
+      "behavior": {
+        "pauseBehavior": "在执行器命令检查点遵循暂停状态。",
+        "cancellationBehavior": "停止会终止 worker；主进程清理本程序持有的键鼠状态。",
+        "sideEffects": [
+          "改变系统滚轮输入状态。"
+        ],
+        "coordinateSpace": "none",
+        "permissionNotes": "使用 Windows SendInput；应用响应距离由目标程序决定。"
+      },
+      "example": "MouseWheel(-120)",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.1.0-preview.1",
+      "runtime": {
+        "definition": "function(delta) __AnjianBridge_MouseWheel(delta) end",
+        "bindings": [
+          {
+            "name": "__MouseWheel",
+            "method": "MouseWheel",
+            "localName": "__AnjianBridge_MouseWheel"
+          }
+        ]
+      }
+    },
+    {
+      "id": "anjian.keyboard.key-press",
+      "name": "KeyPress",
+      "category": "keyboard",
+      "title": "单键按下并释放",
+      "description": "按下规范键名对应的键后释放，缺省持续时间为 50 毫秒。",
+      "signature": "KeyPress(key, holdMs?)",
+      "parameters": [
+        {
+          "name": "key",
+          "type": "keyName",
+          "required": true,
+          "description": "按键名（不区分大小写）；具体映射由 Windows 输入层解析。",
+          "allowedValues": [
+            "ENTER",
+            "ESC",
+            "TAB",
+            "SPACE",
+            "BACKSPACE",
+            "DELETE",
+            "INSERT",
+            "HOME",
+            "END",
+            "PAGEUP",
+            "PAGEDOWN",
+            "UP",
+            "DOWN",
+            "LEFT",
+            "RIGHT",
+            "CTRL",
+            "CONTROL",
+            "SHIFT",
+            "ALT",
+            "WIN",
+            "CAPSLOCK",
+            "PRINTSCREEN",
+            "PAUSE",
+            "NUMLOCK",
+            "SCROLLLOCK",
+            "NUMPAD0-9",
+            "NUMPADMULTIPLY",
+            "NUMPADADD",
+            "NUMPADSUBTRACT",
+            "NUMPADDECIMAL",
+            "NUMPADDIVIDE",
+            "SEMICOLON",
+            "EQUALS",
+            "COMMA",
+            "MINUS",
+            "PERIOD",
+            "SLASH",
+            "BACKTICK",
+            "LEFTBRACKET",
+            "BACKSLASH",
+            "RIGHTBRACKET",
+            "QUOTE"
+          ],
+          "valuePatterns": [
+            "A-Z",
+            "0-9",
+            "F1-F24"
+          ]
+        },
+        {
+          "name": "holdMs",
+          "type": "integer",
+          "required": false,
+          "description": "按键持续时间；0 表示不增加人为等待。",
+          "defaultValue": 50,
+          "minimum": 0,
+          "maximum": 600000,
+          "unit": "毫秒"
+        }
+      ],
+      "returns": {
+        "type": "nil",
+        "description": "无显式返回值；成功后继续执行后续 Lua 语句。"
+      },
+      "errors": [
+        "参数类型、整数性或范围不合法时产生 Lua 错误。",
+        "输入调用失败、权限不足或目标程序拒绝输入时会报告执行错误。"
+      ],
+      "behavior": {
+        "pauseBehavior": "在执行器命令检查点遵循暂停状态。",
+        "cancellationBehavior": "按键等待可停止取消；正常结束、错误或取消时尝试释放，worker 退出时主进程清理。",
+        "sideEffects": [
+          "发送指定键的按下/释放输入。"
+        ],
+        "coordinateSpace": "none",
+        "permissionNotes": "键名由 Windows 输入映射解析，权限及键盘布局可能影响结果。"
+      },
+      "example": "KeyPress(\"ENTER\")",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.1.0-preview.1",
+      "runtime": {
+        "definition": "function(key, ms) __AnjianBridge_KeyPress(key, ms == nil and 50 or ms) end",
+        "bindings": [
+          {
+            "name": "__KeyPress",
+            "method": "KeyPress",
+            "localName": "__AnjianBridge_KeyPress"
+          }
+        ]
+      }
+    },
+    {
+      "id": "anjian.keyboard.key-down",
+      "name": "KeyDown",
+      "category": "keyboard",
+      "title": "按下按键",
+      "description": "按下按键；按下保持到 KeyUp 或统一清理。",
+      "signature": "KeyDown(key)",
+      "parameters": [
+        {
+          "name": "key",
+          "type": "keyName",
+          "required": true,
+          "description": "按键名（不区分大小写）；具体映射由 Windows 输入层解析。",
+          "allowedValues": [
+            "ENTER",
+            "ESC",
+            "TAB",
+            "SPACE",
+            "BACKSPACE",
+            "DELETE",
+            "INSERT",
+            "HOME",
+            "END",
+            "PAGEUP",
+            "PAGEDOWN",
+            "UP",
+            "DOWN",
+            "LEFT",
+            "RIGHT",
+            "CTRL",
+            "CONTROL",
+            "SHIFT",
+            "ALT",
+            "WIN",
+            "CAPSLOCK",
+            "PRINTSCREEN",
+            "PAUSE",
+            "NUMLOCK",
+            "SCROLLLOCK",
+            "NUMPAD0-9",
+            "NUMPADMULTIPLY",
+            "NUMPADADD",
+            "NUMPADSUBTRACT",
+            "NUMPADDECIMAL",
+            "NUMPADDIVIDE",
+            "SEMICOLON",
+            "EQUALS",
+            "COMMA",
+            "MINUS",
+            "PERIOD",
+            "SLASH",
+            "BACKTICK",
+            "LEFTBRACKET",
+            "BACKSLASH",
+            "RIGHTBRACKET",
+            "QUOTE"
+          ],
+          "valuePatterns": [
+            "A-Z",
+            "0-9",
+            "F1-F24"
+          ]
+        }
+      ],
+      "returns": {
+        "type": "nil",
+        "description": "无显式返回值；成功后继续执行后续 Lua 语句。"
+      },
+      "errors": [
+        "参数类型、整数性或范围不合法时产生 Lua 错误。",
+        "输入调用失败、权限不足或目标程序拒绝输入时会报告执行错误。"
+      ],
+      "behavior": {
+        "pauseBehavior": "命令检查点遵循暂停状态。",
+        "cancellationBehavior": "停止会终止 worker；主进程清理本程序持有的键鼠状态。",
+        "sideEffects": [
+          "按下并保持指定按键。"
+        ],
+        "coordinateSpace": "none",
+        "permissionNotes": "受 Windows 权限级别和目标程序能力约束；不会绕过 UIPI 或受保护桌面。"
+      },
+      "example": "KeyDown(\"CTRL\")",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.1.0-preview.1",
+      "runtime": {
+        "definition": "function(key) __AnjianBridge_KeyDown(key) end",
+        "bindings": [
+          {
+            "name": "__KeyDown",
+            "method": "KeyDown",
+            "localName": "__AnjianBridge_KeyDown"
+          }
+        ]
+      }
+    },
+    {
+      "id": "anjian.keyboard.key-up",
+      "name": "KeyUp",
+      "category": "keyboard",
+      "title": "释放按键",
+      "description": "释放按键；暂停时仍允许释放，避免遗留按键。",
+      "signature": "KeyUp(key)",
+      "parameters": [
+        {
+          "name": "key",
+          "type": "keyName",
+          "required": true,
+          "description": "按键名（不区分大小写）；具体映射由 Windows 输入层解析。",
+          "allowedValues": [
+            "ENTER",
+            "ESC",
+            "TAB",
+            "SPACE",
+            "BACKSPACE",
+            "DELETE",
+            "INSERT",
+            "HOME",
+            "END",
+            "PAGEUP",
+            "PAGEDOWN",
+            "UP",
+            "DOWN",
+            "LEFT",
+            "RIGHT",
+            "CTRL",
+            "CONTROL",
+            "SHIFT",
+            "ALT",
+            "WIN",
+            "CAPSLOCK",
+            "PRINTSCREEN",
+            "PAUSE",
+            "NUMLOCK",
+            "SCROLLLOCK",
+            "NUMPAD0-9",
+            "NUMPADMULTIPLY",
+            "NUMPADADD",
+            "NUMPADSUBTRACT",
+            "NUMPADDECIMAL",
+            "NUMPADDIVIDE",
+            "SEMICOLON",
+            "EQUALS",
+            "COMMA",
+            "MINUS",
+            "PERIOD",
+            "SLASH",
+            "BACKTICK",
+            "LEFTBRACKET",
+            "BACKSLASH",
+            "RIGHTBRACKET",
+            "QUOTE"
+          ],
+          "valuePatterns": [
+            "A-Z",
+            "0-9",
+            "F1-F24"
+          ]
+        }
+      ],
+      "returns": {
+        "type": "nil",
+        "description": "无显式返回值；成功后继续执行后续 Lua 语句。"
+      },
+      "errors": [
+        "参数类型、整数性或范围不合法时产生 Lua 错误。",
+        "输入调用失败、权限不足或目标程序拒绝输入时会报告执行错误。"
+      ],
+      "behavior": {
+        "pauseBehavior": "允许暂停期间释放按键。",
+        "cancellationBehavior": "停止会终止 worker；主进程清理本程序持有的键鼠状态。",
+        "sideEffects": [
+          "释放指定按键。"
+        ],
+        "coordinateSpace": "none",
+        "permissionNotes": "受 Windows 权限级别和目标程序能力约束；不会绕过 UIPI 或受保护桌面。"
+      },
+      "example": "KeyUp(\"CTRL\")",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.1.0-preview.1",
+      "runtime": {
+        "definition": "function(key) __AnjianBridge_KeyUp(key) end",
+        "bindings": [
+          {
+            "name": "__KeyUp",
+            "method": "KeyUp",
+            "localName": "__AnjianBridge_KeyUp"
+          }
+        ]
+      }
+    },
+    {
+      "id": "anjian.keyboard.type-text",
+      "name": "TypeText",
+      "category": "keyboard",
+      "title": "输入 Unicode 文本",
+      "description": "向当前输入目标注入 Unicode 文本，不保证重建真实物理键盘或输入法组合过程。",
+      "signature": "TypeText(text)",
+      "parameters": [
+        {
+          "name": "text",
+          "type": "string",
+          "required": true,
+          "description": "待输入的 Unicode 文本；允许空字符串，不允许 nil。"
+        }
+      ],
+      "returns": {
+        "type": "nil",
+        "description": "无显式返回值；成功后继续执行后续 Lua 语句。"
+      },
+      "errors": [
+        "参数类型、整数性或范围不合法时产生 Lua 错误。",
+        "输入调用失败、权限不足或目标程序拒绝输入时会报告执行错误。"
+      ],
+      "behavior": {
+        "pauseBehavior": "在执行器命令检查点遵循暂停状态。",
+        "cancellationBehavior": "文本按 rune 分段注入并检查停止令牌；worker 退出时主进程清理输入状态。",
+        "sideEffects": [
+          "向当前输入目标注入 Unicode 文本。"
+        ],
+        "coordinateSpace": "none",
+        "permissionNotes": "输入法、受保护控件、权限级别和目标程序行为可能影响结果。"
+      },
+      "example": "TypeText(\"按键精灵 2026\")",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.1.0-preview.1",
+      "runtime": {
+        "definition": "function(text) __AnjianBridge_TypeText(text) end",
+        "bindings": [
+          {
+            "name": "__TypeText",
+            "method": "TypeText",
+            "localName": "__AnjianBridge_TypeText"
+          }
+        ]
+      }
+    },
+    {
+      "id": "anjian.keyboard.hotkey",
+      "name": "Hotkey",
+      "category": "keyboard",
+      "title": "组合键",
+      "description": "按参数顺序按下一个或多个规范键名，再按逆序释放；出错时尝试释放已按下的键。",
+      "signature": "Hotkey(key1, ..., keyN)",
+      "parameters": [
+        {
+          "name": "keys",
+          "type": "keyName[]",
+          "required": true,
+          "description": "一个或多个规范按键名，按输入顺序按下、逆序释放。",
+          "allowedValues": [
+            "ENTER",
+            "ESC",
+            "TAB",
+            "SPACE",
+            "BACKSPACE",
+            "DELETE",
+            "INSERT",
+            "HOME",
+            "END",
+            "PAGEUP",
+            "PAGEDOWN",
+            "UP",
+            "DOWN",
+            "LEFT",
+            "RIGHT",
+            "CTRL",
+            "CONTROL",
+            "SHIFT",
+            "ALT",
+            "WIN",
+            "CAPSLOCK",
+            "PRINTSCREEN",
+            "PAUSE",
+            "NUMLOCK",
+            "SCROLLLOCK",
+            "NUMPAD0-9",
+            "NUMPADMULTIPLY",
+            "NUMPADADD",
+            "NUMPADSUBTRACT",
+            "NUMPADDECIMAL",
+            "NUMPADDIVIDE",
+            "SEMICOLON",
+            "EQUALS",
+            "COMMA",
+            "MINUS",
+            "PERIOD",
+            "SLASH",
+            "BACKTICK",
+            "LEFTBRACKET",
+            "BACKSLASH",
+            "RIGHTBRACKET",
+            "QUOTE"
+          ],
+          "valuePatterns": [
+            "A-Z",
+            "0-9",
+            "F1-F24"
+          ],
+          "minimumCount": 1,
+          "variadic": true
+        }
+      ],
+      "returns": {
+        "type": "nil",
+        "description": "无显式返回值；成功后继续执行后续 Lua 语句。"
+      },
+      "errors": [
+        "参数类型、整数性或范围不合法时产生 Lua 错误。",
+        "输入调用失败、权限不足或目标程序拒绝输入时会报告执行错误。"
+      ],
+      "behavior": {
+        "pauseBehavior": "在执行器命令检查点遵循暂停状态。",
+        "cancellationBehavior": "执行错误时逆序释放已记录按键；Stop 时主进程最终清理。",
+        "sideEffects": [
+          "发送组合键输入。"
+        ],
+        "coordinateSpace": "none",
+        "permissionNotes": "受 Windows 权限级别和目标程序能力约束；不会绕过 UIPI 或受保护桌面。"
+      },
+      "example": "Hotkey(\"CTRL\", \"SHIFT\", \"S\")",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.1.0-preview.1",
+      "runtime": {
+        "definition": "function(...)\n  local keys = {...}\n  if #keys < 1 then error(\"Hotkey 至少需要一个按键。\", 2) end\n  local held = {}\n  local ok, err = pcall(function()\n    for i = 1, #keys do KeyDown(keys[i]); held[#held + 1] = keys[i] end\n  end)\n  for i = #held, 1, -1 do\n    local released, releaseError = pcall(function() KeyUp(held[i]) end)\n    if not released and ok then ok, err = false, releaseError end\n  end\n  if not ok then error(err, 0) end\nend",
+        "bindings": []
+      }
+    },
+    {
+      "id": "anjian.runtime.delay",
+      "name": "Delay",
+      "category": "runtime",
+      "title": "可取消延时",
+      "description": "等待指定的非负整数毫秒，与脚本轮间隔相互独立。",
+      "signature": "Delay(milliseconds)",
+      "parameters": [
+        {
+          "name": "milliseconds",
+          "type": "integer",
+          "required": true,
+          "description": "延时长度。",
+          "minimum": 0,
+          "maximum": 600000,
+          "unit": "毫秒"
+        }
+      ],
+      "returns": {
+        "type": "nil",
+        "description": "无显式返回值；成功后继续执行后续 Lua 语句。"
+      },
+      "errors": [
+        "参数类型、整数性或范围不合法时产生 Lua 错误。",
+        "输入调用失败、权限不足或目标程序拒绝输入时会报告执行错误。"
+      ],
+      "behavior": {
+        "pauseBehavior": "在执行器命令检查点遵循暂停状态。",
+        "cancellationBehavior": "等待可被 Stop 取消；worker 退出时主进程清理键鼠状态。",
+        "sideEffects": [
+          "等待指定时长。"
+        ],
+        "coordinateSpace": "none",
+        "permissionNotes": "不需要提升权限；实际时间受系统调度和暂停时长影响。"
+      },
+      "example": "Delay(500)",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.1.0-preview.1",
+      "runtime": {
+        "definition": "function(ms) __AnjianBridge_Delay(ms) end",
+        "bindings": [
+          {
+            "name": "__Delay",
+            "method": "Delay",
+            "localName": "__AnjianBridge_Delay"
+          }
+        ]
+      }
+    },
+    {
+      "id": "anjian.runtime.random-delay",
+      "name": "RandomDelay",
+      "category": "runtime",
+      "title": "随机延时",
+      "description": "在包含两端的整数毫秒区间内随机选择时长；最小值不得大于最大值。",
+      "signature": "RandomDelay(minMs, maxMs)",
+      "parameters": [
+        {
+          "name": "minMs",
+          "type": "integer",
+          "required": true,
+          "description": "区间最小值。",
+          "minimum": 0,
+          "maximum": 600000,
+          "unit": "毫秒"
+        },
+        {
+          "name": "maxMs",
+          "type": "integer",
+          "required": true,
+          "description": "区间最大值；不得小于最小值。",
+          "minimum": 0,
+          "maximum": 600000,
+          "unit": "毫秒"
+        }
+      ],
+      "returns": {
+        "type": "nil",
+        "description": "无显式返回值；成功后继续执行后续 Lua 语句。"
+      },
+      "errors": [
+        "参数类型、整数性或范围不合法时产生 Lua 错误。",
+        "输入调用失败、权限不足或目标程序拒绝输入时会报告执行错误。"
+      ],
+      "behavior": {
+        "pauseBehavior": "在执行器命令检查点遵循暂停状态。",
+        "cancellationBehavior": "等待阶段可被 Stop 取消。",
+        "sideEffects": [
+          "随机选择时长并等待。"
+        ],
+        "coordinateSpace": "none",
+        "permissionNotes": "结果为闭区间内整数毫秒。"
+      },
+      "example": "RandomDelay(100, 300)",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.1.0-preview.1",
+      "runtime": {
+        "definition": "function(a, b) __AnjianBridge_RandomDelay(a, b) end",
+        "bindings": [
+          {
+            "name": "__RandomDelay",
+            "method": "RandomDelay",
+            "localName": "__AnjianBridge_RandomDelay"
+          }
+        ]
+      }
+    },
+    {
+      "id": "anjian.runtime.log",
+      "name": "Log",
+      "category": "runtime",
+      "title": "写入运行日志",
+      "description": "使用 Lua tostring 将参数转为文本并发送到主程序运行日志。",
+      "signature": "Log(message)",
+      "parameters": [
+        {
+          "name": "message",
+          "type": "any",
+          "required": true,
+          "description": "任意 Lua 值；运行时使用 tostring 转换为文本。"
+        }
+      ],
+      "returns": {
+        "type": "nil",
+        "description": "无显式返回值；成功后继续执行后续 Lua 语句。"
+      },
+      "errors": [
+        "参数类型、整数性或范围不合法时产生 Lua 错误。",
+        "输入调用失败、权限不足或目标程序拒绝输入时会报告执行错误。"
+      ],
+      "behavior": {
+        "pauseBehavior": "在执行器命令检查点遵循暂停状态。",
+        "cancellationBehavior": "停止会终止 worker；主进程清理本程序持有的键鼠状态。",
+        "sideEffects": [
+          "在主程序运行日志中追加消息。"
+        ],
+        "coordinateSpace": "none",
+        "permissionNotes": "不需要额外 Windows 权限；消息不会自动写入持久化配置。"
+      },
+      "example": "Log(\"本轮完成\")",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.1.0-preview.1",
+      "runtime": {
+        "definition": "function(text) __AnjianBridge_Log(tostring(text)) end",
+        "bindings": [
+          {
+            "name": "__Log",
+            "method": "Log",
+            "localName": "__AnjianBridge_Log"
+          }
+        ]
+      }
+    }
+  ],
+  "runtime": {
+    "prelude": "local function __AnjianDoubleClick(click, holdMs, gapMs)\n  holdMs = holdMs == nil and 50 or holdMs\n  gapMs = gapMs == nil and 100 or gapMs\n  click(holdMs)\n  Delay(gapMs)\n  click(holdMs)\nend",
+    "disabledGlobals": [
+      "os",
+      "io",
+      "package",
+      "debug",
+      "require",
+      "dofile",
+      "loadfile",
+      "luanet"
+    ]
+  }
+}
