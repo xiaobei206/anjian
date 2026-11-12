@@ -112,7 +112,7 @@ internal sealed class WindowsWindowManager : IDisposable
 
                 var className = ReadClassName(handle);
                 var processName = ReadProcessName(processId, out var processStartTicks);
-                var reference = RegisterReference(handle, processId, threadId, className, processStartTicks);
+                var reference = RegisterReference(handle, processId, threadId, className, processStartTicks, isChild: true);
                 results.Add(CreateInfo(
                     reference,
                     ReadWindowText(handle),
@@ -194,7 +194,8 @@ internal sealed class WindowsWindowManager : IDisposable
         var reference = Resolve(id);
         var bounds = ReadWindowRect(reference.Handle);
         EnsureCurrent(reference);
-        SetPosition(reference.Handle, 0, x, y, bounds.Width, bounds.Height, SwpNoZOrder | SwpNoActivate);
+        var position = ToWindowPosition(reference, x, y);
+        SetPosition(reference.Handle, 0, position.X, position.Y, bounds.Width, bounds.Height, SwpNoZOrder | SwpNoActivate);
         return true;
     }
 
@@ -206,7 +207,8 @@ internal sealed class WindowsWindowManager : IDisposable
         var reference = Resolve(id);
         var bounds = ReadWindowRect(reference.Handle);
         EnsureCurrent(reference);
-        SetPosition(reference.Handle, 0, bounds.Left, bounds.Top, width, height, SwpNoZOrder | SwpNoActivate);
+        var position = ToWindowPosition(reference, bounds.Left, bounds.Top);
+        SetPosition(reference.Handle, 0, position.X, position.Y, width, height, SwpNoZOrder | SwpNoActivate);
         return true;
     }
 
@@ -222,7 +224,8 @@ internal sealed class WindowsWindowManager : IDisposable
 
         var work = ToPixelRect(monitorInfo.Work);
         var location = CoordinateConverter.AlignWindow(bounds, work, anchor, offsetX, offsetY);
-        SetPosition(reference.Handle, 0, location.X, location.Y, bounds.Width, bounds.Height, SwpNoZOrder | SwpNoActivate);
+        var position = ToWindowPosition(reference, location.X, location.Y);
+        SetPosition(reference.Handle, 0, position.X, position.Y, bounds.Width, bounds.Height, SwpNoZOrder | SwpNoActivate);
         return true;
     }
 
@@ -296,14 +299,15 @@ internal sealed class WindowsWindowManager : IDisposable
         uint processId,
         uint threadId,
         string className,
-        long processStartTicks)
+        long processStartTicks,
+        bool isChild = false)
     {
         if (_destroyHook == 0)
             throw new InvalidOperationException(
                 "无法安装 Windows 窗口销毁事件跟踪；为避免 HWND 销毁后复用导致误操作，本次拒绝创建窗口引用。");
 
         var id = Guid.NewGuid().ToString("N");
-        var reference = new WindowReference(id, handle, processId, threadId, className, processStartTicks);
+        var reference = new WindowReference(id, handle, processId, threadId, className, processStartTicks, isChild);
         _references[id] = reference;
         _referencesByHandle.AddOrUpdate(
             handle,
@@ -389,6 +393,7 @@ internal sealed class WindowsWindowManager : IDisposable
             IsZoomed(reference.Handle),
             GetForegroundWindow() == reference.Handle,
             IsFocused(reference.Handle, reference.ThreadId),
+            reference.IsChild,
             windowRect,
             clientRect,
             DestroyTracking: _destroyHook != 0);
@@ -493,6 +498,27 @@ internal sealed class WindowsWindowManager : IDisposable
             throw new ArgumentOutOfRangeException(nameof(timeoutMilliseconds), "窗口等待超时必须在 0 到 600000 毫秒之间。");
     }
 
+    /// <summary>
+    /// Public Move/Align coordinates are always virtual-desktop screen pixels.
+    /// SetWindowPos expects parent-client coordinates for child HWNDs, so convert
+    /// only at the Win32 boundary and keep the public coordinate contract stable.
+    /// </summary>
+    private static (int X, int Y) ToWindowPosition(WindowReference reference, int screenX, int screenY)
+    {
+        if (!reference.IsChild)
+            return (screenX, screenY);
+
+        var parent = GetParent(reference.Handle);
+        if (parent == 0 || !IsWindow(parent))
+            throw new InvalidOperationException("目标子窗口的父窗口已关闭，无法按屏幕坐标定位。");
+
+        var point = new Point { X = screenX, Y = screenY };
+        if (!ScreenToClient(parent, ref point))
+            throw new Win32Exception(Marshal.GetLastWin32Error(), "无法将屏幕坐标转换为父窗口客户区坐标。");
+
+        return (point.X, point.Y);
+    }
+
     private static void SetPosition(
         nint handle,
         nint insertAfter,
@@ -548,7 +574,8 @@ internal sealed class WindowsWindowManager : IDisposable
         uint processId,
         uint threadId,
         string className,
-        long processStartTicks)
+        long processStartTicks,
+        bool isChild)
     {
         public string Id { get; } = id;
         public nint Handle { get; } = handle;
@@ -556,6 +583,7 @@ internal sealed class WindowsWindowManager : IDisposable
         public uint ThreadId { get; } = threadId;
         public string ClassName { get; } = className;
         public long ProcessStartTicks { get; } = processStartTicks;
+        public bool IsChild { get; } = isChild;
         public int Destroyed;
     }
 
@@ -655,6 +683,13 @@ internal sealed class WindowsWindowManager : IDisposable
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool IsChild(nint parent, nint child);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern nint GetParent(nint handle);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool ScreenToClient(nint handle, ref Point point);
 
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]

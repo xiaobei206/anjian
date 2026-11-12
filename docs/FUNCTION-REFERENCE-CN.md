@@ -547,7 +547,7 @@ local w = WindowFind("记事本")\nif w then\n  local children = WindowEnumerate
 |---|---|---|---|---|---|
 | `id` | `string` | 是 | — | — | 由窗口查找/枚举 API 返回的窗口引用 ID。 |
 
-**返回值：** `table` — 包含 id/title/className/processId/processName/visible/minimized/maximized/foreground/focused/windowRect/clientRect/destroyTracking 的信息表。
+**返回值：** `table` — 包含 id/title/className/processId/processName/visible/minimized/maximized/foreground/focused/isChild/windowRect/clientRect/destroyTracking 的信息表。
 **错误：** 窗口 ID 无效、过期或句柄已销毁时产生 Lua 错误。
 **执行/取消语义：** 在执行器命令边界遵循暂停状态；等待操作期间响应暂停/停止。 等待操作响应统一停止令牌；停止会终止 worker，窗口等待取消后不保留后台任务。
 **坐标/权限：** 坐标空间：screen（矩形均为虚拟桌面物理像素）。只读取窗口基本元数据；窗口矩形为右/下边界不包含的矩形。
@@ -567,7 +567,7 @@ local w = WindowFind("记事本")\nif w then local info = WindowGetInfo(w.id); L
 |---|---|---|---|---|---|
 | `id` | `string` | 是 | — | — | 窗口引用 ID。 |
 
-**返回值：** `boolean` — 操作请求成功返回 true；Windows 拒绝或窗口已失效时产生错误。
+**返回值：** `boolean` — Windows 接受前台激活请求时返回 true；受前台锁定策略拒绝时返回 false；窗口引用失效或 Win32 查询失败时产生错误。
 **错误：** 参数类型、整数性或范围不合法时产生 Lua 错误。；目标窗口关闭、权限不足或 Windows API 调用失败时报告执行错误。
 **执行/取消语义：** 在执行器命令边界遵循暂停状态；等待操作期间响应暂停/停止。 等待操作响应统一停止令牌；停止会终止 worker，窗口等待取消后不保留后台任务。
 **坐标/权限：** 坐标空间：none。通过标准 Win32 窗口 API 请求操作；不保证应用接受激活请求，不提升权限、不绕过安全桌面。

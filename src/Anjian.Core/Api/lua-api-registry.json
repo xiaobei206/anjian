@@ -1541,7 +1541,7 @@
       ],
       "returns": {
         "type": "table",
-        "description": "包含 id/title/className/processId/processName/visible/minimized/maximized/foreground/focused/windowRect/clientRect/destroyTracking 的信息表。"
+        "description": "包含 id/title/className/processId/processName/visible/minimized/maximized/foreground/focused/isChild/windowRect/clientRect/destroyTracking 的信息表。"
       },
       "errors": [
         "窗口 ID 无效、过期或句柄已销毁时产生 Lua 错误。"
@@ -1585,7 +1585,7 @@
       ],
       "returns": {
         "type": "boolean",
-        "description": "操作请求成功返回 true；Windows 拒绝或窗口已失效时产生错误。"
+        "description": "Windows 接受前台激活请求时返回 true；受前台锁定策略拒绝时返回 false；窗口引用失效或 Win32 查询失败时产生错误。"
       },
       "errors": [
         "参数类型、整数性或范围不合法时产生 Lua 错误。",

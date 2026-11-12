@@ -45,6 +45,7 @@ public sealed record WindowInfo(
     bool Maximized,
     bool Foreground,
     bool Focused,
+    bool IsChild,
     PixelRect WindowRect,
     PixelRect ClientRect,
     bool DestroyTracking);

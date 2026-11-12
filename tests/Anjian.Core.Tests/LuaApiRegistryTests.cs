@@ -41,18 +41,19 @@ public sealed class LuaApiRegistryTests
  {
   var pipe = new Recorder
   {
-   Response = """{"id":"window-opaque-1","title":"目标窗口","className":"TestClass","processId":42,"processName":"test","visible":true,"minimized":false,"maximized":false,"foreground":true,"focused":true,"windowRect":{"left":-100,"top":20,"right":500,"bottom":420,"width":600,"height":400,"hasArea":true},"clientRect":{"left":-92,"top":48,"right":492,"bottom":412,"width":584,"height":364,"hasArea":true},"destroyTracking":true}"""
+   Response = """{"id":"window-opaque-1","title":"目标窗口","className":"TestClass","processId":42,"processName":"test","visible":true,"minimized":false,"maximized":false,"foreground":true,"focused":true,"isChild":false,"windowRect":{"left":-100,"top":20,"right":500,"bottom":420,"width":600,"height":400,"hasArea":true},"clientRect":{"left":-92,"top":48,"right":492,"bottom":412,"width":584,"height":364,"hasArea":true},"destroyTracking":true}"""
   };
   using var lua = new Lua(openLibs:true);
   LuaApiRuntime.Register(lua, new WorkerLuaApi(pipe, lua));
   var values = lua.DoString("""
     local w = WindowFind("目标", "", "test", 42, true)
     local info = WindowGetInfo(w.id)
-    return w.id, w.title, info.focused
+    return w.id, w.title, info.focused, info.isChild
     """);
   Assert.Equal("window-opaque-1", values[0]?.ToString());
   Assert.Equal("目标窗口", values[1]?.ToString());
   Assert.True(Convert.ToBoolean(values[2]));
+  Assert.False(Convert.ToBoolean(values[3]));
   Assert.Contains(pipe.Items, item => item.Type == "window-find");
   Assert.Contains(pipe.Items, item => item.Type == "window-get-info");
  }
