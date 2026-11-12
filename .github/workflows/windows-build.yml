@@ -3,7 +3,6 @@ name: Windows build and test
 on:
   push:
     branches: [main]
-    tags: ['v*']
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -33,6 +32,8 @@ jobs:
         shell: pwsh
         run: |
           $version = (Get-Content VERSION -Raw).Trim()
+          $productVersion = [System.Diagnostics.FileVersionInfo]::GetVersionInfo("artifacts/publish/win-x64/Anjian.App.exe").ProductVersion
+          if (-not $productVersion.StartsWith($version)) { throw "ProductVersion mismatch: $productVersion vs $version" }
           $zip = "Anjian2026-$version-win-x64.zip"
           Compress-Archive -Path "artifacts/publish/win-x64/*" -DestinationPath "artifacts/$zip" -CompressionLevel Optimal
           $hash = (Get-FileHash "artifacts/$zip" -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -46,10 +47,21 @@ jobs:
             artifacts/Anjian2026-*-win-x64.zip.sha256
           if-no-files-found: error
           retention-days: 30
+      - name: Read release version
+        if: github.event_name == 'push' && startsWith(github.event.head_commit.message, 'release:')
+        id: release_version
+        shell: pwsh
+        run: |
+          $version = (Get-Content VERSION -Raw).Trim()
+          "version=$version" | Set-Content $env:GITHUB_OUTPUT -Encoding utf8 -Append
       - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: github.event_name == 'push' && startsWith(github.event.head_commit.message, 'release:')
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: v${{ steps.release_version.outputs.version }}
+          target_commitish: ${{ github.sha }}
+          name: Anjian2026 v${{ steps.release_version.outputs.version }}
+          prerelease: true
           generate_release_notes: true
           files: |
             artifacts/Anjian2026-*-win-x64.zip

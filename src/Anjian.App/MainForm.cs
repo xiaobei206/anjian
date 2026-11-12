@@ -132,6 +132,21 @@ internal sealed class MainForm : Form
         _scripts.Dock = DockStyle.Fill;
         _scripts.IntegralHeight = false;
         split.Panel1.Controls.Add(_scripts);
+        var scriptMenu = new ContextMenuStrip();
+        scriptMenu.Items.Add("打开", null, (_, _) => SelectScript());
+        scriptMenu.Items.Add("新建脚本", null, (_, _) => CreateScript());
+        scriptMenu.Items.Add("复制脚本", null, (_, _) => DuplicateCurrent());
+        scriptMenu.Items.Add("重命名", null, (_, _) => RenameCurrent());
+        scriptMenu.Items.Add("删除", null, (_, _) => DeleteCurrent());
+        _scripts.ContextMenuStrip = scriptMenu;
+        _scripts.MouseDown += (_, e) =>
+        {
+            if (e.Button == MouseButtons.Right)
+            {
+                var index = _scripts.IndexFromPoint(e.Location);
+                if (index >= 0) _scripts.SelectedIndex = index;
+            }
+        };
 
         var sideButtons = new FlowLayoutPanel
         {
@@ -347,6 +362,21 @@ internal sealed class MainForm : Form
         catch (Exception ex)
         {
             MessageBox.Show(this, ex.Message, "重命名失败", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    private void DuplicateCurrent()
+    {
+        if (_current is null || !SaveCurrent()) return;
+        try
+        {
+            var copy = _repository.Duplicate(_current);
+            RefreshScripts(copy.FullPath);
+            AppendLog($"已复制脚本：{copy.Name}");
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, "复制失败", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
 

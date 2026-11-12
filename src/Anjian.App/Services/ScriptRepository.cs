@@ -62,6 +62,13 @@ public sealed class ScriptRepository
         return new ScriptEntry(safe, target);
     }
 
+    public ScriptEntry Duplicate(ScriptEntry entry)
+    {
+        var copy = Create(entry.Name + "_副本");
+        File.Copy(entry.FullPath, copy.FullPath, overwrite: true);
+        return copy;
+    }
+
     public void Delete(ScriptEntry entry)
     {
         if (File.Exists(entry.FullPath))
