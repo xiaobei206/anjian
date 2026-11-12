@@ -4,29 +4,29 @@ Windows 10/11 x64 桌面自动化工具，首版使用 WinForms + .NET 10 + Lua 
 
 ## 当前进度
 
-Windows x64 预览版 v0.1.0-preview.2 已完成 CI 构建与自动化测试。该版本新增全局快捷键：F10 启动、F11 暂停/继续、F12 中止。它不是完整 IDE，优先提供录制、Lua 编辑、播放控制和重复运行设置。
+Windows x64 预览版 v0.1.0-preview.3 本轮新增点击坐标录制、录制暂停/续录、紧凑悬浮窗、实时鼠标坐标和可选置顶。当前 Release 工作流正在进行最终构建与打包；这是早期预览版，不是完整 IDE。
 
-开发中的下一预览增量已加入：只记录点击坐标、暂停后继续录制、默认紧凑悬浮窗、实时鼠标坐标和可选置顶；新版本通过 CI 后再发布。
-
-下载入口：[v0.1.0-preview.2 正式预览版](https://github.com/xiaobei206/anjian/releases/tag/v0.1.0-preview.2)，或直接下载 [Windows x64 ZIP](https://github.com/xiaobei206/anjian/releases/download/v0.1.0-preview.2/Anjian2026-0.1.0-preview.2-win-x64.zip) 和 [SHA256](https://github.com/xiaobei206/anjian/releases/download/v0.1.0-preview.2/Anjian2026-0.1.0-preview.2-win-x64.zip.sha256)。
+下载入口：[v0.1.0-preview.3 正式预览版](https://github.com/xiaobei206/anjian/releases/tag/v0.1.0-preview.3)，或直接下载 [Windows x64 ZIP](https://github.com/xiaobei206/anjian/releases/download/v0.1.0-preview.3/Anjian2026-0.1.0-preview.3-win-x64.zip) 和 [SHA256](https://github.com/xiaobei206/anjian/releases/download/v0.1.0-preview.3/Anjian2026-0.1.0-preview.3-win-x64.zip.sha256)。
 使用说明：[首版使用说明](docs/USER-GUIDE-CN.md)。
 
 ## 首版目标
 
 - 本地 Lua 脚本列表：新建、打开、保存、重命名、复制、删除；支持右键菜单。
 - 全局鼠标/键盘录制，生成可编辑 Lua 脚本；录制会过滤本程序自身界面和注入输入。
-- 鼠标移动合并/降噪；点击和按键的按下时长会被保留。
+- 鼠标移动合并/降噪；可勾选只记录点击坐标，生成 MoveTo -> 可选 Delay -> Click，避免录入手抖轨迹；点击和按键按下时长会被保留。
+- 录制按钮可开始/暂停/继续，单独结束录制；暂停时保留前段事件并排除暂停时长。
 - 鼠标移动、点击、按下/释放、滚轮；键盘单键、按下/释放、组合键和 Unicode 文本输入。
 - 播放、暂停、停止；脚本在独立子进程执行，停止通过终止执行进程处理 Lua 无限循环，并清理仍按下的输入。
 - 全局快捷键：F10 启动、F11 暂停/继续、F12 立即中止；无需切回主窗口。
 - 重复次数：默认 1；输入 100 表示执行 100 轮；0 表示无限循环。
 - 每轮间隔：默认 2000ms，可设 0 至 600000ms。只在两轮之间等待，最后一轮后不等待。
+- 默认紧凑悬浮窗显示脚本名和实时鼠标坐标；可切换完整模式、拖动窗口和设置始终置顶。
 - 设置保存在本机用户配置目录。
 
 ## 快速使用
 
 1. 从 GitHub Releases 下载 Anjian2026 对应版本的 win-x64 ZIP，解压后运行 Anjian.App.exe。
-2. 点击“新建脚本”或“开始录制”。录制开始后切换到目标程序操作，完成后切回本软件点击“结束录制”。
+2. 在悬浮窗点击“开始录制”；默认“只录点击”已勾选，需要鼠标轨迹时取消勾选。录制中可暂停并继续，最后点击“结束录制”。需要编辑代码时点击“完整模式”。
 3. 双击脚本列表中的脚本打开编辑；Ctrl+S 保存。
 4. 设置重复次数和每轮间隔后点击“播放”；也可在任意窗口按 F10 启动、F11 暂停/继续、F12 中止并释放键鼠输入。
 

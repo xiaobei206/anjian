@@ -210,3 +210,11 @@ TV-01：Lua 5.4 / .NET 10 绑定与中断机制 PoC。
 - 本地工具链未执行 Windows 编译；等待 GitHub Actions Windows runner 验证。
 - Windows 实机交互和 UI 布局：NOT RUN。
 - 若 CI 通过，再将版本递增至 v0.1.0-preview.3 并发布；不覆盖 preview.2。
+
+
+## 2026-11-12 — S004.1 — Windows CI 第一轮通过
+
+- 功能提交 `659db9836c1ab51c7e8812958eb1fee7166fa9ad` 对应 Actions run `43231551625`：SUCCESS。
+- Build、Test、self-contained publish、ZIP/SHA256 package、artifact upload 全部通过。
+- 随后在紧凑悬浮窗顶部增加“只录点击”勾选，commit `3d79665418869487405e74c12d0f4308f404bbf1`，其 CI run `43231710764` 已通过 Build/Test/Publish/Package。
+- 正在递增版本至 v0.1.0-preview.3，并由 Release workflow 对最终代码再次完整验证。

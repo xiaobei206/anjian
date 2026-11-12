@@ -8,7 +8,7 @@
 - Release：https://github.com/xiaobei206/anjian/releases/tag/v0.1.0-preview.2
 - 发布提交：`3e63ff38d8111181fa1a402547350c80e6ceb882`
 - 发布 Actions run：`43226666516`，结论 SUCCESS。
-- 当前开发：新增点击坐标模式、录制暂停/继续、紧凑悬浮窗、实时坐标和可选置顶，代码已写入 main，尚待 Windows CI 编译验证；preview.2 仍是最新正式 Release。通过后发布 preview.3。
+- 当前开发：点击坐标模式、录制暂停/继续、紧凑悬浮窗、实时坐标和可选置顶已实现；第一轮 CI（commit `659db9836c1ab51c7e8812958eb1fee7166fa9ad`）SUCCESS，包含 Build/Test/Publish/Package。最终 UI 小修与 preview.3 Release 工作流正在验证；实机验收待用户完成。
 
 ## 本轮新增需求与实现目标
 - 默认勾选“只记录点击坐标”：鼠标移动不生成 MoveTo 轨迹；点击使用真实按下坐标，生成 MoveTo -> 可选 Delay -> Click。

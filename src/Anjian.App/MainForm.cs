@@ -487,6 +487,13 @@ internal sealed class MainForm : Form
     {
         if (_scripts.SelectedItem is not ScriptEntry selected || selected == _current)
             return;
+        if (_recordSessionActive)
+        {
+            var currentIndex = _scripts.Items.IndexOf(_current);
+            if (currentIndex >= 0) _scripts.SelectedIndex = currentIndex;
+            AppendLog("录制期间不能切换脚本，请先结束录制。");
+            return;
+        }
         if (!SaveCurrent())
             return;
 
@@ -504,6 +511,7 @@ internal sealed class MainForm : Form
 
     private void CreateScript()
     {
+        if (_recordSessionActive) { AppendLog("请先结束录制，再新建脚本。"); return; }
         if (!SaveCurrent()) return;
         try
         {
@@ -519,6 +527,7 @@ internal sealed class MainForm : Form
 
     private bool SaveCurrent()
     {
+        if (_recordSessionActive) return true;
         if (_current is null || !_dirty) return true;
         try
         {
@@ -536,6 +545,7 @@ internal sealed class MainForm : Form
 
     private void RenameCurrent()
     {
+        if (_recordSessionActive) { AppendLog("请先结束录制，再重命名脚本。"); return; }
         if (_current is null || !SaveCurrent()) return;
         using var prompt = new TextPromptForm("重命名脚本", "新的脚本名称：", _current.Name);
         if (prompt.ShowDialog(this) != DialogResult.OK) return;
@@ -555,6 +565,7 @@ internal sealed class MainForm : Form
 
     private void DuplicateCurrent()
     {
+        if (_recordSessionActive) { AppendLog("请先结束录制，再复制脚本。"); return; }
         if (_current is null || !SaveCurrent()) return;
         try
         {
@@ -570,6 +581,7 @@ internal sealed class MainForm : Form
 
     private void DeleteCurrent()
     {
+        if (_recordSessionActive) { AppendLog("请先结束录制，再删除脚本。"); return; }
         if (_current is null) return;
         if (MessageBox.Show(this, $"确定删除脚本“{_current.Name}”吗？此操作不可撤销。",
             "删除脚本", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
@@ -710,6 +722,7 @@ internal sealed class MainForm : Form
         _miniStopRecordButton.Enabled = _recordSessionActive;
         _recordButton.Enabled = !_playback.IsRunning;
         _miniRecordButton.Enabled = !_playback.IsRunning;
+        _scripts.Enabled = !_recordSessionActive;
         _clickOnlyCheck.Enabled = !_recordSessionActive;
         _miniClickOnlyCheck.Enabled = !_recordSessionActive;
         _playButton.Enabled = !_recordSessionActive && !_playback.IsRunning;
