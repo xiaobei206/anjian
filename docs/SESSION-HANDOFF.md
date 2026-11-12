@@ -104,7 +104,7 @@
 - Windows CI 编译、7 项自动化测试、self-contained 发布、ZIP/SHA256 和 Release 创建：PASS（Actions run `43253611158`）。
 - Windows 10/11 实机手工验收：NOT RUN；CI 成功不代表桌面窗口、托盘、Hook 或图标实机通过。
 
-## M1 实机验收待办（仍为 NOT RUN，不阻塞 M2 文档/API 工程）
+## M1 实机验收待办（仍为 NOT RUN，不阻塞后续 M4 开发）
 用户下载 v0.1.0-preview.4，在 Windows 10/11 实机验收：
 1. 默认启动确认只显示悬浮窗与托盘图标，任务栏没有主窗口按钮。
 2. 点击悬浮窗“完整界面”打开主窗口，确认悬浮窗一直留在桌面；关闭主窗口右上角 × 后，主窗口任务栏按钮消失，悬浮窗和托盘仍在。
@@ -134,18 +134,18 @@
 
 ### 验收边界与未完成事项
 - 当前执行容器没有 .NET SDK（`dotnet --info` 返回 command not found），本地 Restore/Build/Test：NOT RUN；实际构建和 12 项自动化测试由 Windows GitHub Actions runner 执行并通过。
-- 编辑器自动补全、参数提示、命令面板 UI 尚未实现；M2 已提供唯一数据源，M3 必须直接消费该注册表，不能复制维护第二份 API 清单。
+- M2 完成时，编辑器补全/签名提示和命令面板 UI 尚未实现；随后 M3 已交付注册表驱动的编辑器补全与签名提示，独立命令面板仍未实现。
 - M1 Windows 10/11 窗口/托盘/Hook 实机验收、DPI/多显示器、复杂拖拽和 2 小时稳定性仍为 NOT RUN。CI 成功不等于桌面实机验收成功。
 
 ### M3 完成：完整 Lua IDE 基础（Windows CI 已验收）
 
-- 最终 M3 代码验收基线：`71555d30815a60f96ef0708fe6c46f4cc0a16253`。
-- Windows Actions run `43281738798`：SUCCESS；Restore PASS；Release Build PASS（0 warnings / 0 errors）；自动化测试 `20 passed / 0 failed / 0 skipped`；API handbook `--check` PASS；self-contained win-x64 publish、ZIP/SHA256 和 artifact upload 均 PASS。
+- 最终 M3 代码验收基线：`71fd493cad0fbed1451a4ffa46192752a18bd0a6`。
+- Windows Actions run `43282795272`：SUCCESS；Restore PASS；Release Build PASS（0 warnings / 0 errors）；自动化测试 `20 passed / 0 failed / 0 skipped`；API handbook `--check` PASS；self-contained win-x64 publish、ZIP/SHA256 和 artifact upload 均 PASS。
 - 实现位于 `Anjian.Core.Editor.LuaEditorService` 和 WinForms `LuaEditorControl` / `ScriptSearchReplaceForm` / `MainForm`。功能包括语法高亮、行号、API 补全、活动参数/签名帮助、查找替换、多标签保存/重开、语法诊断和错误行导航。
 - API 候选、签名和高亮只读取 `LuaApiRegistry.Load().Categories` / `.Apis`；不复制函数定义，只列出状态为 `implemented` 的 API。独立 API 命令面板未实现。
-- 语法检查调用 NLua `LoadString` 编译 chunk，不执行脚本；高亮扫描移至后台线程并以文本版本号丢弃过期结果。
+- 语法检查调用 NLua `LoadString` 编译 chunk，不执行脚本；高亮扫描移至后台线程并以文本版本号丢弃过期结果。签名提示统计嵌套 `()`、`[]`、`{}`，不会把表构造器或内层调用中的逗号误判成外层参数分隔符。
 - Windows 自动测试 20 项全部通过；本地 Restore/Build/Test 为 NOT RUN（容器无 .NET SDK）。桌面实机验收与 1MB 文件/DPI/中文日文输入人工验证仍为 NOT RUN。
-- 早期有一项签名提示测试因测试夹具逗号位置错误失败；修正夹具后最终 run `43281738798` 通过。前期错误不隐藏，最终状态以该次最新成功运行作为验收依据。
+- 早期有一项签名提示测试因测试夹具逗号位置错误失败；修正夹具后最终 run `43282795272` 通过。前期错误不隐藏，最终状态以该次最新成功运行作为验收依据。
 - M3 未创建 Release，v0.1.0-preview.4 Release ZIP/SHA256 未改变。代码折叠不在该 handoff 强制范围，功能矩阵 F04 仍为部分实现；M4 调试器未实现。
 
 ### 下一会话唯一任务（M4：Lua 调试器基础）
@@ -164,4 +164,4 @@ M3 Windows 桌面手工验收仍为 NOT RUN；代码折叠和独立 API 命令�
 
 ## 下一会话接手指令
 
-先核对 `main` 最新 HEAD，再读取本文件、`AGENTS.md`、`README.md`、`docs/ROADMAP-CN.md`。M3 已由 Windows Actions run `43281738798` 验收通过；下一会话唯一开发任务为 M4 Lua 调试器基础，严格按本节 ID/范围/验收条件执行，不重复询问仓库已有答案。直接在 main 小步提交，不创建长期分支或 PR。v0.1.0-preview.4 发布资产不变；M1 和 M3 Windows 桌面手工验收都必须保留为 NOT RUN，CI 不可代替实机验收。
+先核对 `main` 最新 HEAD，再读取本文件、`AGENTS.md`、`README.md`、`docs/ROADMAP-CN.md`。M3 已由 Windows Actions run `43282795272` 验收通过；下一会话唯一开发任务为 M4 Lua 调试器基础，严格按本节 ID/范围/验收条件执行，不重复询问仓库已有答案。直接在 main 小步提交，不创建长期分支或 PR。v0.1.0-preview.4 发布资产不变；M1 和 M3 Windows 桌面手工验收都必须保留为 NOT RUN，CI 不可代替实机验收。

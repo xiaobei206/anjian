@@ -360,18 +360,18 @@ M2 已 DONE。下一开发任务为 M3：完整 Lua IDE 基础。编辑器补全
 - 新增 `ScriptSearchReplaceForm`：查找下一个（循环）、替换当前、全部替换和区分大小写。
 - `MainForm` 接入多标签。切换标签自动保存，关闭标签保存，已有脚本重新打开时恢复对应编辑器；录制期间禁止切换/关闭活动编辑器标签。
 - 增加语法检查工具入口：显示诊断、将光标导航到首个错误行/列；语法通过与失败的日志都明确说明只检查语法，不运行脚本。
-- 新增编辑器 Core 单元测试：token 分类和 API 识别、注册表补全边界、嵌套函数签名提示、只编译不执行、错误行解析、注释/字符串上下文、标识符前缀和约 1MB 输入的词法扫描。
+- 新增编辑器 Core 单元测试：token 分类和 API 识别、注册表补全边界、嵌套函数/表构造器签名提示、只编译不执行、错误行解析、注释/字符串上下文、标识符前缀和约 1MB 输入的词法扫描。
 - API 补全、签名帮助、API 颜色只使用 `LuaApiRegistry.Load()` 的 `Categories` / `Apis`；未把计划中的 `FindWindow` 等目标设计 API 伪装成当前可调用函数。没有接入独立 API 命令面板；调试器保留在 M4。
 
 ### Windows CI 验证
-- M3 代码验收提交：`71555d30815a60f96ef0708fe6c46f4cc0a16253`。
-- Windows Actions run `43281738798`：**SUCCESS**（<https://github.com/xiaobei206/anjian/actions/runs/43281738798>）。
+- M3 最终代码验收基线：`71fd493cad0fbed1451a4ffa46192752a18bd0a6`。
+- Windows Actions run `43282795272`：**SUCCESS**（<https://github.com/xiaobei206/anjian/actions/runs/43282795272>）。
 - Restore：PASS。
 - Release Build：PASS，0 warnings / 0 errors。
 - 自动化测试：**20 passed / 0 failed / 0 skipped**。
 - `Anjian.ApiDocsGenerator --check`：PASS。
 - self-contained win-x64 publish：PASS；ZIP/SHA256 package：PASS；Actions Artifact upload：PASS。
-- 早期自动化验证曾出现 1 项签名提示断言失败。检查 Windows runner 日志后确认测试输入字符串的逗号被误放在光标前，实际对应第三个外层参数；修正测试夹具为尚未关闭的嵌套调用后，最终 20 项测试全部通过。Build 全程为 0 warning / 0 error。
+- 早期自动化验证曾出现 1 项签名提示断言失败。检查 Windows runner 日志后确认测试夹具中的字符串逗号位于光标之前，实际对应第三个外层参数；修正测试夹具后，又补强 `()` / `[]` / `{}` 嵌套深度，并增加表构造器逗号回归。最终 Actions run `43282795272` 的 20 项测试全部通过；Build 为 0 warnings / 0 errors。
 - 当前执行容器没有 .NET SDK，且无法在本容器执行 Windows WinForms 桌面测试；本地 Restore/Build/Test：NOT RUN。以上成功结果仅来自 Windows GitHub Actions runner。
 - 本轮没有创建 Release；已发布的 `v0.1.0-preview.4` 文件和 SHA256 没有更新。M3 功能目前只在 main 未发布代码中。
 
@@ -387,7 +387,8 @@ M2 已 DONE。下一开发任务为 M3：完整 Lua IDE 基础。编辑器补全
 - WinForms 编辑器控件：`fff758d58f8066ed206d483270026d74ff59c882`。
 - 查找替换窗口：`14aef3017159d7d0823d0a82add4875fbce1a526`。
 - 主窗口多标签/诊断接入：`0090450ffe275323e28cc46f8fcd79dbe21ecab7`。
-- 最终 Windows CI 测试夹具修正：`71555d30815a60f96ef0708fe6c46f4cc0a16253`。
+- 原签名测试夹具修正：`71555d30815a60f96ef0708fe6c46f4cc0a16253`。
+- 嵌套表构造器签名解析修复：`17ecde69672694354ccac2c9f3d7e096e8bb5b0b`；回归测试：`71fd493cad0fbed1451a4ffa46192752a18bd0a6`。
 
 ### 下一步
 M3 已 DONE。下一会话唯一任务为 M4：Lua 调试器基础。必须实现真实断点、单步、运行到光标、变量观察和调用栈，禁止仅用日志显示冒充调试。M1 Windows 实机验收作为独立未完成事项继续保留，不阻塞 M4。

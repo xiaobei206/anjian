@@ -64,13 +64,13 @@ M2 验收：当前实现中的 22 个公开函数均可在注册表和手册中�
 - [x] 查找下一个（含循环查找）、替换当前项、全部替换和大小写选项。
 - [x] API 自动补全和参数/签名提示直接读取 `LuaApiRegistry.Load()` 的 `Categories` / `Apis`；只提示注册表中标记为 `implemented` 的真实 API，不在 UI 维护第二份函数定义。
 - [x] Lua 语法诊断使用 NLua 编译 chunk 的 `LoadString` 路径，不调用脚本；错误写入运行日志并导航到首个错误行/列。
-- [x] 自动化测试覆盖 token 分类、真实 API 补全边界、嵌套函数参数提示、只编译不执行、语法错误定位、注释/字符串上下文以及大文本词法处理。
+- [x] 自动化测试覆盖 token 分类、真实 API 补全边界、函数/表构造器嵌套参数提示、只编译不执行、语法错误定位、注释/字符串上下文以及大文本词法处理。
 - [x] 语法着色词法扫描移至后台任务并使用文本版本号丢弃过期结果，避免大文本扫描阻塞 UI；录制期间防止切换或关闭活动脚本标签。
 
 ### Windows CI 验证
-- 最终验收提交：`71555d30815a60f96ef0708fe6c46f4cc0a16253`；Actions run `43281738798`：SUCCESS。
+- 最终代码验收基线：`71fd493cad0fbed1451a4ffa46192752a18bd0a6`；Actions run `43282795272`：SUCCESS。
 - Restore PASS；Release Build PASS（0 warnings / 0 errors）；自动化测试 **20 passed / 0 failed / 0 skipped**；API handbook `--check` PASS；self-contained win-x64 publish PASS；ZIP/SHA256 package PASS；artifact upload PASS。
-- 前期测试曾因签名提示测试夹具把字符串内部逗号误算为外层函数参数，出现 1 项断言失败；纠正夹具后最终主线运行全部通过。UI 集成相关 Build 均通过。
+- 前期测试曾因签名提示测试夹具把光标前的字符串逗号误算为外层参数，出现 1 项断言失败；修正夹具后又补上表构造器 `{} ` 及 `[]` / `()` 嵌套逗号处理与回归测试，最终主线运行全部通过。UI 集成相关 Build 均通过。
 - 本执行环境未安装 .NET SDK，故本地 Restore/Build/Test 为 NOT RUN；上述结果仅来自 Windows GitHub Actions runner。
 - 本轮没有创建 release，已发布的 v0.1.0-preview.4 资产没有更新；新 IDE 功能目前只在 main 未发布代码中。
 
