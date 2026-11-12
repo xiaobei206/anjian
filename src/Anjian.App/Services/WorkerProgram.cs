@@ -88,10 +88,30 @@ internal static class WorkerProgram
             Delay = function(ms) __Delay(ms) end
             Log = function(text) __Log(tostring(text)) end
             RandomDelay = function(a, b) __RandomDelay(a, b) end
+            local function DoubleClick(click, holdMs, gapMs)
+                holdMs = holdMs == nil and 50 or holdMs
+                gapMs = gapMs == nil and 100 or gapMs
+                click(holdMs)
+                Delay(gapMs)
+                click(holdMs)
+            end
+            LeftDoubleClick = function(holdMs, gapMs) DoubleClick(LeftClick, holdMs, gapMs) end
+            RightDoubleClick = function(holdMs, gapMs) DoubleClick(RightClick, holdMs, gapMs) end
+            MiddleDoubleClick = function(holdMs, gapMs) DoubleClick(MiddleClick, holdMs, gapMs) end
             Hotkey = function(...)
                 local keys = {...}
-                for i = 1, #keys do KeyDown(keys[i]) end
-                for i = #keys, 1, -1 do KeyUp(keys[i]) end
+                local held = {}
+                local ok, err = pcall(function()
+                    for i = 1, #keys do
+                        KeyDown(keys[i])
+                        held[#held + 1] = keys[i]
+                    end
+                end)
+                for i = #held, 1, -1 do
+                    local released, releaseError = pcall(function() KeyUp(held[i]) end)
+                    if not released and ok then ok, err = false, releaseError end
+                end
+                if not ok then error(err, 0) end
             end
             os = nil; io = nil; package = nil; debug = nil
             require = nil; dofile = nil; loadfile = nil

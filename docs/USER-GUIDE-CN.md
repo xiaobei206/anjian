@@ -31,6 +31,7 @@
 |---|---|---|
 | 移动鼠标 | MoveTo(122, 100) | 虚拟桌面物理坐标 |
 | 左/右/中键点击 | LeftClick(50) | 默认按下 50ms 后释放 |
+| 双击 | LeftDoubleClick() | 两次左键点击，默认间隔 100ms |
 | 按下/释放 | LeftDown() / LeftUp() | 长按控制 |
 | 滚轮 | MouseWheel(120) | 正数向上 |
 | 单键点击 | KeyPress("ENTER") | 默认按下 50ms |

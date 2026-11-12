@@ -35,6 +35,7 @@ TypeText("Hello")
 | 中键单击 | `MiddleClick(holdMs?)` | 中键按下指定时长后释放 |
 | 左键双击 | `LeftDoubleClick(holdMs?, gapMs?)` | 左键连续单击两次 |
 | 右键双击 | `RightDoubleClick(holdMs?, gapMs?)` | 右键连续单击两次 |
+| 中键双击 | `MiddleDoubleClick(holdMs?, gapMs?)` | 中键连续单击两次 |
 | 左键按下 | `LeftDown()` | 按下并保持，直到 LeftUp 或统一清理 |
 | 左键释放 | `LeftUp()` | 释放左键 |
 | 右键按下/释放 | `RightDown() / RightUp()` | 按下或释放右键 |
@@ -46,6 +47,7 @@ TypeText("Hello")
 
 - `LeftClick()` 等省略参数时，默认按下 **50 ms**，然后释放。
 - `LeftClick(50)` 表示按下 50 ms 后释放；`LeftClick(100)` 表示按下 100 ms 后释放。
+- 双击函数默认每次按下 50ms、两次点击之间间隔 100ms；可分别传入 holdMs 与 gapMs。
 - 参数是按下持续时间，不是两次点击之间的间隔。
 - 显式传入 `0` 表示按下与释放连续发送，不增加人为等待。
 - 时间参数必须是非负整数毫秒；超过 60,000 ms 时应报参数错误。需要更长的按住过程时，使用 Down / Delay / Up。
@@ -73,7 +75,7 @@ LeftUp()
 | 组合键 | `Hotkey(modifier1, ..., key)` | 按参数顺序按下，逆序释放 |
 | 输入文本 | `TypeText(text)` | 输入 Unicode 文本 |
 
-首批规范键名：`ENTER`、`ESC`、`TAB`、`SPACE`、`BACKSPACE`、`DELETE`、方向键、`CTRL`、`SHIFT`、`ALT`、`WIN`、`F1..F24`、`A..Z`、`0..9`。
+首批规范键名：`ENTER`、`ESC`、`TAB`、`SPACE`、`BACKSPACE`、`DELETE`、方向键、`CTRL`、`SHIFT`、`ALT`、`WIN`、`F1..F24`、`A..Z`、`0..9`、常见标点键及数字小键盘键。
 
 示例：
 

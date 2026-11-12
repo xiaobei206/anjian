@@ -142,6 +142,15 @@ internal sealed class WindowsInputController
             "UP" => 0x26, "DOWN" => 0x28, "LEFT" => 0x25, "RIGHT" => 0x27,
             "CTRL" or "CONTROL" => 0x11, "SHIFT" => 0x10, "ALT" => 0x12, "WIN" => 0x5B,
             "CAPSLOCK" => 0x14, "PRINTSCREEN" => 0x2C, "PAUSE" => 0x13,
+            "NUMLOCK" => 0x90, "SCROLLLOCK" => 0x91,
+            "NUMPAD0" => 0x60, "NUMPAD1" => 0x61, "NUMPAD2" => 0x62, "NUMPAD3" => 0x63,
+            "NUMPAD4" => 0x64, "NUMPAD5" => 0x65, "NUMPAD6" => 0x66, "NUMPAD7" => 0x67,
+            "NUMPAD8" => 0x68, "NUMPAD9" => 0x69,
+            "NUMPADMULTIPLY" => 0x6A, "NUMPADADD" => 0x6B, "NUMPADSUBTRACT" => 0x6D,
+            "NUMPADDECIMAL" => 0x6E, "NUMPADDIVIDE" => 0x6F,
+            "SEMICOLON" => 0xBA, "EQUALS" => 0xBB, "COMMA" => 0xBC, "MINUS" => 0xBD,
+            "PERIOD" => 0xBE, "SLASH" => 0xBF, "BACKTICK" => 0xC0,
+            "LEFTBRACKET" => 0xDB, "BACKSLASH" => 0xDC, "RIGHTBRACKET" => 0xDD, "QUOTE" => 0xDE,
             _ => throw new ArgumentException($"不支持的按键：{key}")
         };
     }
