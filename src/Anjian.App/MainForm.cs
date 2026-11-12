@@ -39,7 +39,6 @@ internal sealed class MainForm : Form
     private bool _loadingSettings;
     private GlobalHotkeyManager? _hotkeyManager;
     private ScriptEntry? _current;
-    private bool _loading;
     private bool _recording;
     private bool _dirty;
     private Task? _runTask;
@@ -861,10 +860,8 @@ internal sealed class MainForm : Form
         {
             var entry = _repository.Create($"录制_{DateTime.Now:yyyyMMdd_HHmmss}");
             RefreshScripts(entry.FullPath);
-            _loading = true;
             _editor.Clear();
             _dirty = true;
-            _loading = false;
             _clickOnlyForSession = _clickOnlyCheck.Checked;
             _recorder.Start(_clickOnlyForSession);
             _recordSessionActive = true;
@@ -923,9 +920,7 @@ internal sealed class MainForm : Form
 
     private void UpdateRecordingPreview()
     {
-        _loading = true;
         _editor.Text = GlobalRecorder.GenerateLua(_recorder.GetEventsSnapshot(), _clickOnlyForSession);
-        _loading = false;
         _dirty = true;
     }
 
@@ -935,11 +930,9 @@ internal sealed class MainForm : Form
         try
         {
             var events = _recorder.Stop();
-            _loading = true;
             _editor.ReadOnly = false;
             _editor.Text = GlobalRecorder.GenerateLua(events, _clickOnlyForSession);
             _dirty = true;
-            _loading = false;
             _recordSessionActive = false;
             _recording = false;
             _recordingPaused = false;
