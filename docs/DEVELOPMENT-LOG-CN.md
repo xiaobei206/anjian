@@ -264,3 +264,5 @@ TV-01：Lua 5.4 / .NET 10 绑定与中断机制 PoC。
 - 源码结构检查：已完成。
 - Windows 构建、测试、打包：待执行。
 - Windows 10/11 实机窗口/托盘/图标验收：NOT RUN。
+
+- CI 通过后的发布触发提交：`release: publish v0.1.0-preview.4`；Release workflow 再次从该提交构建并创建 prerelease。
