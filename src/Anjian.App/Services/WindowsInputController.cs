@@ -75,10 +75,11 @@ internal sealed class WindowsInputController
         lock (_sync) _heldKeys.Remove(key);
     }
 
-    public void TypeText(string text)
+    public void TypeText(string text, CancellationToken cancellationToken)
     {
         foreach (var rune in text.EnumerateRunes())
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var value = rune.Value;
             if (value <= 0xFFFF)
             {
@@ -90,10 +91,14 @@ internal sealed class WindowsInputController
                 var scalar = value - 0x10000;
                 var high = (ushort)(0xD800 + (scalar >> 10));
                 var low = (ushort)(0xDC00 + (scalar & 0x3FF));
-                SendUnicode(high, false); SendUnicode(high, true);
-                SendUnicode(low, false); SendUnicode(low, true);
+                // Send the surrogate pair as one UTF-16 sequence: both downs, then both ups.
+                SendUnicode(high, false);
+                SendUnicode(low, false);
+                SendUnicode(high, true);
+                SendUnicode(low, true);
             }
         }
+        cancellationToken.ThrowIfCancellationRequested();
     }
 
     public void ReleaseAll()

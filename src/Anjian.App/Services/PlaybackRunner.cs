@@ -161,7 +161,7 @@ internal sealed class PlaybackRunner : IDisposable
                 _input.KeyUp(message.Name ?? "ENTER");
                 break;
             case "type-text":
-                _input.TypeText(message.Text ?? "");
+                _input.TypeText(message.Text ?? "", token);
                 break;
             case "delay":
                 await _gate.DelayAsync(message.Milliseconds, token).ConfigureAwait(false);
