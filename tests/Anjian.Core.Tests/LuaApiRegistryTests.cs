@@ -4,8 +4,8 @@ using Xunit;
 namespace Anjian.Core.Tests;
 public sealed class LuaApiRegistryTests
 {
- private static readonly string[] Expected=["MoveTo","LeftClick","RightClick","MiddleClick","LeftDoubleClick","RightDoubleClick","MiddleDoubleClick","LeftDown","LeftUp","RightDown","RightUp","MiddleDown","MiddleUp","MouseWheel","KeyPress","KeyDown","KeyUp","TypeText","Hotkey","Delay","RandomDelay","Log","WindowFind","WindowEnumerate","WindowEnumerateChildren","WindowGetInfo","WindowActivate","WindowShow","WindowHide","WindowMinimize","WindowMaximize","WindowRestore","WindowSetTopmost","WindowMove","WindowResize","WindowAlign","WindowWait","WindowWaitClosed","CoordinateToScreen","CoordinateFromScreen"];
- [Fact] public void RegistryContainsOnlyImplementedPublicFunctions(){var r=LuaApiRegistry.Load();Assert.Equal(1,r.SchemaVersion);Assert.Equal(Expected.Order(StringComparer.Ordinal),r.PublicFunctionNames.Order(StringComparer.Ordinal));Assert.All(r.Apis,a=>{Assert.Equal("implemented",a.ImplementationStatus);Assert.NotEmpty(a.Id);Assert.NotEmpty(a.Signature);Assert.NotEmpty(a.Example);Assert.NotEmpty(a.Errors);Assert.NotEmpty(a.Behavior.PauseBehavior);Assert.NotEmpty(a.Behavior.CancellationBehavior);Assert.NotEmpty(a.Behavior.CoordinateSpace);Assert.NotEmpty(a.Behavior.PermissionNotes);});Assert.DoesNotContain(r.Apis,a=>a.Name is "FindImage" or "OCR" or "CaptureScreen" or "MoveToWindow");var keys=r.Apis.Single(a=>a.Name=="KeyPress").Parameters.Single(p=>p.Name=="key").AllowedValues;Assert.Contains("NUMPAD0",keys);Assert.Contains("NUMPAD9",keys);Assert.DoesNotContain("NUMPAD0-9",keys);}
+ private static readonly string[] Expected=["MoveTo","LeftClick","RightClick","MiddleClick","LeftDoubleClick","RightDoubleClick","MiddleDoubleClick","LeftDown","LeftUp","RightDown","RightUp","MiddleDown","MiddleUp","MouseWheel","KeyPress","KeyDown","KeyUp","TypeText","Hotkey","Delay","RandomDelay","Log","WindowFind","WindowEnumerate","WindowEnumerateChildren","WindowGetInfo","WindowActivate","WindowShow","WindowHide","WindowMinimize","WindowMaximize","WindowRestore","WindowSetTopmost","WindowMove","WindowResize","WindowAlign","WindowWait","WindowWaitClosed","CoordinateToScreen","CoordinateFromScreen","WindowBind","WindowUnbind","WindowGetCapabilities","ControlEnumerate","ControlGetInfo","ControlGetValue","ControlSetValue","ControlGetText","ControlGetSelection","ControlSelect","ControlGetToggleState","ControlToggle","ControlInvoke","WindowInput"];
+ [Fact] public void RegistryContainsOnlyImplementedPublicFunctions(){var r=LuaApiRegistry.Load();Assert.Equal(1,r.SchemaVersion);Assert.Equal("0.4",r.ApiVersion);Assert.Equal(Expected.Order(StringComparer.Ordinal),r.PublicFunctionNames.Order(StringComparer.Ordinal));Assert.All(r.Apis,a=>{Assert.Equal("implemented",a.ImplementationStatus);Assert.NotEmpty(a.Id);Assert.NotEmpty(a.Signature);Assert.NotEmpty(a.Example);Assert.NotEmpty(a.Errors);Assert.NotEmpty(a.Behavior.PauseBehavior);Assert.NotEmpty(a.Behavior.CancellationBehavior);Assert.NotEmpty(a.Behavior.CoordinateSpace);Assert.NotEmpty(a.Behavior.PermissionNotes);});Assert.DoesNotContain(r.Apis,a=>a.Name is "FindImage" or "OCR" or "CaptureScreen" or "MoveToWindow");var keys=r.Apis.Single(a=>a.Name=="KeyPress").Parameters.Single(p=>p.Name=="key").AllowedValues;Assert.Contains("NUMPAD0",keys);Assert.Contains("NUMPAD9",keys);Assert.DoesNotContain("NUMPAD0-9",keys);}
  [Fact] public void RuntimeCreatesCatalogGlobalsAndHidesBridgeNames(){var r=LuaApiRegistry.Load();using var lua=new Lua(openLibs:true);LuaApiRuntime.Register(lua,new WorkerLuaApi(new Recorder()));foreach(var a in r.Apis)Assert.Equal("function",lua.DoString($"return type({a.Name})")[0]?.ToString());foreach(var b in r.Apis.SelectMany(a=>a.Runtime.Bindings))Assert.Equal("nil",lua.DoString($"return type({b.Name})")[0]?.ToString());Assert.Equal("nil",lua.DoString("return type(FindWindow)")[0]?.ToString());Assert.Equal("nil",lua.DoString("return type(FindImage)")[0]?.ToString());Assert.Equal("nil",lua.DoString("return type(OCR)")[0]?.ToString());Assert.Equal("nil",lua.DoString("return type(os)")[0]?.ToString());Assert.Equal("nil",lua.DoString("return type(io)")[0]?.ToString());}
  [Fact]
  public void LuaCallsAndDefaultsMatchCatalog()
@@ -58,6 +58,25 @@ public sealed class LuaApiRegistryTests
   Assert.Contains(pipe.Items, item => item.Type == "window-get-info");
  }
 
+ [Fact]
+ public void ControlAutomationApisAreRegistryBoundAndSendStructuredRequests()
+ {
+  var pipe = new Recorder { Response = "true" };
+  using var lua = new Lua(openLibs:true);
+  LuaApiRuntime.Register(lua, new WorkerLuaApi(pipe, lua));
+  lua.DoString("""
+    local binding = WindowBind("window-token")
+    WindowUnbind(binding)
+    ControlSetValue("binding-token", "control-token", "hello")
+    ControlInvoke("binding-token", "control-token")
+    WindowInput("binding-token", "auto", "click", "left", -40, 100, "", 25)
+    """);
+  Assert.Contains(pipe.Items, item => item.Type == "window-bind");
+  Assert.Contains(pipe.Items, item => item.Type == "window-unbind");
+  Assert.Contains(pipe.Items, item => item.Type == "control-set-value" && item.Text!.Contains("\"value\":\"hello\"", StringComparison.Ordinal));
+  Assert.Contains(pipe.Items, item => item.Type == "control-invoke");
+  Assert.Contains(pipe.Items, item => item.Type == "window-input" && item.Text!.Contains("\"x\":-40", StringComparison.Ordinal));
+ }
  [Fact] public void ManualGeneratedRegionMatchesCatalog(){var root=FindRoot();var m=File.ReadAllText(Path.Combine(root,"docs","FUNCTION-REFERENCE-CN.md"));Assert.Equal(LuaApiRegistry.NormalizeNewlines(m),LuaApiRegistry.NormalizeNewlines(LuaApiRegistry.Load().UpdateGeneratedReferenceSection(m)));Assert.Contains("MoveTo(x, y)",m,StringComparison.Ordinal);Assert.Contains("600000",m,StringComparison.Ordinal);Assert.Contains("完整产品目标中的函数类别",m,StringComparison.Ordinal);Assert.Contains("目标设计",m,StringComparison.Ordinal);}
  private static string FindRoot(){foreach(var s in new[]{Environment.CurrentDirectory,AppContext.BaseDirectory}){var d=new DirectoryInfo(s);while(d is not null){if(File.Exists(Path.Combine(d.FullName,"docs","FUNCTION-REFERENCE-CN.md")))return d.FullName;d=d.Parent;}}throw new DirectoryNotFoundException();}
  private sealed class Recorder:ILuaCommandPipe{public List<Item> Items{get;}=[];public string? Response{get;set;} public void Send(string type,string? name=null,double x=0,double y=0,int milliseconds=0,string? text=null)=>Items.Add(new Item(type,name,x,y,milliseconds,text));public string? Request(string type,string? name=null,double x=0,double y=0,int milliseconds=0,string? text=null){Items.Add(new Item(type,name,x,y,milliseconds,text));return Response;}}

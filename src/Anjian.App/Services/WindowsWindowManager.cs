@@ -18,6 +18,7 @@ internal sealed class WindowsWindowManager : IDisposable
     private const int ObjIdWindow = 0;
     private const int ChildIdSelf = 0;
     private const uint MonitorDefaultToNearest = 2;
+    private const uint GaRoot = 2;
     private const uint SwpNoSize = 0x0001;
     private const uint SwpNoMove = 0x0002;
     private const uint SwpNoZOrder = 0x0004;
@@ -39,6 +40,17 @@ internal sealed class WindowsWindowManager : IDisposable
         _eventCallback = OnWinEvent;
         _destroyHook = SetWinEventHook(
             EventObjectDestroy, EventObjectDestroy, 0, _eventCallback, 0, 0, WineventOutOfContext);
+    }
+
+    /// <summary>Returns a validated HWND only to in-process Windows adapters; it is never serialized to Lua.</summary>
+    public nint GetValidatedHandle(string id) => Resolve(id).Handle;
+
+    /// <summary>Checks the top-level foreground window without activating or stealing focus.</summary>
+    public bool IsForeground(string id)
+    {
+        var reference = Resolve(id);
+        var root = GetAncestor(reference.Handle, GaRoot);
+        return GetForegroundWindow() == (root == 0 ? reference.Handle : root);
     }
 
     public IReadOnlyList<WindowInfo> Enumerate(WindowSelector selector)
@@ -696,6 +708,9 @@ internal sealed class WindowsWindowManager : IDisposable
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern nint GetParent(nint handle);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern nint GetAncestor(nint handle, uint flags);
 
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]

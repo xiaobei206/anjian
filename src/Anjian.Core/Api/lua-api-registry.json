@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "apiVersion": "0.3",
+  "apiVersion": "0.4",
   "product": "按键精灵 2026",
   "categories": [
     {
@@ -22,6 +22,11 @@
       "id": "window",
       "title": "窗口与坐标",
       "description": "安全窗口引用、窗口状态/布局管理，以及 screen/window/client/anchor/ratio 坐标换算。"
+    },
+    {
+      "id": "automation",
+      "title": "控件与输入自动化",
+      "description": "窗口绑定、UI Automation 标准控件 Pattern 能力以及显式前台输入。"
     }
   ],
   "apis": [
@@ -2405,6 +2410,757 @@
             "name": "__CoordinateFromScreen",
             "method": "CoordinateFromScreen",
             "localName": "__AnjianBridge_CoordinateFromScreen"
+          }
+        ]
+      }
+    },
+    {
+      "id": "anjian.automation.window-bind",
+      "name": "WindowBind",
+      "category": "automation",
+      "title": "绑定自动化窗口",
+      "description": "将当前运行期有效的 M6 不透明窗口引用绑定为控件自动化会话，返回新的运行期不透明 bindingId；不暴露 HWND。",
+      "signature": "WindowBind(id)",
+      "parameters": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true,
+          "description": "由 WindowFind/WindowEnumerate 返回的窗口引用 ID。"
+        }
+      ],
+      "returns": {
+        "type": "string",
+        "description": "新的运行期窗口绑定 ID。"
+      },
+      "errors": [
+        "窗口引用不存在、已失效或目标进程身份无法验证时产生错误。"
+      ],
+      "behavior": {
+        "pauseBehavior": "在 Lua 命令边界遵循暂停状态；UI Automation 同步调用期间无法被中途抢占。",
+        "cancellationBehavior": "Stop 会终止 worker；UI Automation provider 的同步 COM 调用无法保证被硬中断，停止会在调用返回后的下一个边界生效。",
+        "sideEffects": [],
+        "coordinateSpace": "none",
+        "permissionNotes": "仅使用公开 Windows UI Automation API；受 UIPI、UAC、安全桌面、用户会话和目标 provider 能力约束，不提升权限或绕过访问控制。"
+      },
+      "example": "local w = WindowFind(\"记事本\")\nif w then local binding = WindowBind(w.id) end",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.3.0-dev.1",
+      "runtime": {
+        "definition": "function(id) return __AnjianBridge_WindowBind(id) end",
+        "bindings": [
+          {
+            "name": "__WindowBind",
+            "method": "WindowBind",
+            "localName": "__AnjianBridge_WindowBind"
+          }
+        ]
+      }
+    },
+    {
+      "id": "anjian.automation.window-unbind",
+      "name": "WindowUnbind",
+      "category": "automation",
+      "title": "解除自动化窗口绑定",
+      "description": "解除 WindowBind 建立的绑定并释放该绑定缓存的控件引用。",
+      "signature": "WindowUnbind(bindingId)",
+      "parameters": [
+        {
+          "name": "bindingId",
+          "type": "string",
+          "required": true,
+          "description": "WindowBind 返回的运行期绑定 ID。"
+        }
+      ],
+      "returns": {
+        "type": "boolean",
+        "description": "解绑成功返回 true；不存在或已经解绑返回 false。"
+      },
+      "errors": [
+        "绑定 ID 为空时产生参数错误。"
+      ],
+      "behavior": {
+        "pauseBehavior": "在 Lua 命令边界遵循暂停状态；UI Automation 同步调用期间无法被中途抢占。",
+        "cancellationBehavior": "Stop 会终止 worker；UI Automation provider 的同步 COM 调用无法保证被硬中断，停止会在调用返回后的下一个边界生效。",
+        "sideEffects": [],
+        "coordinateSpace": "none",
+        "permissionNotes": "仅使用公开 Windows UI Automation API；受 UIPI、UAC、安全桌面、用户会话和目标 provider 能力约束，不提升权限或绕过访问控制。"
+      },
+      "example": "local binding = WindowBind(w.id)\nWindowUnbind(binding)",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.3.0-dev.1",
+      "runtime": {
+        "definition": "function(bindingId) return __AnjianBridge_WindowUnbind(bindingId) end",
+        "bindings": [
+          {
+            "name": "__WindowUnbind",
+            "method": "WindowUnbind",
+            "localName": "__AnjianBridge_WindowUnbind"
+          }
+        ]
+      }
+    },
+    {
+      "id": "anjian.automation.window-capabilities",
+      "name": "WindowGetCapabilities",
+      "category": "automation",
+      "title": "查询窗口自动化能力",
+      "description": "逐项返回控件树、UIA Pattern、前台 SendInput 和后台输入能力、使用后端、限制及拒绝原因。",
+      "signature": "WindowGetCapabilities(bindingId)",
+      "parameters": [
+        {
+          "name": "bindingId",
+          "type": "string",
+          "required": true,
+          "description": "WindowBind 返回的运行期绑定 ID。"
+        }
+      ],
+      "returns": {
+        "type": "table",
+        "description": "返回 provider、目标 PID、前台状态以及 capabilities 数组；每项含 name/status/backend/reason/limitations。"
+      },
+      "errors": [
+        "绑定失效或窗口关闭时产生错误。"
+      ],
+      "behavior": {
+        "pauseBehavior": "在 Lua 命令边界遵循暂停状态；UI Automation 同步调用期间无法被中途抢占。",
+        "cancellationBehavior": "Stop 会终止 worker；UI Automation provider 的同步 COM 调用无法保证被硬中断，停止会在调用返回后的下一个边界生效。",
+        "sideEffects": [],
+        "coordinateSpace": "none",
+        "permissionNotes": "仅使用公开 Windows UI Automation API；受 UIPI、UAC、安全桌面、用户会话和目标 provider 能力约束，不提升权限或绕过访问控制。"
+      },
+      "example": "local caps = WindowGetCapabilities(binding)\nfor i, item in ipairs(caps.capabilities) do Log(item.name .. \":\" .. item.status) end",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.3.0-dev.1",
+      "runtime": {
+        "definition": "function(bindingId) return __AnjianBridge_WindowGetCapabilities(bindingId) end",
+        "bindings": [
+          {
+            "name": "__WindowGetCapabilities",
+            "method": "WindowGetCapabilities",
+            "localName": "__AnjianBridge_WindowGetCapabilities"
+          }
+        ]
+      }
+    },
+    {
+      "id": "anjian.automation.control-enumerate",
+      "name": "ControlEnumerate",
+      "category": "automation",
+      "title": "枚举标准控件",
+      "description": "按 UI Automation Control View 深度优先枚举目标窗口根元素及控件，返回运行期 controlId、名称、AutomationId、类名、控件类型、物理像素矩形、状态及受支持 Pattern。",
+      "signature": "ControlEnumerate(bindingId, maxResults?)",
+      "parameters": [
+        {
+          "name": "bindingId",
+          "type": "string",
+          "required": true,
+          "description": "WindowBind 返回的运行期绑定 ID。"
+        },
+        {
+          "name": "maxResults",
+          "type": "integer",
+          "required": false,
+          "description": "最多返回控件数量，范围 1 到 512。",
+          "defaultValue": 256,
+          "minimum": 1,
+          "maximum": 512
+        }
+      ],
+      "returns": {
+        "type": "table",
+        "description": "返回控件信息数组；每项含 controlId/name/automationId/className/controlType/bounds/isEnabled/isOffscreen/isKeyboardFocusable/isPassword/supportedPatterns。"
+      },
+      "errors": [
+        "数量超出范围、绑定失效或 UI Automation 无法访问目标窗口时产生错误。"
+      ],
+      "behavior": {
+        "pauseBehavior": "在 Lua 命令边界遵循暂停状态；UI Automation 同步调用期间无法被中途抢占。",
+        "cancellationBehavior": "Stop 会终止 worker；UI Automation provider 的同步 COM 调用无法保证被硬中断，停止会在调用返回后的下一个边界生效。",
+        "sideEffects": [],
+        "coordinateSpace": "none",
+        "permissionNotes": "仅使用公开 Windows UI Automation API；受 UIPI、UAC、安全桌面、用户会话和目标 provider 能力约束，不提升权限或绕过访问控制。"
+      },
+      "example": "local controls = ControlEnumerate(binding, 256)\nfor i, c in ipairs(controls) do Log(c.name .. \" \" .. c.controlType) end",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.3.0-dev.1",
+      "runtime": {
+        "definition": "function(bindingId, maxResults) return __AnjianBridge_ControlEnumerate(bindingId, maxResults == nil and 256 or maxResults) end",
+        "bindings": [
+          {
+            "name": "__ControlEnumerate",
+            "method": "ControlEnumerate",
+            "localName": "__AnjianBridge_ControlEnumerate"
+          }
+        ]
+      }
+    },
+    {
+      "id": "anjian.automation.control-get-info",
+      "name": "ControlGetInfo",
+      "category": "automation",
+      "title": "读取控件信息",
+      "description": "读取当前枚举所得控件的最新 UIA 元数据与可用 Pattern；控件已销毁时要求重新枚举。",
+      "signature": "ControlGetInfo(bindingId, controlId)",
+      "parameters": [
+        {
+          "name": "bindingId",
+          "type": "string",
+          "required": true,
+          "description": "WindowBind 返回的运行期绑定 ID。"
+        },
+        {
+          "name": "controlId",
+          "type": "string",
+          "required": true,
+          "description": "ControlEnumerate 返回的运行期控件 ID。"
+        }
+      ],
+      "returns": {
+        "type": "table",
+        "description": "返回与 ControlEnumerate 相同结构的单个控件信息表。"
+      },
+      "errors": [
+        "绑定/控件 ID 失效或控件已销毁时产生明确错误。"
+      ],
+      "behavior": {
+        "pauseBehavior": "在 Lua 命令边界遵循暂停状态；UI Automation 同步调用期间无法被中途抢占。",
+        "cancellationBehavior": "Stop 会终止 worker；UI Automation provider 的同步 COM 调用无法保证被硬中断，停止会在调用返回后的下一个边界生效。",
+        "sideEffects": [],
+        "coordinateSpace": "none",
+        "permissionNotes": "仅使用公开 Windows UI Automation API；受 UIPI、UAC、安全桌面、用户会话和目标 provider 能力约束，不提升权限或绕过访问控制。"
+      },
+      "example": "local info = ControlGetInfo(binding, control.controlId)",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.3.0-dev.1",
+      "runtime": {
+        "definition": "function(bindingId, controlId) return __AnjianBridge_ControlGetInfo(bindingId, controlId) end",
+        "bindings": [
+          {
+            "name": "__ControlGetInfo",
+            "method": "ControlGetInfo",
+            "localName": "__AnjianBridge_ControlGetInfo"
+          }
+        ]
+      }
+    },
+    {
+      "id": "anjian.automation.control-get-value",
+      "name": "ControlGetValue",
+      "category": "automation",
+      "title": "读取控件值",
+      "description": "读取控件 UIA ValuePattern 当前值。",
+      "signature": "ControlGetValue(bindingId, controlId)",
+      "parameters": [
+        {
+          "name": "bindingId",
+          "type": "string",
+          "required": true,
+          "description": "窗口绑定 ID。"
+        },
+        {
+          "name": "controlId",
+          "type": "string",
+          "required": true,
+          "description": "控件运行期 ID。"
+        }
+      ],
+      "returns": {
+        "type": "string",
+        "description": "ValuePattern 当前字符串值。"
+      },
+      "errors": [
+        "控件未实现 ValuePattern、绑定失效或控件销毁时产生错误。"
+      ],
+      "behavior": {
+        "pauseBehavior": "在 Lua 命令边界遵循暂停状态；UI Automation 同步调用期间无法被中途抢占。",
+        "cancellationBehavior": "Stop 会终止 worker；UI Automation provider 的同步 COM 调用无法保证被硬中断，停止会在调用返回后的下一个边界生效。",
+        "sideEffects": [],
+        "coordinateSpace": "none",
+        "permissionNotes": "仅使用公开 Windows UI Automation API；受 UIPI、UAC、安全桌面、用户会话和目标 provider 能力约束，不提升权限或绕过访问控制。"
+      },
+      "example": "local value = ControlGetValue(binding, edit.controlId)",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.3.0-dev.1",
+      "runtime": {
+        "definition": "function(bindingId, controlId) return __AnjianBridge_ControlGetValue(bindingId, controlId) end",
+        "bindings": [
+          {
+            "name": "__ControlGetValue",
+            "method": "ControlGetValue",
+            "localName": "__AnjianBridge_ControlGetValue"
+          }
+        ]
+      }
+    },
+    {
+      "id": "anjian.automation.control-set-value",
+      "name": "ControlSetValue",
+      "category": "automation",
+      "title": "设置控件值",
+      "description": "通过 UIA ValuePattern.SetValue 设置控件值；只读、不支持该 Pattern 或值超长时明确失败，不回退为键盘输入。",
+      "signature": "ControlSetValue(bindingId, controlId, value)",
+      "parameters": [
+        {
+          "name": "bindingId",
+          "type": "string",
+          "required": true,
+          "description": "窗口绑定 ID。"
+        },
+        {
+          "name": "controlId",
+          "type": "string",
+          "required": true,
+          "description": "控件运行期 ID。"
+        },
+        {
+          "name": "value",
+          "type": "string",
+          "required": true,
+          "description": "要设置的字符串，最多 32768 个字符。"
+        }
+      ],
+      "returns": {
+        "type": "boolean",
+        "description": "UIA provider 的 SetValue 调用成功返回 true。"
+      },
+      "errors": [
+        "不支持 ValuePattern、只读、控件失效、权限拒绝或值超过 32768 字符时产生错误。"
+      ],
+      "behavior": {
+        "pauseBehavior": "在 Lua 命令边界遵循暂停状态；UI Automation 同步调用期间无法被中途抢占。",
+        "cancellationBehavior": "Stop 会终止 worker；UI Automation provider 的同步 COM 调用无法保证被硬中断，停止会在调用返回后的下一个边界生效。",
+        "sideEffects": [],
+        "coordinateSpace": "none",
+        "permissionNotes": "仅使用公开 Windows UI Automation API；受 UIPI、UAC、安全桌面、用户会话和目标 provider 能力约束，不提升权限或绕过访问控制。"
+      },
+      "example": "ControlSetValue(binding, edit.controlId, \"hello\")",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.3.0-dev.1",
+      "runtime": {
+        "definition": "function(bindingId, controlId, value) return __AnjianBridge_ControlSetValue(bindingId, controlId, value) end",
+        "bindings": [
+          {
+            "name": "__ControlSetValue",
+            "method": "ControlSetValue",
+            "localName": "__AnjianBridge_ControlSetValue"
+          }
+        ]
+      }
+    },
+    {
+      "id": "anjian.automation.control-get-text",
+      "name": "ControlGetText",
+      "category": "automation",
+      "title": "读取控件文本",
+      "description": "优先读取 UIA TextPattern 文档范围文本；若无 TextPattern，则读取 ValuePattern 值。",
+      "signature": "ControlGetText(bindingId, controlId)",
+      "parameters": [
+        {
+          "name": "bindingId",
+          "type": "string",
+          "required": true,
+          "description": "窗口绑定 ID。"
+        },
+        {
+          "name": "controlId",
+          "type": "string",
+          "required": true,
+          "description": "控件运行期 ID。"
+        }
+      ],
+      "returns": {
+        "type": "string",
+        "description": "最多 32768 个字符的控件文本。"
+      },
+      "errors": [
+        "控件未实现 TextPattern/ValuePattern、绑定失效或控件销毁时产生错误。"
+      ],
+      "behavior": {
+        "pauseBehavior": "在 Lua 命令边界遵循暂停状态；UI Automation 同步调用期间无法被中途抢占。",
+        "cancellationBehavior": "Stop 会终止 worker；UI Automation provider 的同步 COM 调用无法保证被硬中断，停止会在调用返回后的下一个边界生效。",
+        "sideEffects": [],
+        "coordinateSpace": "none",
+        "permissionNotes": "仅使用公开 Windows UI Automation API；受 UIPI、UAC、安全桌面、用户会话和目标 provider 能力约束，不提升权限或绕过访问控制。"
+      },
+      "example": "local text = ControlGetText(binding, edit.controlId)",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.3.0-dev.1",
+      "runtime": {
+        "definition": "function(bindingId, controlId) return __AnjianBridge_ControlGetText(bindingId, controlId) end",
+        "bindings": [
+          {
+            "name": "__ControlGetText",
+            "method": "ControlGetText",
+            "localName": "__AnjianBridge_ControlGetText"
+          }
+        ]
+      }
+    },
+    {
+      "id": "anjian.automation.control-get-selection",
+      "name": "ControlGetSelection",
+      "category": "automation",
+      "title": "读取控件选项",
+      "description": "读取容器 UIA SelectionPattern 当前已选元素名称数组。",
+      "signature": "ControlGetSelection(bindingId, controlId)",
+      "parameters": [
+        {
+          "name": "bindingId",
+          "type": "string",
+          "required": true,
+          "description": "窗口绑定 ID。"
+        },
+        {
+          "name": "controlId",
+          "type": "string",
+          "required": true,
+          "description": "支持 SelectionPattern 的容器控件 ID。"
+        }
+      ],
+      "returns": {
+        "type": "table",
+        "description": "返回 Lua 数组，数组元素是 provider 报告的已选控件名称。"
+      },
+      "errors": [
+        "控件未实现 SelectionPattern、绑定失效或控件销毁时产生错误。"
+      ],
+      "behavior": {
+        "pauseBehavior": "在 Lua 命令边界遵循暂停状态；UI Automation 同步调用期间无法被中途抢占。",
+        "cancellationBehavior": "Stop 会终止 worker；UI Automation provider 的同步 COM 调用无法保证被硬中断，停止会在调用返回后的下一个边界生效。",
+        "sideEffects": [],
+        "coordinateSpace": "none",
+        "permissionNotes": "仅使用公开 Windows UI Automation API；受 UIPI、UAC、安全桌面、用户会话和目标 provider 能力约束，不提升权限或绕过访问控制。"
+      },
+      "example": "local selected = ControlGetSelection(binding, list.controlId)",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.3.0-dev.1",
+      "runtime": {
+        "definition": "function(bindingId, controlId) return __AnjianBridge_ControlGetSelection(bindingId, controlId) end",
+        "bindings": [
+          {
+            "name": "__ControlGetSelection",
+            "method": "ControlGetSelection",
+            "localName": "__AnjianBridge_ControlGetSelection"
+          }
+        ]
+      }
+    },
+    {
+      "id": "anjian.automation.control-select",
+      "name": "ControlSelect",
+      "category": "automation",
+      "title": "选择控件项",
+      "description": "调用控件 UIA SelectionItemPattern.Select 选择单个项目。",
+      "signature": "ControlSelect(bindingId, controlId)",
+      "parameters": [
+        {
+          "name": "bindingId",
+          "type": "string",
+          "required": true,
+          "description": "窗口绑定 ID。"
+        },
+        {
+          "name": "controlId",
+          "type": "string",
+          "required": true,
+          "description": "支持 SelectionItemPattern 的项目控件 ID。"
+        }
+      ],
+      "returns": {
+        "type": "boolean",
+        "description": "SelectionItemPattern.Select 调用成功返回 true。"
+      },
+      "errors": [
+        "控件未实现 SelectionItemPattern、选择被容器拒绝或控件失效时产生错误。"
+      ],
+      "behavior": {
+        "pauseBehavior": "在 Lua 命令边界遵循暂停状态；UI Automation 同步调用期间无法被中途抢占。",
+        "cancellationBehavior": "Stop 会终止 worker；UI Automation provider 的同步 COM 调用无法保证被硬中断，停止会在调用返回后的下一个边界生效。",
+        "sideEffects": [],
+        "coordinateSpace": "none",
+        "permissionNotes": "仅使用公开 Windows UI Automation API；受 UIPI、UAC、安全桌面、用户会话和目标 provider 能力约束，不提升权限或绕过访问控制。"
+      },
+      "example": "ControlSelect(binding, item.controlId)",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.3.0-dev.1",
+      "runtime": {
+        "definition": "function(bindingId, controlId) return __AnjianBridge_ControlSelect(bindingId, controlId) end",
+        "bindings": [
+          {
+            "name": "__ControlSelect",
+            "method": "ControlSelect",
+            "localName": "__AnjianBridge_ControlSelect"
+          }
+        ]
+      }
+    },
+    {
+      "id": "anjian.automation.control-toggle-state",
+      "name": "ControlGetToggleState",
+      "category": "automation",
+      "title": "读取勾选状态",
+      "description": "读取 UIA TogglePattern 状态 Off、On 或 Indeterminate。",
+      "signature": "ControlGetToggleState(bindingId, controlId)",
+      "parameters": [
+        {
+          "name": "bindingId",
+          "type": "string",
+          "required": true,
+          "description": "窗口绑定 ID。"
+        },
+        {
+          "name": "controlId",
+          "type": "string",
+          "required": true,
+          "description": "支持 TogglePattern 的控件 ID。"
+        }
+      ],
+      "returns": {
+        "type": "string",
+        "description": "Off、On 或 Indeterminate。"
+      },
+      "errors": [
+        "控件未实现 TogglePattern、绑定失效或控件销毁时产生错误。"
+      ],
+      "behavior": {
+        "pauseBehavior": "在 Lua 命令边界遵循暂停状态；UI Automation 同步调用期间无法被中途抢占。",
+        "cancellationBehavior": "Stop 会终止 worker；UI Automation provider 的同步 COM 调用无法保证被硬中断，停止会在调用返回后的下一个边界生效。",
+        "sideEffects": [],
+        "coordinateSpace": "none",
+        "permissionNotes": "仅使用公开 Windows UI Automation API；受 UIPI、UAC、安全桌面、用户会话和目标 provider 能力约束，不提升权限或绕过访问控制。"
+      },
+      "example": "local state = ControlGetToggleState(binding, checkbox.controlId)",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.3.0-dev.1",
+      "runtime": {
+        "definition": "function(bindingId, controlId) return __AnjianBridge_ControlGetToggleState(bindingId, controlId) end",
+        "bindings": [
+          {
+            "name": "__ControlGetToggleState",
+            "method": "ControlGetToggleState",
+            "localName": "__AnjianBridge_ControlGetToggleState"
+          }
+        ]
+      }
+    },
+    {
+      "id": "anjian.automation.control-toggle",
+      "name": "ControlToggle",
+      "category": "automation",
+      "title": "切换勾选状态",
+      "description": "调用控件 UIA TogglePattern.Toggle 切换一次状态；不会假设调用前状态。",
+      "signature": "ControlToggle(bindingId, controlId)",
+      "parameters": [
+        {
+          "name": "bindingId",
+          "type": "string",
+          "required": true,
+          "description": "窗口绑定 ID。"
+        },
+        {
+          "name": "controlId",
+          "type": "string",
+          "required": true,
+          "description": "支持 TogglePattern 的控件 ID。"
+        }
+      ],
+      "returns": {
+        "type": "boolean",
+        "description": "TogglePattern.Toggle 调用成功返回 true。"
+      },
+      "errors": [
+        "控件未实现 TogglePattern、provider 拒绝或控件失效时产生错误。"
+      ],
+      "behavior": {
+        "pauseBehavior": "在 Lua 命令边界遵循暂停状态；UI Automation 同步调用期间无法被中途抢占。",
+        "cancellationBehavior": "Stop 会终止 worker；UI Automation provider 的同步 COM 调用无法保证被硬中断，停止会在调用返回后的下一个边界生效。",
+        "sideEffects": [],
+        "coordinateSpace": "none",
+        "permissionNotes": "仅使用公开 Windows UI Automation API；受 UIPI、UAC、安全桌面、用户会话和目标 provider 能力约束，不提升权限或绕过访问控制。"
+      },
+      "example": "ControlToggle(binding, checkbox.controlId)",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.3.0-dev.1",
+      "runtime": {
+        "definition": "function(bindingId, controlId) return __AnjianBridge_ControlToggle(bindingId, controlId) end",
+        "bindings": [
+          {
+            "name": "__ControlToggle",
+            "method": "ControlToggle",
+            "localName": "__AnjianBridge_ControlToggle"
+          }
+        ]
+      }
+    },
+    {
+      "id": "anjian.automation.control-invoke",
+      "name": "ControlInvoke",
+      "category": "automation",
+      "title": "触发控件操作",
+      "description": "调用控件 UIA InvokePattern.Invoke，适用于 provider 声明可调用的按钮等元素。",
+      "signature": "ControlInvoke(bindingId, controlId)",
+      "parameters": [
+        {
+          "name": "bindingId",
+          "type": "string",
+          "required": true,
+          "description": "窗口绑定 ID。"
+        },
+        {
+          "name": "controlId",
+          "type": "string",
+          "required": true,
+          "description": "支持 InvokePattern 的控件 ID。"
+        }
+      ],
+      "returns": {
+        "type": "boolean",
+        "description": "InvokePattern.Invoke 调用成功返回 true。"
+      },
+      "errors": [
+        "控件未实现 InvokePattern、provider 拒绝或控件失效时产生错误。"
+      ],
+      "behavior": {
+        "pauseBehavior": "在 Lua 命令边界遵循暂停状态；UI Automation 同步调用期间无法被中途抢占。",
+        "cancellationBehavior": "Stop 会终止 worker；UI Automation provider 的同步 COM 调用无法保证被硬中断，停止会在调用返回后的下一个边界生效。",
+        "sideEffects": [],
+        "coordinateSpace": "none",
+        "permissionNotes": "仅使用公开 Windows UI Automation API；受 UIPI、UAC、安全桌面、用户会话和目标 provider 能力约束，不提升权限或绕过访问控制。"
+      },
+      "example": "ControlInvoke(binding, button.controlId)",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.3.0-dev.1",
+      "runtime": {
+        "definition": "function(bindingId, controlId) return __AnjianBridge_ControlInvoke(bindingId, controlId) end",
+        "bindings": [
+          {
+            "name": "__ControlInvoke",
+            "method": "ControlInvoke",
+            "localName": "__AnjianBridge_ControlInvoke"
+          }
+        ]
+      }
+    },
+    {
+      "id": "anjian.automation.window-input",
+      "name": "WindowInput",
+      "category": "automation",
+      "title": "按能力执行窗口输入",
+      "description": "按目标绑定和明确后端执行可见前台输入。auto/foreground 均要求目标窗口已经在前台；不会自动激活或静默切换后端。后台鼠标/键盘/文本注入当前明确不支持。",
+      "signature": "WindowInput(bindingId, backend, action, name?, x?, y?, value?, holdMs?)",
+      "parameters": [
+        {
+          "name": "bindingId",
+          "type": "string",
+          "required": true,
+          "description": "窗口绑定 ID。"
+        },
+        {
+          "name": "backend",
+          "type": "string",
+          "required": true,
+          "description": "auto 或 foreground。",
+          "allowedValues": [
+            "auto",
+            "foreground"
+          ]
+        },
+        {
+          "name": "action",
+          "type": "string",
+          "required": true,
+          "description": "move、click、key-press 或 text。",
+          "allowedValues": [
+            "move",
+            "click",
+            "key-press",
+            "text"
+          ]
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "required": false,
+          "description": "click 的 left/right/middle，或 key-press 的键名。",
+          "defaultValue": ""
+        },
+        {
+          "name": "x",
+          "type": "integer",
+          "required": false,
+          "description": "move/click 的屏幕绝对物理像素 X 坐标。",
+          "defaultValue": 0,
+          "minimum": -2147483648,
+          "maximum": 2147483647,
+          "unit": "物理像素"
+        },
+        {
+          "name": "y",
+          "type": "integer",
+          "required": false,
+          "description": "move/click 的屏幕绝对物理像素 Y 坐标。",
+          "defaultValue": 0,
+          "minimum": -2147483648,
+          "maximum": 2147483647,
+          "unit": "物理像素"
+        },
+        {
+          "name": "value",
+          "type": "string",
+          "required": false,
+          "description": "text 动作的 Unicode 文本，最多 100000 个字符。",
+          "defaultValue": ""
+        },
+        {
+          "name": "holdMs",
+          "type": "integer",
+          "required": false,
+          "description": "click/key-press 按下时长，范围 0 到 600000 毫秒。",
+          "defaultValue": 50,
+          "minimum": 0,
+          "maximum": 600000,
+          "unit": "毫秒"
+        }
+      ],
+      "returns": {
+        "type": "boolean",
+        "description": "输入 API 成功提交返回 true；实际目标控件是否响应仍取决于前台焦点、权限与应用状态。"
+      },
+      "errors": [
+        "backend 不支持、目标不是前台窗口、参数非法、SendInput 被 Windows 拒绝或停止取消时产生错误。"
+      ],
+      "behavior": {
+        "pauseBehavior": "在 Lua 命令边界遵循暂停状态；UI Automation 同步调用期间无法被中途抢占。",
+        "cancellationBehavior": "Stop 会终止 worker；UI Automation provider 的同步 COM 调用无法保证被硬中断，停止会在调用返回后的下一个边界生效。",
+        "sideEffects": [],
+        "coordinateSpace": "none",
+        "permissionNotes": "仅使用公开 Windows UI Automation API；受 UIPI、UAC、安全桌面、用户会话和目标 provider 能力约束，不提升权限或绕过访问控制。"
+      },
+      "example": "WindowInput(binding, \"auto\", \"click\", \"left\", 400, 300, \"\", 50)",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.3.0-dev.1",
+      "runtime": {
+        "definition": "function(bindingId, backend, action, name, x, y, value, holdMs) return __AnjianBridge_WindowInput(bindingId, backend, action, name or \"\", x or 0, y or 0, value or \"\", holdMs == nil and 50 or holdMs) end",
+        "bindings": [
+          {
+            "name": "__WindowInput",
+            "method": "WindowInput",
+            "localName": "__AnjianBridge_WindowInput"
           }
         ]
       }

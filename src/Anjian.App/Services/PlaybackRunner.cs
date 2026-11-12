@@ -12,11 +12,14 @@ internal sealed class PlaybackRunner : IDisposable
 {
     private readonly WindowsInputController _input = new();
     private readonly WindowsWindowManager _windows = new();
+    private readonly WindowsControlAutomationProvider _controls;
     private readonly ExecutionGate _gate = new();
     private CancellationTokenSource? _runCts;
     private Process? _worker;
     private LuaDebugLaunchOptions? _debugLaunchOptions;
     private TaskCompletionSource<LuaDebugCommand>? _debugCommandSource;
+
+    public PlaybackRunner() => _controls = new WindowsControlAutomationProvider(_windows, _input);
 
     public event Action<string>? Log;
     public event Action<int, int>? IterationChanged;
@@ -148,6 +151,7 @@ internal sealed class PlaybackRunner : IDisposable
             worker.Dispose();
             _worker = null;
             _input.ReleaseAll();
+            _controls.ClearBindings();
             _windows.ClearReferences();
         }
     }
@@ -267,6 +271,81 @@ internal sealed class PlaybackRunner : IDisposable
                 var result = await _windows.WaitForClosedAsync(request.Id, request.TimeoutMilliseconds, token)
                     .ConfigureAwait(false);
                 return JsonSerializer.Serialize(result);
+            }
+            case "window-bind":
+            {
+                var request = ReadWindowPayload<WindowBindingRequest>(message.Text);
+                return _controls.Bind(request.WindowId);
+            }
+            case "window-unbind":
+            {
+                var request = ReadWindowPayload<WindowBindingIdRequest>(message.Text);
+                return JsonSerializer.Serialize(_controls.Unbind(request.BindingId));
+            }
+            case "window-capabilities":
+            {
+                var request = ReadWindowPayload<WindowBindingIdRequest>(message.Text);
+                return JsonSerializer.Serialize(_controls.GetCapabilities(request.BindingId), WindowApiJson.Options);
+            }
+            case "control-enumerate":
+            {
+                var request = ReadWindowPayload<ControlEnumerateRequest>(message.Text);
+                return JsonSerializer.Serialize(_controls.Enumerate(request.BindingId, request.MaxResults), WindowApiJson.Options);
+            }
+            case "control-get-info":
+            {
+                var request = ReadWindowPayload<ControlReferenceRequest>(message.Text);
+                return JsonSerializer.Serialize(_controls.GetInfo(request.BindingId, request.ControlId), WindowApiJson.Options);
+            }
+            case "control-get-value":
+            {
+                var request = ReadWindowPayload<ControlReferenceRequest>(message.Text);
+                return JsonSerializer.Serialize(_controls.GetValue(request.BindingId, request.ControlId));
+            }
+            case "control-set-value":
+            {
+                var request = ReadWindowPayload<ControlSetValueRequest>(message.Text);
+                _controls.SetValue(request.BindingId, request.ControlId, request.Value);
+                return JsonSerializer.Serialize(true);
+            }
+            case "control-get-text":
+            {
+                var request = ReadWindowPayload<ControlReferenceRequest>(message.Text);
+                return JsonSerializer.Serialize(_controls.GetText(request.BindingId, request.ControlId));
+            }
+            case "control-get-selection":
+            {
+                var request = ReadWindowPayload<ControlReferenceRequest>(message.Text);
+                return JsonSerializer.Serialize(_controls.GetSelection(request.BindingId, request.ControlId), WindowApiJson.Options);
+            }
+            case "control-select":
+            {
+                var request = ReadWindowPayload<ControlReferenceRequest>(message.Text);
+                _controls.Select(request.BindingId, request.ControlId);
+                return JsonSerializer.Serialize(true);
+            }
+            case "control-get-toggle":
+            {
+                var request = ReadWindowPayload<ControlReferenceRequest>(message.Text);
+                return JsonSerializer.Serialize(_controls.GetToggleState(request.BindingId, request.ControlId));
+            }
+            case "control-toggle":
+            {
+                var request = ReadWindowPayload<ControlReferenceRequest>(message.Text);
+                _controls.Toggle(request.BindingId, request.ControlId);
+                return JsonSerializer.Serialize(true);
+            }
+            case "control-invoke":
+            {
+                var request = ReadWindowPayload<ControlReferenceRequest>(message.Text);
+                _controls.Invoke(request.BindingId, request.ControlId);
+                return JsonSerializer.Serialize(true);
+            }
+            case "window-input":
+            {
+                var request = ReadWindowPayload<WindowInputRequest>(message.Text);
+                await _controls.SendInputAsync(request, token).ConfigureAwait(false);
+                return JsonSerializer.Serialize(true);
             }
             case "coordinate-to-screen":
             case "coordinate-from-screen":

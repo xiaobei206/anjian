@@ -58,3 +58,46 @@ public static class WindowApiJson
         PropertyNameCaseInsensitive = true
     };
 }
+
+
+public sealed record WindowBindingRequest(string WindowId);
+public sealed record WindowBindingIdRequest(string BindingId);
+public sealed record ControlEnumerateRequest(string BindingId, int MaxResults);
+public sealed record ControlReferenceRequest(string BindingId, string ControlId);
+public sealed record ControlSetValueRequest(string BindingId, string ControlId, string Value);
+public sealed record WindowInputRequest(
+    string BindingId,
+    string Backend,
+    string Action,
+    string Name,
+    int X,
+    int Y,
+    string Value,
+    int HoldMilliseconds);
+
+public sealed record AutomationCapability(
+    string Name,
+    string Status,
+    string Backend,
+    string Reason,
+    string Limitations);
+
+public sealed record WindowAutomationCapabilities(
+    string BindingId,
+    string Provider,
+    int ProcessId,
+    bool Foreground,
+    IReadOnlyList<AutomationCapability> Capabilities);
+
+public sealed record ControlElementInfo(
+    string ControlId,
+    string Name,
+    string AutomationId,
+    string ClassName,
+    string ControlType,
+    PixelRect Bounds,
+    bool IsEnabled,
+    bool IsOffscreen,
+    bool IsKeyboardFocusable,
+    bool IsPassword,
+    IReadOnlyList<string> SupportedPatterns);

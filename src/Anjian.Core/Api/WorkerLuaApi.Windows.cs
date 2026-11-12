@@ -187,3 +187,89 @@ public sealed partial class WorkerLuaApi
     private static string RequiredText(string? value, string label) =>
         string.IsNullOrWhiteSpace(value) ? throw new ArgumentException($"{label}不能为空。", nameof(value)) : value.Trim();
 }
+
+
+public sealed partial class WorkerLuaApi
+{
+    public string WindowBind(string id)
+    {
+        var response = pipe.Request("window-bind", text: JsonSerializer.Serialize(new WindowBindingRequest(RequiredId(id)), WindowApiJson.Options));
+        return string.IsNullOrWhiteSpace(response) ? throw new IOException("窗口绑定没有返回 ID。") : response;
+    }
+
+    public bool WindowUnbind(string bindingId) =>
+        RequestBoolean("window-unbind", new WindowBindingIdRequest(RequiredId(bindingId)));
+
+    public LuaTable WindowGetCapabilities(string bindingId) =>
+        RequestTable("window-capabilities", new WindowBindingIdRequest(RequiredId(bindingId)))
+        ?? throw new InvalidDataException("窗口能力查询未返回结果。");
+
+    public LuaTable ControlEnumerate(string bindingId, double maxResults)
+    {
+        var maximum = Integer(maxResults, 1, 512, "控件最大数量");
+        return RequestTable("control-enumerate", new ControlEnumerateRequest(RequiredId(bindingId), maximum))
+            ?? throw new InvalidDataException("控件枚举未返回结果。");
+    }
+
+    public LuaTable ControlGetInfo(string bindingId, string controlId) =>
+        RequestTable("control-get-info", CreateControlRequest(bindingId, controlId))
+        ?? throw new InvalidDataException("控件信息未返回结果。");
+
+    public string ControlGetValue(string bindingId, string controlId) =>
+        RequestString("control-get-value", CreateControlRequest(bindingId, controlId));
+
+    public bool ControlSetValue(string bindingId, string controlId, string value) =>
+        RequestBoolean("control-set-value", new ControlSetValueRequest(RequiredId(bindingId), RequiredId(controlId), value ?? string.Empty));
+
+    public string ControlGetText(string bindingId, string controlId) =>
+        RequestString("control-get-text", CreateControlRequest(bindingId, controlId));
+
+    public LuaTable ControlGetSelection(string bindingId, string controlId) =>
+        RequestTable("control-get-selection", CreateControlRequest(bindingId, controlId))
+        ?? throw new InvalidDataException("控件选择项读取未返回结果。");
+
+    public bool ControlSelect(string bindingId, string controlId) =>
+        RequestBoolean("control-select", CreateControlRequest(bindingId, controlId));
+
+    public string ControlGetToggleState(string bindingId, string controlId) =>
+        RequestString("control-get-toggle", CreateControlRequest(bindingId, controlId));
+
+    public bool ControlToggle(string bindingId, string controlId) =>
+        RequestBoolean("control-toggle", CreateControlRequest(bindingId, controlId));
+
+    public bool ControlInvoke(string bindingId, string controlId) =>
+        RequestBoolean("control-invoke", CreateControlRequest(bindingId, controlId));
+
+    public bool WindowInput(
+        string bindingId,
+        string backend,
+        string action,
+        string name,
+        double x,
+        double y,
+        string value,
+        double holdMs)
+    {
+        var request = new WindowInputRequest(
+            RequiredId(bindingId),
+            RequiredText(backend, "输入后端"),
+            RequiredText(action, "输入动作"),
+            name ?? string.Empty,
+            Coord(x),
+            Coord(y),
+            value ?? string.Empty,
+            Duration(holdMs));
+        return RequestBoolean("window-input", request);
+    }
+
+    private static ControlReferenceRequest CreateControlRequest(string bindingId, string controlId) =>
+        new(RequiredId(bindingId), RequiredId(controlId));
+
+    private string RequestString(string type, object payload)
+    {
+        var response = pipe.Request(type, text: JsonSerializer.Serialize(payload, WindowApiJson.Options));
+        if (response is null)
+            throw new IOException($"窗口自动化 API {type} 没有返回数据。");
+        return response;
+    }
+}
