@@ -42,9 +42,9 @@ internal sealed class FloatingForm : Form
         FormBorderStyle = FormBorderStyle.None;
         ShowInTaskbar = false;
         StartPosition = FormStartPosition.Manual;
-        ClientSize = new Size(600, 142);
-        MinimumSize = new Size(600, 142);
-        MaximumSize = new Size(600, 142);
+        ClientSize = new Size(660, 142);
+        MinimumSize = new Size(660, 142);
+        MaximumSize = new Size(660, 142);
         BackColor = Color.FromArgb(245, 247, 250);
         Font = new Font("Microsoft YaHei UI", 9F);
         BuildUi();
@@ -137,24 +137,34 @@ internal sealed class FloatingForm : Form
             Padding = Padding.Empty
         };
         _recordButton.Text = "● 开始录制";
+        _recordButton.Width = 112;
+        _recordButton.Height = 30;
         _recordButton.Click += (_, _) => RecordToggleRequested?.Invoke();
         actions.Controls.Add(_recordButton);
 
         _stopRecordButton.Text = "■ 结束录制";
+        _stopRecordButton.Width = 102;
+        _stopRecordButton.Height = 30;
         _stopRecordButton.Enabled = false;
         _stopRecordButton.Click += (_, _) => StopRecordingRequested?.Invoke();
         actions.Controls.Add(_stopRecordButton);
 
         _playButton.Text = "▶ 播放";
+        _playButton.Width = 82;
+        _playButton.Height = 30;
         _playButton.Click += (_, _) => PlayRequested?.Invoke();
         actions.Controls.Add(_playButton);
 
         _pauseButton.Text = "Ⅱ 暂停";
+        _pauseButton.Width = 82;
+        _pauseButton.Height = 30;
         _pauseButton.Enabled = false;
         _pauseButton.Click += (_, _) => PauseRequested?.Invoke();
         actions.Controls.Add(_pauseButton);
 
         _stopButton.Text = "■ 停止";
+        _stopButton.Width = 82;
+        _stopButton.Height = 30;
         _stopButton.Enabled = false;
         _stopButton.Click += (_, _) => StopPlaybackRequested?.Invoke();
         actions.Controls.Add(_stopButton);
@@ -284,6 +294,7 @@ internal sealed class FloatingForm : Form
         bool recordingPaused, bool playbackRunning, bool playbackPaused)
     {
         _scriptLabel.Text = $"脚本：{scriptName}";
+        _clickOnlyCheck.Enabled = !recordingSessionActive;
         _recordButton.Text = !recordingSessionActive ? "● 开始录制" : recordingPaused ? "▶ 继续录制" : "Ⅱ 暂停录制";
         _recordButton.Enabled = !playbackRunning;
         _stopRecordButton.Enabled = recordingSessionActive;
