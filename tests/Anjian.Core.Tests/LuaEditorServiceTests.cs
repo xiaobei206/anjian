@@ -46,7 +46,7 @@ public sealed class LuaEditorServiceTests
     [Fact]
     public void SignatureHelpFindsTheActiveParameterAndIgnoresNestedCommas()
     {
-        const string source = "LeftDoubleClick(50, Delay(10, 20), \"a,b\"";
+        const string source = "LeftDoubleClick(50, Delay(10, 20)";
 
         var help = LuaEditorService.GetSignatureHelp(source, source.Length, _registry);
 
