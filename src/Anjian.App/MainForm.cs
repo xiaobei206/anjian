@@ -124,6 +124,7 @@ internal sealed class MainForm : Form
         AppendLog("就绪。脚本保存在：" + _repository.RootDirectory);
         AppendLog("播放设置：次数 1=执行一次，0=无限；间隔只在每轮之间等待。");
         AppendLog("全局快捷键：F10 启动，F11 暂停/继续，F12 立即中止。");
+        UpdateDebuggerButtons(isPaused: false);
     }
 
     private void BuildUi()
@@ -1058,6 +1059,7 @@ internal sealed class MainForm : Form
         _playButton.Enabled = !_recordSessionActive && !_playback.IsRunning;
         _status.Text = !_recordSessionActive ? "未运行" : _recordingPaused ? "录制已暂停" : "正在录制…";
         UpdateFloatingState();
+        UpdateDebuggerButtons(isPaused: false);
     }
 
     private async Task StartPlaybackAsync()
@@ -1089,6 +1091,7 @@ internal sealed class MainForm : Form
         _stopButton.Enabled = true;
         _pauseButton.Text = "暂停";
         _status.Text = "正在运行";
+        UpdateDebuggerButtons(isPaused: false);
         UpdateFloatingState();
         AppendLog($"开始播放：{Path.GetFileNameWithoutExtension(scriptPath)}；次数={(options.IsInfinite ? "无限" : options.RepeatCount)}；每轮间隔={options.IntervalMilliseconds}ms。");
 
@@ -1173,6 +1176,9 @@ internal sealed class MainForm : Form
         ClearDebuggerView();
         _scripts.Enabled = false;
         _editorTabs.Enabled = false;
+        _playButton.Enabled = false;
+        _recordButton.Enabled = false;
+        _pauseButton.Enabled = false;
         _status.Text = "正在启动调试…";
         _debugSummary.Text = "等待 Lua 首个执行行…";
         _stopButton.Enabled = true;
