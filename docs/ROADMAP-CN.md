@@ -13,7 +13,7 @@
 | M0 完整产品范围冻结 | DONE（文档已提交） | 完整 PRD、功能矩阵、函数手册初版、后续开发阶段与验收门槛统一 |
 | M1 preview.4 实机基线与可靠性 | IN_PROGRESS | 实际 Windows 10/11 验收窗口/托盘/热键/Hook，进行长时运行、多显示器和 DPI 验证 |
 | M2 单一 API 注册表与文档生成 | DONE（Windows CI PASS，2026-11-13） | 建立机器可读 API 注册描述；以同一来源生成手册和后续 IDE 提示 |
-| M3 完整 Lua IDE 基础 | TODO | 高亮、行号、补全、参数提示、诊断、查找/替换、多标签、错误行导航 |
+| M3 完整 Lua IDE 基础 | DONE（Windows CI PASS，2026-11-13；桌面手工验收待执行） | 高亮、行号、补全、参数提示、诊断、查找/替换、多标签、错误行导航 |
 | M4 调试器 | TODO | 断点、单步、运行到光标、变量观察、调用栈 |
 | M5 可视化录制/动作列表 | TODO | 动作编辑、分组、排序、延时编辑、生成代码区块和同步状态 |
 | M6 坐标系统与窗口自动化 | TODO | screen/window/client/anchor/ratio、坐标转换、窗口查找/布局/对齐/等待 |
@@ -56,6 +56,32 @@ M1 的实机验证不要求用户提供未经要求的敏感数据。若实机�
 - [x] 不在本阶段一次性重构整个运行器，也不改动已发布 API 的含义。
 
 M2 验收：当前实现中的 22 个公开函数均可在注册表和手册中找到；生成文档可复现；错误参数/默认值、运行时绑定与 Unicode 契约测试通过；Windows CI run `43273917056` 的 Restore/Build/12 项测试/API 文档检查/win-x64 发布与 ZIP/SHA256/Artifact 上传全部成功。编辑器补全、参数提示和命令面板 UI 尚未实现，作为 M3 的实际工作继续推进。
+
+## M3 — 完整 Lua IDE 基础（DONE，Windows CI 已通过）
+
+### 已交付
+- [x] WinForms Lua 编辑器具备语法高亮、行号和多标签；脚本标签切换/关闭会保存，重开从脚本文件恢复。
+- [x] 查找下一个（含循环查找）、替换当前项、全部替换和大小写选项。
+- [x] API 自动补全和参数/签名提示直接读取 `LuaApiRegistry.Load()` 的 `Categories` / `Apis`；只提示注册表中标记为 `implemented` 的真实 API，不在 UI 维护第二份函数定义。
+- [x] Lua 语法诊断使用 NLua 编译 chunk 的 `LoadString` 路径，不调用脚本；错误写入运行日志并导航到首个错误行/列。
+- [x] 自动化测试覆盖 token 分类、真实 API 补全边界、嵌套函数参数提示、只编译不执行、语法错误定位、注释/字符串上下文以及大文本词法处理。
+- [x] 语法着色词法扫描移至后台任务并使用文本版本号丢弃过期结果，避免大文本扫描阻塞 UI；录制期间防止切换或关闭活动脚本标签。
+
+### Windows CI 验证
+- 最终验收提交：`71555d30815a60f96ef0708fe6c46f4cc0a16253`；Actions run `43281738798`：SUCCESS。
+- Restore PASS；Release Build PASS（0 warnings / 0 errors）；自动化测试 **20 passed / 0 failed / 0 skipped**；API handbook `--check` PASS；self-contained win-x64 publish PASS；ZIP/SHA256 package PASS；artifact upload PASS。
+- 前期测试曾因签名提示测试夹具把字符串内部逗号误算为外层函数参数，出现 1 项断言失败；纠正夹具后最终主线运行全部通过。UI 集成相关 Build 均通过。
+- 本执行环境未安装 .NET SDK，故本地 Restore/Build/Test 为 NOT RUN；上述结果仅来自 Windows GitHub Actions runner。
+- 本轮没有创建 release，已发布的 v0.1.0-preview.4 资产没有更新；新 IDE 功能目前只在 main 未发布代码中。
+
+### 尚未完成与验收边界
+- Windows 桌面 UI 手工验收：NOT RUN；尤其是 WinForms 窗口中的多标签交互、中文/日文输入、1MB 文件输入/滚动、100–200% DPI 和错误导航仍需实机确认。
+- 代码折叠不在本轮 handoff 的 M3 强制范围，F04 仍为“部分实现”，后续需按产品完整目标补齐。
+- 独立 API 命令面板未实现；当前有编辑器自动补全与签名提示，不能把它们描述成命令面板。
+- 断点、单步、变量窗和调用栈属于 M4，未实现。
+
+### 下一步
+M3 已 DONE。下一会话唯一开发任务为 M4：Lua 调试器基础（真实断点/单步/运行到光标、变量观察和调用栈）；不能用日志展示冒充执行点控制。M1 preview.4 Windows 桌面实机验收继续保留为单独 NOT RUN 项，不阻塞 M4。
 
 ## M3–M7 — IDE、调试、录制、坐标与窗口
 
