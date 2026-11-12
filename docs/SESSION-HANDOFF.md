@@ -1,66 +1,66 @@
-# 当前会话交接（唯一有效状态）
-
-> 本文件每个会话结束时整体更新。历史过程写在 DEVELOPMENT-LOG-CN.md。
+# 当前会话交接
 
 ## 当前状态
-
-- 项目：按键精灵 2026（暂定名）
+- 项目：按键精灵 2026（暂定工作名）
 - 仓库：xiaobei206/anjian
 - 主分支：main
-- 当前阶段：M0 文档与产品交互规格完成；尚无应用代码
-- 当前版本：未发布（不要创建虚假版本/发布资产）
-- 本次规格冻结提交：本文件所在提交（以 GitHub main HEAD 为准）
+- 当前版本：0.1.0-preview.1
+- 当前阶段：首个 Windows x64 预览版代码、CI 和便携 ZIP 已完成；本次提交会触发 GitHub prerelease 自动创建。
+- 实机手工验收：NOT RUN，必须由用户在 Windows 电脑上验证后才能标记通过。
 
-## 本会话 S001
+## 用户明确确认的产品决策
+- Windows 10/11 x64。
+- WinForms + .NET 10 + Lua 5.4。
+- Lua 用户脚本采用全局函数调用，例如 MoveTo(122, 100)。
+- 录制时合并/降噪鼠标移动，保留必要路径采样点、终点和关键输入事件。
+- 首版坐标为虚拟桌面全屏绝对物理像素，允许副屏负坐标，不做窗口相对坐标。
+- LeftClick() 默认按下 50ms 后释放；LeftClick(50) 为 50ms；0 表示不增加等待。KeyPress 同样默认 50ms。
+- 重复次数默认 1，正整数按完整脚本轮数执行；0 表示无限循环。
+- 每轮间隔默认 2000ms，只在两轮之间等待，末轮后不等待；独立于脚本内部 Delay。
+- 初版界面以小工具为主，不先做完整 IDE。
 
-- 主题：首版交互确认与 Lua API 语义冻结
-- 状态：DONE（文档决策已提交；功能开发尚未开始）
-- 用户明确确认：A/A/A
-  1. Lua 函数调用语法，例如 `MoveTo(122, 100)`。
-  2. 录制时合并鼠标移动，保留必要路径点和终点。
-  3. 首版采用全屏绝对坐标，不做窗口相对坐标。
-- 用户补充确认的 API 语义：
-  - `LeftClick(50)` = 左键按下 50 ms 后释放。
-  - `LeftClick()` 默认 50 ms。
-  - 右键、中键点击和 `KeyPress` 同样默认 50 ms。
-  - 显式 0 表示不增加等待；超过 60,000 ms 的长按使用 Down / Delay / Up。
-  - Stop 必须中断点击保持并释放输入；Pause 在当前完整 Click / KeyPress 动作完成后生效。
+## 当前首版实现
+- WinForms 主窗口、脚本本地存储、新建/打开/保存/重命名/复制/删除、右键菜单。
+- 基础 Lua 编辑器（RichTextBox），Ctrl+S 保存；目前没有语法高亮、补全或断点。
+- 全局鼠标/键盘录制，低级 Hook 采集，合并鼠标移动，过滤注入事件和本软件窗口事件，避免键盘自动重复污染；录制结束时补齐尚未释放的按键。
+- 录制结果生成 Lua 脚本，保留点击按下时长和动作之间的间隔。
+- Lua 5.4 / NLua 1.7.9 执行 worker 子进程；named pipe 将键鼠操作、延时和日志交由主进程执行。
+- CPU 无限循环可由主程序强制结束 worker；Stop 时清理本程序仍按下的鼠标/键盘输入。
+- Windows SendInput / SetCursorPos 注入，Unicode 文本输入，长文本可在字符边界取消。
+- 播放/暂停/停止、重复次数、每轮间隔；设置写入本地 settings.json。
+- 0.1.0-preview.1 self-contained win-x64 文件夹 ZIP 和 SHA256 sidecar。
 
-## 已确认的首版用户层 API
+## Windows CI 验证证据
+- 最后完整测试提交：fbf208fb42535d330286bb811a0911dd21f82afa
+- GitHub Actions run：43222878724，结论 SUCCESS。
+- Release build：0 warning / 0 error。
+- 自动化测试：7 passed / 0 failed / 0 skipped。
+  - 4 项重复次数/轮间隔规则测试。
+  - 3 项 Lua 运行时测试：Lua 5.4 版本、C# 全局函数绑定、instruction-count hook。
+- win-x64 self-contained publish 成功。
+- ZIP 与 SHA256 sidecar 上传成功；Actions artifact id 13947200664。
+- 内部应用 ZIP：Anjian2026-0.1.0-preview.1-win-x64.zip
+- 内部 ZIP 大小：51,879,713 bytes。
+- 内部 ZIP SHA256：baceea2b0c0b2a63783851ff942e049a6d59a8a0a5a23e957a952966a78f4135。
+- 已从 Actions artifact 下载解包检查：包含 276 个文件，确认 Anjian.App.exe 和 NLua.dll 存在；内部 ZIP SHA256 与 sidecar 完全一致。
+- Release 本次准备通过 commit message 前缀 release: 触发，由 GitHub Actions 创建 tag v0.1.0-preview.1 和 prerelease。
 
-- 鼠标：`MoveTo`、`LeftClick`、`RightClick`、`MiddleClick`、`Left/Right/MiddleDown`、`Left/Right/MiddleUp`、`MouseWheel`、`GetMousePosition`。
-- 键盘：`KeyPress`、`KeyDown`、`KeyUp`、`Hotkey`、`TypeText`。
-- 时间/日志：`Delay`、`RandomDelay`、`Log`。
-- 标准 Lua 5.4 语法；API 全局函数形式，不要求 Mouse / Keyboard 命名空间。
-- 时间统一为毫秒。坐标使用虚拟桌面物理像素，负坐标合法。
+## 已知限制
+- 当前是早期预览版，不等于完整 PRD 的全部 P0。
+- 编辑器仅基础文本框；没有 Lua 高亮、自动补全、参数提示、断点。
+- 没有可视化动作列表/动作编辑器；录制直接生成 Lua 代码。
+- 录制基于低级 Windows Hook，需要实机验证长录制和 Hook 生命周期。
+- 输入注入受 Windows UIPI/完整性级别限制，不绕过安全桌面或高权限边界。
+- 鼠标移动经过采样/合并，不保证逐像素回放；复杂拖拽、多设备键盘行为需要手工验证。
+- 尚未完成 2 小时稳定性、DPI 多屏和 Windows 10/11 干净环境手工验收。
+- TypeText 支持 Unicode 注入，但不是物理 IME 组合过程的重建。
 
-## 已更新的权威文档
+## 下一步
+1. 检查本次 release workflow run。
+2. 核验 GitHub Release v0.1.0-preview.1 和两个资产（ZIP、SHA256）。
+3. 最后更新本 handoff 写入真实 Release URL 和 release workflow run。
+4. 请用户在 Windows 电脑上实测录制、脚本编辑、LeftClick(50)、键盘输入、暂停/停止、100 次循环、无限循环和轮间隔。
+5. 根据用户实测问题继续迭代，保持每次小版本提交、CI 和 handoff 完整。
 
-- `docs/LUA-API-CN.md`：API 0.2，函数命名、点击按下时长、默认值和坐标语义。
-- `docs/RECORDER-DESIGN-CN.md`：移动合并、Down/Up 配对、holdMs 和动作间隔分离、Lua 生成形式。
-- `docs/ARCHITECTURE-CN.md`：内部 IInputController 时长参数、Stop/Pause 约定。
-- `docs/DECISIONS-CN.md`：ADR-014 至 ADR-017，记录四项冻结决策。
-- `docs/ROADMAP-CN.md`：M0 完成，TV-01 为唯一下一任务。
-- `docs/DEVELOPMENT-LOG-CN.md`：追加 S001 记录。
-
-## 当前技术事实
-
-- 仓库最新已确认基线：S000 最终提交 `306ed5dc85c36576c52452a499551e4a8f9abc70`；写入前必须再次检查最新 main HEAD。
-- 目前没有 .sln、应用项目、应用代码、可运行安装包或 Release。
-- .NET 10、WinForms、Lua 5.4 是已确认技术方向；NLua/KeraLua 包版本和 lua_sethook 使用路径仍须 TV-01 实测。
-- 当前会话只完成规格冻结，没有运行构建或测试，不得把 PoC 标为通过。
-
-## 下一任务（唯一）
-
-- ID：TV-01
-- 名称：Lua 5.4 / .NET 10 绑定与中断机制 PoC
-- 目标：在独立最小 PoC 中验证 Lua 5.4 运行、C# 全局函数注册、错误行号、CPU 无限循环 Stop、可取消 Delay、Pause/Resume、win-x64 self-contained。
-- 先核对 NLua / KeraLua 当前包、依赖树、许可和 native assets；检查高层绑定是否能提供稳定的 instruction hook。
-- 若高层 API 做不到，在证据支持下验证 KeraLua 原生 API 路径；不要直接编写正式桌面 UI。
-- 需要提交 PoC 代码、Windows CI 构建/测试工作流、验证结果和依赖锁定结论。
-- 必须更新 TECHNICAL-VALIDATION-CN.md、DECISIONS-CN.md、ROADMAP-CN.md、DEVELOPMENT-LOG-CN.md、SESSION-HANDOFF.md。
-- 结束时实际检查 GitHub Actions 结果；未通过则记录日志和精确失败原因。
-
-## 下一会话接手指令
-
-先读取 AGENTS.md、README.md、docs/SESSION-HANDOFF.md、docs/ROADMAP-CN.md、docs/TECHNICAL-VALIDATION-CN.md 与 docs/LUA-API-CN.md。以 main 最新 HEAD 为准。只执行 TV-01；写入前检查 HEAD；完成独立 PoC、Windows CI 构建/测试和真实验证后，更新 handoff / log / roadmap 并提交 main。不得把未执行测试写成 PASS。
+## 新会话接手指令
+先读取 AGENTS.md、README.md、docs/SESSION-HANDOFF.md、docs/ROADMAP-CN.md、docs/LUA-API-CN.md 和 docs/USER-GUIDE-CN.md。以 main 最新 HEAD 和当前 GitHub Release 为准；首先确认 Release 资产存在。下一任务是用户实机验收与反馈修复，不要回退到 M0 文档建设或 TV-01 任务。

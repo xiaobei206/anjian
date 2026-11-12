@@ -59,3 +59,40 @@
 
 ### 下一步
 TV-01：Lua 5.4 / .NET 10 绑定与中断机制 PoC。
+
+
+## 2026-11-12 — S002 — 首个可用 Windows 预览版
+
+### 实现内容
+- .NET 10 WinForms 主程序、Core 项目和自动化测试项目。
+- 脚本本地存储、编辑器、新建/打开/保存/重命名/复制/删除及右键菜单。
+- NLua 1.7.9 / Lua 5.4 worker 子进程；脚本通过 IPC 请求主进程执行键鼠输入、延时和日志。
+- Windows SendInput / SetCursorPos 鼠标键盘输入，输入状态跟踪和 Stop 清理。
+- 全局低级鼠标/键盘 Hook 录制；过滤注入事件和本程序窗口操作，移动合并，Down/Up 配对，键盘自动重复过滤。
+- Lua 点击/按键默认 50ms，显式按下时长，双击快捷 API，常见标点键和数字小键盘键。
+- 播放次数默认 1，0=无限；每轮间隔默认 2000ms，只在两轮之间等待，末轮后不等待；设置持久化。
+- 长文本 Unicode 注入可在字符边界响应 Stop；代理对按 UTF-16 序列注入。
+- GitHub Actions Windows build/test/self-contained ZIP/SHA256 与 release 流程。
+
+### 最新 CI 结果（测试提交 fbf208f）
+- Workflow run：43222878724，SUCCESS。
+- Release build：0 warning / 0 error。
+- Tests：7 passed / 0 failed / 0 skipped。
+- Lua runtime 实测：Lua 5.4、Lua 调用 C# 注册函数、instruction count hook 触发。
+- win-x64 self-contained publish 成功。
+- ZIP 上传成功，Actions artifact ID 13947200664。
+
+### 产物复核
+- ZIP：Anjian2026-0.1.0-preview.1-win-x64.zip
+- 大小：51,879,713 bytes。
+- SHA256：baceea2b0c0b2a63783851ff942e049a6d59a8a0a5a23e957a952966a78f4135。
+- 已下载 Actions artifact 并检查内部 ZIP，276 个文件，主程序 EXE 与 NLua.dll 存在。
+- sidecar SHA256 与实际 ZIP 计算结果一致。
+
+### 限制与验收
+- 本次 CI 和包结构验证通过，但尚无用户 Windows 实机验收证据。
+- 不将 2 小时稳定性、复杂拖拽、混合 DPI、多显示器和所有权限目标标记 PASS。
+- 当前不是完整 IDE，也没有可视化动作列表；录制结果直接生成 Lua。
+
+### 当前任务
+发布 GitHub prerelease v0.1.0-preview.1，并核验正式 Release 的 ZIP 和 SHA256 资产。
