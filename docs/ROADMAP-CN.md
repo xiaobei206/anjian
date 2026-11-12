@@ -3,13 +3,13 @@
 - 当前版本：Roadmap 0.1
 - 任务状态只允许：TODO / IN_PROGRESS / BLOCKED / DONE
 - 更新规则：每个会话结束时更新本文件和 SESSION-HANDOFF.md。
-- 任务分配原则：一个 GPT 会话优先负责一个清晰、可验证的任务，不让新会话自行猜测工作范围。
+- 任务分配原则：一个 GPT 会话优先负责一个清晰、可验证的任务。
 
 ## 0. 里程碑总览
 
 | 里程碑 | 内容 | 状态 | 结果 |
 |---|---|---|---|
-| M0 | 仓库初始化与项目文档框架 | IN_PROGRESS | 当前会话完成文档首版 |
+| M0 | 仓库初始化与项目文档框架 | DONE | 已建立规范、需求、架构、API、验收和交接文件 |
 | M1 | 技术验证 PoC | TODO | 锁定 Lua 绑定、编辑器、输入采集和发布方式 |
 | M2 | .NET 解决方案与空壳程序 | TODO | 可启动的 WinForms 主程序和测试结构 |
 | M3 | Core 数据模型与工程文件 | TODO | 工程/脚本/动作模型及可靠保存 |
@@ -21,24 +21,24 @@
 | M9 | P0 功能集成与稳定性 | TODO | P0 全链路验收通过 |
 | M10 | 首个可用版本 | TODO | self-contained ZIP、说明、测试报告、SHA256 |
 
-## 1. M0 — 仓库初始化与文档（当前会话）
+## 1. M0 — 仓库初始化与文档（已完成）
 
 | 任务 ID | 内容 | 状态 | 验收 |
 |---|---|---|---|
 | BOOT-01 | 初始化 README 与项目入口 | DONE | README 指向权威文档 |
 | BOOT-02 | 建立 AGENTS 与会话协议 | DONE | 新会话有强制读取顺序 |
 | BOOT-03 | 建立 PRD/架构/API/录制/验收文档 | DONE | 文档覆盖范围明确 |
-| BOOT-04 | 建立路线图、决策、日志和 handoff | IN_PROGRESS | 完成提交后核对 commit SHA |
-| BOOT-05 | 建立 src/tests 结构说明 | TODO | 无代码但保留规划入口 |
+| BOOT-04 | 建立路线图、决策、日志和 handoff | DONE | 文件已提交并复核 |
+| BOOT-05 | 建立 src/tests 结构说明 | DONE | 无代码但保留规划入口 |
 
 ## 2. M1 — 技术验证 PoC
 
 ### TV-01：Lua 5.4 / .NET 绑定与取消机制
-- 状态：TODO
+- 状态：TODO（下一会话任务）
 - 范围：只做最小 PoC，不做正式应用 UI。
 - 输出：poc/LuaRuntime 或同等清晰目录；记录精确 NuGet 版本、许可证、Lua 版本、Win-x64 发布结果。
 - 验证：C# 注册 API、Lua 错误行号、Lua 指令钩子、无限循环停止、可取消 Delay、暂停/恢复。
-- 验收：技术验证文档中的 Lua PoC 项全部有结果；不能仅编译成功就判定通过。
+- 验收：TECHNICAL-VALIDATION-CN.md 第 3 节逐项有结果；关键取消目标有重复实测数据；所有包版本和来源写明。
 
 ### TV-02：WinForms Lua 编辑器组件
 - 状态：TODO
