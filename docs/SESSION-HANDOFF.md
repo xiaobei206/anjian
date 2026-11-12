@@ -8,7 +8,7 @@
 - Release：https://github.com/xiaobei206/anjian/releases/tag/v0.1.0-preview.1
 - 发布提交：cf24ac9292ea21dd1063ea9e9d65f18e3637442a
 - 发布 Actions run：43224009158，结论 SUCCESS。
-- 当前任务：用户 Windows 实机试用与反馈；不要重建文档框架，不要把项目说成尚未编码。
+- 当前任务：准备 v0.1.0-preview.2，全局热键功能已提交，最终 Windows Actions 验证进行中；preview.1 仍是最新正式 Release。随后由用户实测快捷键与原有播放功能。
 
 ## 用户确认的产品决策
 - Windows 10/11 x64。
@@ -31,6 +31,7 @@
 - Windows SendInput / SetCursorPos 鼠标键盘输入、键状态追踪和停止清理。
 - Unicode 文本输入、可取消长文本注入、常见标点键和数字小键盘键映射。
 - 播放/暂停/停止、重复次数和轮间间隔；配置持久化于用户本地配置目录。
+- 全局快捷键已加入：空闲时 F10 启动；运行/暂停时 F11 暂停/继续、F12 中止。低级键盘钩子过滤模拟注入事件；功能键仅在对应动作可用时被截获。代码提交 `e8e96cb26df1a254d2db45dd2a72b2c7ef11cd9f`，待该提交 CI 完成及用户实机验收。
 - self-contained win-x64 ZIP 和 SHA256 发布资产。
 
 ## 正式 Release 资产
@@ -70,6 +71,7 @@
 3. 手写 `MoveTo`、`LeftClick(50)`、`KeyPress`、`Hotkey`、`TypeText`、`Delay` 测试。
 4. 重复次数设置 100，确认完整执行 100 轮；每轮间隔 0/1000/2000ms，确认只在两轮之间发生等待。
 5. 设置 0 无限循环并执行 Stop；测试 CPU 无限循环 Stop、Delay 中 Stop、Pause/Resume 和输入释放。
+5. 实机验证 F10/F11/F12 全局快捷键：应用最小化或焦点在目标应用时分别启动、暂停/继续、停止；验证 F12 停止后键鼠释放，空闲时 F12 仍可交给浏览器/前台程序。若钩子安装失败，收集日志和 Win32 错误码。
 6. 把实际错误日志、具体复现步骤和目标程序环境交给下一会话，按小版本迭代修复。
 
 ## 下一会话接手指令
