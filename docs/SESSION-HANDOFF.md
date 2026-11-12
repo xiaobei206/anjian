@@ -10,7 +10,7 @@
 - 发布 Actions run：`43253611158`，结论 SUCCESS。
 - 最新产品代码/release commit：`08886d9e66c08ba24f6f1b7d9e91bbdaeba8a9e0`。
 - main 分支可能继续产生文档提交；新 GPT 接手时必须重新查询 main 最新 HEAD，不要把 handoff 中的历史提交 SHA 当成分支当前头部。
-- 当前阶段：preview.4 的 CI/发布已完成；下一步优先 Windows 实机验收、2 小时稳定性、DPI/多显示器及输入 Hook 验证，不要默认用户已经完成验收。
+- 当前阶段：M0 完成；M1 Windows 实机验收仍 IN_PROGRESS/NOT RUN；M2 单一 API 注册表与函数手册工程已完成且 Windows CI PASS；下一开发阶段为 M3 完整 Lua IDE 基础。
 
 ## 完整产品目标已冻结（2026-11-13）
 - 产品范围基线：[docs/PRD-CN.md](PRD-CN.md)。
@@ -19,7 +19,7 @@
 - API 当前实现契约：[docs/LUA-API-CN.md](LUA-API-CN.md)。
 - 阶段路线图：[docs/ROADMAP-CN.md](ROADMAP-CN.md)。
 - 完整 IDE、窗口/坐标、图色/OCR、参数 UI、小精灵、插件及函数手册均为正式目标，不得再从大纲中删除或只标为可选远期项目。
-- 下一项开发任务是 M2：先建立机器可读 API 注册表和文档生成/一致性测试，再以它驱动编辑器提示、命令面板和校验。
+- 下一项开发任务是 M3：实现完整 Lua IDE 基础（语法高亮、行号、补全、参数提示、诊断、查找/替换、多标签和错误行导航）；补全与命令面板数据必须直接读取 M2 的唯一 API 注册表。
 
 
 ## preview.4 窗口与托盘决策
@@ -114,17 +114,40 @@
 6. 检查 EXE 文件图标、任务栏主窗口图标、托盘图标和悬浮窗图标是否一致，16/32px 尺寸下是否清晰。
 7. 回归只录点击、录制暂停/续录、F10/F11/F12、播放/停止和原有 Lua API；将失败步骤、截图和日志交给下一会话。
 
-## 当前会话 M2 实施状态（CI 待确认）
+## M2 完成：单一机器可读 API 注册表与函数手册生成（Windows CI 已验收）
 
-- 代码提交：`0f7a80c24f18789833d7fbb92e4979da65ed261d`。唯一 API 来源：`src/Anjian.Core/Api/lua-api-registry.json`，当前含 22 个实际实现的公开函数。
-- 运行时注册、手册生成器和 API 契约测试已接入；候选窗口/找图/OCR/后台能力仍仅属于目标设计。
-- 生成/检查：`dotnet run --project tools/Anjian.ApiDocsGenerator -c Release -- --write` / `--check`。
-- 本环境没有 .NET SDK；本地 Restore/Build/Test 为 NOT RUN。请以 Windows Actions 的实际结果为准，不得伪称本地通过。
-- Windows 10/11 实机、DPI/多显示器、Hook 与 2 小时稳定性验收仍未执行；CI 不代替实机验收。
+### 实现基线
+- M2 实现提交：`0f7a80c24f18789833d7fbb92e4979da65ed261d`。
+- 本次 CI 验收对应的最新主线代码基线：`fdff7c14398485fa30725e3ea283c03a545c97a6`。
+- 唯一机器可读来源：`src/Anjian.Core/Api/lua-api-registry.json`，共 22 个**当前真实实现**的公开 Lua 函数。
+- `LuaApiRuntime.Register` 根据注册表建立 Lua 全局包装；内部 IPC bridge 在闭包建立后隐藏，不作为公开 API。
+- `tools/Anjian.ApiDocsGenerator` 支持 `--write` 和 `--check`；函数手册第 2 节由注册表生成。注册表另提供分类、签名、参数 schema、默认值、范围、返回契约、错误、暂停/取消、坐标/权限语义、示例、实现状态和 API 版本，供后续 IDE/命令面板读取。
+- 当前注册表仅含 22 个真实函数；窗口、图色、OCR、后台控制等均保持“目标设计”，不作为当前可调用能力。
 
-### 下一会话唯一任务（M2 的 CI 确认）
-查询本次提交的 Windows Actions。若 Restore/Build/Test/API 文档检查/发布打包任一步失败，只修复失败项并重跑；全部成功后更新日志与路线图为 DONE，并将唯一开发任务推进到 M3。
+### Windows CI 验收证据
+- 初始 M2 Actions run `43271693389` 在 Build 阶段暴露测试代码 nullable tuple 类型不一致（CS8620）；后续修正后 Build 通过。
+- 随后的契约测试 run `43272945064` 发现 Lua 中文字符串在测试中变为问号；提交 `ac034aa10b1c8b1acae25a297d4e20928d9fe7f4` 将 Lua state encoding 明确设为 UTF-8。
+- 最新主线代码提交 `fdff7c14398485fa30725e3ea283c03a545c97a6` 对应 Actions run `43273917056`：**SUCCESS**。
+- 最新成功运行实际步骤：Restore PASS；Release Build PASS（0 errors）；自动化测试 **12 passed / 0 failed / 0 skipped**；API 手册 `--check` PASS；win-x64 self-contained publish PASS；ZIP/SHA256 打包 PASS；Actions artifact 上传 PASS。
+- 该次 push 不是 `release:` 提交，因此 Read release version / Create GitHub Release 两个发布专用步骤按条件跳过；本轮没有创建新 Release，已发布的 preview.4 资产不变。
+- Actions 记录：<https://github.com/xiaobei206/anjian/actions/runs/43273917056>。
+
+### 验收边界与未完成事项
+- 当前执行容器没有 .NET SDK（`dotnet --info` 返回 command not found），本地 Restore/Build/Test：NOT RUN；实际构建和 12 项自动化测试由 Windows GitHub Actions runner 执行并通过。
+- 编辑器自动补全、参数提示、命令面板 UI 尚未实现；M2 已提供唯一数据源，M3 必须直接消费该注册表，不能复制维护第二份 API 清单。
+- M1 Windows 10/11 窗口/托盘/Hook 实机验收、DPI/多显示器、复杂拖拽和 2 小时稳定性仍为 NOT RUN。CI 成功不等于桌面实机验收成功。
+
+### 下一会话唯一任务（M3：完整 Lua IDE 基础）
+严格按 `docs/ROADMAP-CN.md` 的 M3 范围实施，不重复讨论已冻结的 PRD：
+1. 将当前基础 Lua 文本框升级为可用编辑器，具备语法高亮、行号、查找/替换和多标签编辑。
+2. 提供可工作的 API 补全与参数/签名提示；数据必须来自 `LuaApiRegistry.Load().Categories` / `.Apis`，不允许在 UI 层复制函数名、参数或说明。
+3. 提供脚本诊断和错误行导航；编辑器保存、关闭、重开、多标签切换不能丢失内容。
+4. 命令面板若在本阶段接入，也必须由同一注册表驱动，搜索、展示签名/说明和插入代码需形成真实可用流程。
+5. 增加编辑器与注册表消费的一致性/交互自动测试，并运行 Windows CI；将 Windows 桌面 UI 的手工验收单独标记，不能由 CI 代替。
+6. 调试器的断点/单步/变量窗属于 M4，不要在本任务中冒充完成。
+
+M1 实机验收仍保留为未完成事项，但不阻塞 M3 的独立开发。
 
 ## 下一会话接手指令
 
-先核对最新 main HEAD。当前 M2 代码已提交，先检查本提交的 Windows Actions；失败则仅修复失败项，全部成功后更新 handoff 将唯一开发任务推进至 M3。产品大纲已冻结，不要重做。preview.4 Windows 实机验收仍未完成，须保留 M1 清单并如实记录。所有计划中的函数均保持“目标设计”，直到代码和测试确实存在。
+先核对 `main` 最新 HEAD，再读取本文件、`AGENTS.md`、`README.md` 和 `docs/ROADMAP-CN.md`。M2 已由 Windows Actions run `43273917056` 验收通过；下一会话唯一开发任务为 M3 完整 Lua IDE 基础。严格以 PRD/功能矩阵冻结的完整产品目标为准，直接在 main 小步提交，不创建长期分支或 PR。保留 M1 实机验收未完成的真实状态。

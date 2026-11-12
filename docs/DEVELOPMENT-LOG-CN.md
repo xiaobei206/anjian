@@ -321,7 +321,7 @@ TV-01：Lua 5.4 / .NET 10 绑定与中断机制 PoC。
 M2：实现单一机器可读 API 注册表，并使函数/参数手册可以自动生成/一致性校验。先盘点当前真实 Lua 绑定；不要因计划手册列出了候选函数就添加空壳或宣称功能可用。用自动化测试核对公开函数、注册表、参数默认值和生成文档。
 
 
-## 2026-11-13 — M2 — 单一机器可读 API 注册表与手册生成（CI 待确认）
+## 2026-11-13 — M2 — 单一机器可读 API 注册表与手册生成（Windows CI 已通过）
 
 ### 真实实现盘点
 - `WorkerProgram.cs` 当前向脚本公开 22 个全局函数；`__MoveTo` 等属于内部 IPC 桥接，不是用户 API。
@@ -335,8 +335,16 @@ M2：实现单一机器可读 API 注册表，并使函数/参数手册可以自
 - 新增 `tools/Anjian.ApiDocsGenerator` 的 `--write`/`--check` 命令；函数手册第 2 节生成式维护，规划函数仍位于目标设计章节。
 - 新增公开函数、运行时全局、桥接隐藏、默认参数、600000ms 边界、MouseWheel 整数契约、Hotkey 空参数和手册漂移测试；Windows workflow 增加生成文档一致性检查。
 
-### 验证状态
-- 实现提交：`0f7a80c24f18789833d7fbb92e4979da65ed261d`（`feat: add registry-driven Lua API contracts and handbook`）。
-- 当前执行环境无 .NET SDK，不能本地 Restore/Build/Test；本地验证：NOT RUN。
-- Windows Actions 对该提交/后续文档提交的 Restore/Build/Test/API 手册检查/self-contained publish/ZIP/SHA 结果待查询后补录。
-- Windows 10/11 实机验收、DPI/多屏及 2 小时稳定性仍为 NOT RUN；CI 不代替实机验收。
+### Windows CI 验证结果（已完成）
+- M2 实现提交：`0f7a80c24f18789833d7fbb92e4979da65ed261d`；当前验证的最新主线代码基线：`fdff7c14398485fa30725e3ea283c03a545c97a6`。
+- 首次 CI run `43271693389` 在 Build 阶段失败：新增测试的 tuple nullable 类型与 xUnit 期望类型不一致（CS8620）；后续已修正。
+- run `43272945064` 的 Build 通过，但 `LuaCallsAndDefaultsMatchCatalog` 发现中文 TypeText 测试字符串被解码为问号。提交 `ac034aa10b1c8b1acae25a297d4e20928d9fe7f4` 明确设置 `lua.State.Encoding=Encoding.UTF8` 后，后续 Windows CI 通过。
+- 最新主线 Actions run：`43273917056`，SUCCESS（<https://github.com/xiaobei206/anjian/actions/runs/43273917056>）。
+- 最新成功运行：Restore PASS；Release Build PASS（0 errors）；自动化测试 **12 passed / 0 failed / 0 skipped**；`Anjian.ApiDocsGenerator --check` PASS；self-contained win-x64 publish PASS；ZIP/SHA256 package PASS；artifact upload PASS。
+- 注册表当前包含 22 个真实已实现的公开 Lua 函数。测试覆盖公开函数清单、运行时 Lua 全局/内部桥接隐藏、函数调用与默认值/边界、Hotkey 和 MouseWheel 参数契约、Unicode 文本传输以及手册生成区一致性。
+- 当前 push 不是 `release:` 提交，故发布专用的 Release version / Create Release 步骤按条件跳过；未创建新版本或覆盖 preview.4。
+- 本地执行环境没有 .NET SDK（`dotnet --info`：command not found），本地 Restore/Build/Test 为 NOT RUN；构建和测试结果来自 Windows GitHub Actions runner，不冒称本地通过。
+- Windows 10/11 实机窗口/托盘/Hook、DPI/多显示器、复杂拖拽与 2 小时稳定性验收仍为 NOT RUN。CI 不代替 Windows 桌面手工验收。
+
+### 下一步
+M2 已 DONE。下一开发任务为 M3：完整 Lua IDE 基础。编辑器补全、参数提示和命令面板必须消费 `LuaApiRegistry.Load()` 提供的数据；禁止在 UI 层维护第二份 API 清单。M4 调试器独立排期。
