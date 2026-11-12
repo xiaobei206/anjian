@@ -1164,6 +1164,12 @@ internal sealed class MainForm : Form
         if (_recordSessionActive || _playback.IsRunning || _activeTab is null || _current is null || !SaveCurrent())
             return;
 
+        if (string.IsNullOrWhiteSpace(_editor.Text))
+        {
+            MessageBox.Show(this, "脚本内容为空。", "启动调试", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
         var tab = _activeTab;
         var scriptPath = tab.Entry.FullPath;
         var breakpoints = tab.Breakpoints
