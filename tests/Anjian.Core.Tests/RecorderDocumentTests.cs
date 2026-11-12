@@ -154,6 +154,7 @@ public sealed class RecorderDocumentTests
             new RecorderAction("a1", RecorderActionKind.KeyPress, Name: "ENTER", HoldMs: 30, DelayMs: 12)
         ]);
 
+        Assert.Equal(Path.Combine(directory.FullName, "test.actions.json"), RecorderDocumentStore.GetSidecarPath(scriptPath));
         RecorderDocumentStore.Save(scriptPath, document);
         var loaded = RecorderDocumentStore.Load(RecorderDocumentStore.GetSidecarPath(scriptPath));
         Assert.Equal(document.SchemaVersion, loaded.SchemaVersion);

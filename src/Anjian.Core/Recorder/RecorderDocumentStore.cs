@@ -15,7 +15,10 @@ public static class RecorderDocumentStore
     public static string GetSidecarPath(string scriptPath)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(scriptPath);
-        return scriptPath + ".actions.json";
+        var scriptStem = Path.ChangeExtension(scriptPath, null);
+        if (string.IsNullOrWhiteSpace(scriptStem))
+            throw new ArgumentException("无法确定脚本文件名。", nameof(scriptPath));
+        return scriptStem + ".actions.json";
     }
 
     public static RecorderDocument? LoadIfExists(string scriptPath)
