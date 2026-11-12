@@ -348,3 +348,46 @@ M2：实现单一机器可读 API 注册表，并使函数/参数手册可以自
 
 ### 下一步
 M2 已 DONE。下一开发任务为 M3：完整 Lua IDE 基础。编辑器补全、参数提示和命令面板必须消费 `LuaApiRegistry.Load()` 提供的数据；禁止在 UI 层维护第二份 API 清单。M4 调试器独立排期。
+
+
+## 2026-11-13 — M3 — 完整 Lua IDE 基础（Windows CI 已通过）
+
+### 实现内容
+- 新增 \`Anjian.Core.Editor.LuaEditorService\`：Lua token 识别、注释/字符串上下文判断、脚本标识符前缀提取、注册表 API 候选、嵌套调用参数/签名提示和语法编译诊断。
+- 语法诊断通过 NLua \`LoadString\` 加载/编译 Lua chunk，不执行脚本语句；因此检查语法不会触发 \`Log\`、键盘或鼠标动作。解析错误包含行号时返回诊断行。
+- 新增 WinForms \`LuaEditorControl\`：语法颜色、行号 gutter、注册表驱动的自动补全列表、Ctrl+Space、Enter/Tab 选择、Escape 关闭和活动参数签名提示。
+- 编辑器词法扫描移入后台任务；文本版本号用于丢弃过期结果，避免旧的高亮计算覆盖用户后续输入。长文件的签名帮助仅分析光标前有限上下文。
+- 新增 \`ScriptSearchReplaceForm\`：查找下一个（循环）、替换当前、全部替换和区分大小写。
+- \`MainForm\` 接入多标签。切换标签自动保存，关闭标签保存，已有脚本重新打开时恢复对应编辑器；录制期间禁止切换/关闭活动编辑器标签。
+- 增加语法检查工具入口：显示诊断、将光标导航到首个错误行/列；语法通过与失败的日志都明确说明只检查语法，不运行脚本。
+- 新增编辑器 Core 单元测试：token 分类和 API 识别、注册表补全边界、嵌套函数签名提示、只编译不执行、错误行解析、注释/字符串上下文、标识符前缀和约 1MB 输入的词法扫描。
+- API 补全、签名帮助、API 颜色只使用 \`LuaApiRegistry.Load()\` 的 \`Categories\` / \`Apis\`；未把计划中的 \`FindWindow\` 等目标设计 API 伪装成当前可调用函数。没有接入独立 API 命令面板；调试器保留在 M4。
+
+### Windows CI 验证
+- M3 代码验收提交：\`71555d30815a60f96ef0708fe6c46f4cc0a16253\`。
+- Windows Actions run \`43281738798\`：**SUCCESS**（<https://github.com/xiaobei206/anjian/actions/runs/43281738798>）。
+- Restore：PASS。
+- Release Build：PASS，0 warnings / 0 errors。
+- 自动化测试：**20 passed / 0 failed / 0 skipped**。
+- \`Anjian.ApiDocsGenerator --check\`：PASS。
+- self-contained win-x64 publish：PASS；ZIP/SHA256 package：PASS；Actions Artifact upload：PASS。
+- 早期自动化验证曾出现 1 项签名提示断言失败。检查 Windows runner 日志后确认测试输入字符串的逗号被误放在光标前，实际对应第三个外层参数；修正测试夹具为尚未关闭的嵌套调用后，最终 20 项测试全部通过。Build 全程为 0 warning / 0 error。
+- 当前执行容器没有 .NET SDK，且无法在本容器执行 Windows WinForms 桌面测试；本地 Restore/Build/Test：NOT RUN。以上成功结果仅来自 Windows GitHub Actions runner。
+- 本轮没有创建 Release；已发布的 \`v0.1.0-preview.4\` 文件和 SHA256 没有更新。M3 功能目前只在 main 未发布代码中。
+
+### 手工验收与未完成范围
+- Windows 桌面手工验收：**NOT RUN**。尚未在用户 Windows 10/11 机器上实测多标签、中文/日文输入法、1MB 文件交互、查找替换、补全和签名提示、诊断错误跳转及 100–200% DPI。
+- F04 仍为“部分实现”：完整目标中的代码折叠未在 M3 交付。
+- F06 独立 API 命令面板仍未实现；编辑器自动补全不等于命令面板。
+- M1 preview.4 的窗口/托盘/Hook、DPI/多屏和 2 小时稳定性实机验收仍为 NOT RUN。
+- 断点/单步/运行到光标、变量窗和调用栈未实现，明确留给 M4。
+
+### 关键实现提交
+- Core 语言服务：\`6000813f2a86c1d23e8997ef391c5e3af57289d8\`。
+- WinForms 编辑器控件：\`fff758d58f8066ed206d483270026d74ff59c882\`。
+- 查找替换窗口：\`14aef3017159d7d0823d0a82add4875fbce1a526\`。
+- 主窗口多标签/诊断接入：\`0090450ffe275323e28cc46f8fcd79dbe21ecab7\`。
+- 最终 Windows CI 测试夹具修正：\`71555d30815a60f96ef0708fe6c46f4cc0a16253\`。
+
+### 下一步
+M3 已 DONE。下一会话唯一任务为 M4：Lua 调试器基础。必须实现真实断点、单步、运行到光标、变量观察和调用栈，禁止仅用日志显示冒充调试。M1 Windows 实机验收作为独立未完成事项继续保留，不阻塞 M4。
