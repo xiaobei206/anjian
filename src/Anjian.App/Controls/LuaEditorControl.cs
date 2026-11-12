@@ -153,9 +153,7 @@ internal sealed class LuaEditorControl : UserControl
             return;
         }
 
-        var token = LuaEditorService.Tokenize(source, _registry)
-            .FirstOrDefault(item => caret >= item.Start && caret <= item.End);
-        if (!force && token?.Kind is LuaEditorTokenKind.String or LuaEditorTokenKind.Comment)
+        if (!force && LuaEditorService.IsCaretInCommentOrString(source, caret))
         {
             HideCompletions();
             return;
@@ -187,7 +185,8 @@ internal sealed class LuaEditorControl : UserControl
             return;
 
         var caret = _editor.GetPositionFromCharIndex(_editor.SelectionStart);
-        var x = Math.Clamp(caret.X + 6, 48, Math.Max(48, ClientSize.Width - _completionList.Width));
+        var x = Math.Clamp(caret.X + _gutter.Width + 6, _gutter.Width,
+            Math.Max(_gutter.Width, ClientSize.Width - _completionList.Width));
         var y = caret.Y + _editor.Font.Height + 4;
         if (y + _completionList.Height > ClientSize.Height)
             y = Math.Max(0, caret.Y - _completionList.Height - 4);
@@ -234,7 +233,13 @@ internal sealed class LuaEditorControl : UserControl
 
     private void UpdateSignatureHelp()
     {
-        var help = LuaEditorService.GetSignatureHelp(_editor.Text, _editor.SelectionStart, _registry);
+        var caret = _editor.SelectionStart;
+        const int contextLimit = 8192;
+        var contextStart = Math.Max(0, caret - contextLimit);
+        var help = LuaEditorService.GetSignatureHelp(
+            _editor.Text.Substring(contextStart, caret - contextStart),
+            caret - contextStart,
+            _registry);
         if (help?.Parameter is null)
         {
             _signatureTip.Hide(_editor);
