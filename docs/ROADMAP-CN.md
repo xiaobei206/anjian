@@ -3,13 +3,13 @@
 | 里程碑 | 状态 | 交付目标 |
 |---|---|---|
 | M0 产品规格 | DONE | 首版交互、Lua API 和录制策略已确认 |
-| M1 Windows 预览版 v0.1.0-preview.1 | DONE | WinForms/Lua/键鼠录制和输入/重复播放；Release 已公开发布 |
+| M1 Windows 预览版 v0.1.0-preview.2 | DONE | WinForms/Lua/键鼠录制和输入/重复播放；Release 已公开发布 |
 | M2 用户实机验收与稳定性 | IN_PROGRESS | Windows 10/11 手工测试、2 小时稳定性、DPI 和多屏 |
 | M3 编辑器增强 | TODO | Lua 语法高亮、补全、参数提示、错误标记 |
 | M4 可视化录制增强 | TODO | 动作列表、动作编辑、代码同步 |
 | M5 P1 能力 | TODO | 找图/找色、窗口能力、断点调试 |
 
-## v0.1.0-preview.1 已交付
+## v0.1.0-preview.2 已交付
 
 - [x] Windows 10/11 x64 WinForms 应用，.NET 10 self-contained
 - [x] 脚本新建、打开、保存、重命名、复制、删除和右键菜单
