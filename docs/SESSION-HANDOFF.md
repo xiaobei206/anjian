@@ -45,16 +45,16 @@
 - self-contained win-x64 ZIP 和 SHA256 发布资产。
 
 ## 最新 Release 资产：v0.1.0-preview.4
-- Release 页面：https://github.com/xiaobei206/anjian/releases/tag/v0.1.0-preview.3
-- ZIP：`Anjian2026-0.1.0-preview.3-win-x64.zip`
-- ZIP 下载：https://github.com/xiaobei206/anjian/releases/download/v0.1.0-preview.3/Anjian2026-0.1.0-preview.3-win-x64.zip
-- ZIP 大小：51,887,704 bytes。
-- SHA256 sidecar：`Anjian2026-0.1.0-preview.3-win-x64.zip.sha256`
-- SHA256 下载：https://github.com/xiaobei206/anjian/releases/download/v0.1.0-preview.3/Anjian2026-0.1.0-preview.3-win-x64.zip.sha256
-- ZIP SHA256：`b18071d5ecfb05435198e5ee900e59cc861ef7706328b413bee2412650acf188`
-- Actions artifact 已下载并解包；运行 `sha256sum -c` 成功，sidecar、实际 ZIP 和 GitHub Release ZIP digest 一致。
-- Release asset IDs：ZIP `739709384`；SHA256 `739709386`。
-- Release ID：`443028031`，prerelease=true。
+- Release 页面：https://github.com/xiaobei206/anjian/releases/tag/v0.1.0-preview.4
+- ZIP：`Anjian2026-0.1.0-preview.4-win-x64.zip`
+- ZIP 下载：https://github.com/xiaobei206/anjian/releases/download/v0.1.0-preview.4/Anjian2026-0.1.0-preview.4-win-x64.zip
+- ZIP 大小：51,910,925 bytes。
+- SHA256 sidecar：`Anjian2026-0.1.0-preview.4-win-x64.zip.sha256`
+- SHA256 下载：https://github.com/xiaobei206/anjian/releases/download/v0.1.0-preview.4/Anjian2026-0.1.0-preview.4-win-x64.zip.sha256
+- ZIP SHA256：`6b59ab27f825aa48b2ec5343cec826ad8b0ded759e9989af02d51f8b949f09aa`
+- GitHub Release asset digest 与 ZIP 内容 SHA256 一致；sidecar 已随 ZIP 一同发布。
+- Release asset IDs：ZIP `740099276`；SHA256 `740099275`。
+- Release ID：`443178727`，prerelease=true。
 
 ## 历史 Release：v0.1.0-preview.1
 - Release 页面：https://github.com/xiaobei206/anjian/releases/tag/v0.1.0-preview.1
@@ -63,6 +63,7 @@
 - Release ID：`442961207`，prerelease=true。
 
 ## Windows CI 验证
+- v0.1.0-preview.4 Release workflow run：`43253611158`，SUCCESS；Restore/Build/7 项测试/Publish/ZIP/SHA256/Artifact upload/Release creation 全部成功。
 - v0.1.0-preview.3 Release workflow run：`43232898372`，SUCCESS；所有 job/step 均成功。
 - 修复空值边界后的 CI run：`43232594517`，SUCCESS。
 - 最终 Release 构建、7 项自动化测试、自包含 win-x64 publish、ZIP/SHA256 package、artifact upload、GitHub Release creation：全部 SUCCESS。
