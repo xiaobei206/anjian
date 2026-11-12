@@ -126,6 +126,11 @@ internal sealed class PlaybackRunner : IDisposable
 
     private async Task DispatchAsync(IpcMessage message, CancellationToken token)
     {
+        // Pause takes effect at every command boundary. Explicit Up commands remain allowed
+        // so a paused script cannot strand a held key or mouse button.
+        if (message.Type is not ("mouse-up" or "key-up"))
+            await _gate.WaitUntilRunnableAsync(token).ConfigureAwait(false);
+
         switch (message.Type)
         {
             case "checkpoint":

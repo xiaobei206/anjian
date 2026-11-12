@@ -70,6 +70,7 @@ internal sealed class MainForm : Form
         };
 
         toolbar.Controls.Add(MakeButton("新建脚本", (_, _) => CreateScript()));
+        toolbar.Controls.Add(MakeButton("保存", (_, _) => SaveCurrent()));
         _recordButton.Text = "开始录制";
         _recordButton.Click += (_, _) => StartRecording();
         toolbar.Controls.Add(_recordButton);

@@ -15,6 +15,8 @@ internal sealed class GlobalRecorder : IDisposable
     private const int MaximumEvents = 250_000;
 
     private readonly List<RecordedInputEvent> _events = [];
+    private readonly HashSet<string> _heldKeys = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, (int X, int Y)> _heldMouse = new(StringComparer.OrdinalIgnoreCase);
     private readonly LowLevelProc _mouseProc;
     private readonly LowLevelProc _keyboardProc;
     private nint _mouseHook, _keyboardHook;
@@ -32,6 +34,8 @@ internal sealed class GlobalRecorder : IDisposable
     {
         if (_recording) throw new InvalidOperationException("正在录制。");
         _events.Clear();
+        _heldKeys.Clear();
+        _heldMouse.Clear();
         Overflowed = false;
         _mouseHook = SetWindowsHookEx(WhMouseLl, _mouseProc, GetModuleHandle(null), 0);
         if (_mouseHook == 0) throw new InvalidOperationException($"鼠标录制钩子安装失败：{Marshal.GetLastWin32Error()}");
@@ -50,7 +54,16 @@ internal sealed class GlobalRecorder : IDisposable
         _recording = false;
         if (_mouseHook != 0) { UnhookWindowsHookEx(_mouseHook); _mouseHook = 0; }
         if (_keyboardHook != 0) { UnhookWindowsHookEx(_keyboardHook); _keyboardHook = 0; }
-        return _events.ToArray();
+
+        // Close any held physical input in the recording so the generated script is balanced.
+        var stopTimestamp = Stopwatch.GetTimestamp();
+        foreach (var held in _heldMouse.ToArray())
+            _events.Add(new RecordedInputEvent(stopTimestamp, RecordedEventKind.MouseUp, held.Value.X, held.Value.Y, held.Key));
+        foreach (var key in _heldKeys.ToArray())
+            _events.Add(new RecordedInputEvent(stopTimestamp, RecordedEventKind.KeyUp, Name: key));
+        _heldMouse.Clear();
+        _heldKeys.Clear();
+        return _events.OrderBy(e => e.Timestamp).ToArray();
     }
 
     private nint MouseCallback(int code, nint wParam, nint lParam)
@@ -101,9 +114,16 @@ internal sealed class GlobalRecorder : IDisposable
                     {
                         var timestamp = Stopwatch.GetTimestamp();
                         if (kind is WmKeyDown or WmSysKeyDown)
-                            Add(new(timestamp, RecordedEventKind.KeyDown, Name: name));
+                        {
+                            // Ignore keyboard auto-repeat: one physical hold is one Down/Up pair.
+                            if (!_heldKeys.Contains(name))
+                                Add(new(timestamp, RecordedEventKind.KeyDown, Name: name));
+                        }
                         else if (kind is WmKeyUp or WmSysKeyUp)
-                            Add(new(timestamp, RecordedEventKind.KeyUp, Name: name));
+                        {
+                            if (_heldKeys.Contains(name))
+                                Add(new(timestamp, RecordedEventKind.KeyUp, Name: name));
+                        }
                     }
                 }
             }
@@ -130,6 +150,22 @@ internal sealed class GlobalRecorder : IDisposable
 
     private void Add(RecordedInputEvent value)
     {
+        switch (value.Kind)
+        {
+            case RecordedEventKind.MouseDown when value.Name is not null:
+                _heldMouse[value.Name] = (value.X, value.Y);
+                break;
+            case RecordedEventKind.MouseUp when value.Name is not null:
+                _heldMouse.Remove(value.Name);
+                break;
+            case RecordedEventKind.KeyDown when value.Name is not null:
+                _heldKeys.Add(value.Name);
+                break;
+            case RecordedEventKind.KeyUp when value.Name is not null:
+                _heldKeys.Remove(value.Name);
+                break;
+        }
+
         if (_events.Count < MaximumEvents)
             _events.Add(value);
         else
