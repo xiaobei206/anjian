@@ -73,7 +73,7 @@ internal sealed class GlobalRecorder : IDisposable
             try
             {
                 var data = Marshal.PtrToStructure<MSLLHOOKSTRUCT>(lParam);
-                if ((data.Flags & InjectedFlag) == 0 && !IsOurApplicationForeground())
+                if ((data.Flags & InjectedFlag) == 0 && !IsOurWindowAtPoint(data.Point))
                 {
                     var kind = unchecked((int)wParam);
                     var timestamp = Stopwatch.GetTimestamp();
@@ -253,6 +253,14 @@ internal sealed class GlobalRecorder : IDisposable
         return processId == (uint)Environment.ProcessId;
     }
 
+    private static bool IsOurWindowAtPoint(POINT point)
+    {
+        var hwnd = WindowFromPoint(point);
+        if (hwnd == 0) return false;
+        GetWindowThreadProcessId(hwnd, out var processId);
+        return processId == (uint)Environment.ProcessId;
+    }
+
     private static string? KeyName(uint vk)
     {
         if (vk is >= 0x41 and <= 0x5A || vk is >= 0x30 and <= 0x39)
@@ -282,5 +290,6 @@ internal sealed class GlobalRecorder : IDisposable
     [DllImport("user32.dll")] private static extern nint CallNextHookEx(nint hook, int code, nint wParam, nint lParam);
     [DllImport("kernel32.dll", CharSet = CharSet.Auto)] private static extern nint GetModuleHandle(string? moduleName);
     [DllImport("user32.dll")] private static extern nint GetForegroundWindow();
+    [DllImport("user32.dll")] private static extern nint WindowFromPoint(POINT point);
     [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(nint hwnd, out uint processId);
 }
