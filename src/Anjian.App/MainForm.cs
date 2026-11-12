@@ -422,8 +422,7 @@ internal sealed class MainForm : Form
                 RepeatCount = (int)_repeatCount.Value,
                 IntervalMilliseconds = (int)_repeatInterval.Value,
                 ClickOnlyRecording = _clickOnlyCheck.Checked,
-                AlwaysOnTop = _alwaysOnTopCheck.Checked,
-                CompactMode = true
+                AlwaysOnTop = _alwaysOnTopCheck.Checked
             });
         }
         catch (Exception ex) { AppendLog("设置保存失败：" + ex.Message); }

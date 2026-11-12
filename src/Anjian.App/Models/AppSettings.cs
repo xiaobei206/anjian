@@ -6,5 +6,4 @@ public sealed record AppSettings
     public int IntervalMilliseconds { get; init; } = 2_000;
     public bool ClickOnlyRecording { get; init; } = true;
     public bool AlwaysOnTop { get; init; }
-    public bool CompactMode { get; init; } = true;
 }
