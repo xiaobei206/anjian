@@ -6,6 +6,8 @@ Windows 10/11 x64 桌面自动化工具，首版使用 WinForms + .NET 10 + Lua 
 
 Windows x64 预览版 v0.1.0-preview.2 已完成 CI 构建与自动化测试。该版本新增全局快捷键：F10 启动、F11 暂停/继续、F12 中止。它不是完整 IDE，优先提供录制、Lua 编辑、播放控制和重复运行设置。
 
+开发中的下一预览增量已加入：只记录点击坐标、暂停后继续录制、默认紧凑悬浮窗、实时鼠标坐标和可选置顶；新版本通过 CI 后再发布。
+
 下载入口：[v0.1.0-preview.2 正式预览版](https://github.com/xiaobei206/anjian/releases/tag/v0.1.0-preview.2)，或直接下载 [Windows x64 ZIP](https://github.com/xiaobei206/anjian/releases/download/v0.1.0-preview.2/Anjian2026-0.1.0-preview.2-win-x64.zip) 和 [SHA256](https://github.com/xiaobei206/anjian/releases/download/v0.1.0-preview.2/Anjian2026-0.1.0-preview.2-win-x64.zip.sha256)。
 使用说明：[首版使用说明](docs/USER-GUIDE-CN.md)。
 

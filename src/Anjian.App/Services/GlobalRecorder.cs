@@ -21,8 +21,14 @@ internal sealed class GlobalRecorder : IDisposable
     private readonly LowLevelProc _keyboardProc;
     private nint _mouseHook, _keyboardHook;
     private bool _recording;
+    private bool _sessionStarted;
+    private bool _clickOnly;
+    private long _pausedAtTicks;
+    private long _pausedTicks;
 
     public bool Overflowed { get; private set; }
+    public bool IsRecording => _recording;
+    public bool HasSession => _sessionStarted;
 
     public GlobalRecorder()
     {
@@ -30,13 +36,57 @@ internal sealed class GlobalRecorder : IDisposable
         _keyboardProc = KeyboardCallback;
     }
 
-    public void Start()
+    public void Start(bool clickOnly = false)
     {
-        if (_recording) throw new InvalidOperationException("正在录制。");
+        if (_sessionStarted) throw new InvalidOperationException("当前录制会话尚未结束。");
         _events.Clear();
         _heldKeys.Clear();
         _heldMouse.Clear();
         Overflowed = false;
+        _clickOnly = clickOnly;
+        _pausedTicks = 0;
+        _pausedAtTicks = 0;
+        _sessionStarted = true;
+        try { InstallHooks(); }
+        catch { _sessionStarted = false; throw; }
+    }
+
+    public void Pause()
+    {
+        if (!_recording) throw new InvalidOperationException("当前没有正在进行的录制。");
+        _recording = false;
+        UninstallHooks();
+        CloseHeldInputs(GetRecordingTimestamp());
+        _pausedAtTicks = Stopwatch.GetTimestamp();
+    }
+
+    public void Resume()
+    {
+        if (!_sessionStarted || _recording) throw new InvalidOperationException("当前录制会话无法继续。");
+        if (_pausedAtTicks != 0)
+        {
+            _pausedTicks += Stopwatch.GetTimestamp() - _pausedAtTicks;
+            _pausedAtTicks = 0;
+        }
+        try { InstallHooks(); }
+        catch { _pausedAtTicks = Stopwatch.GetTimestamp(); throw; }
+    }
+
+    public IReadOnlyList<RecordedInputEvent> Stop()
+    {
+        if (_recording)
+        {
+            _recording = false;
+            UninstallHooks();
+            CloseHeldInputs(GetRecordingTimestamp());
+        }
+        _sessionStarted = false;
+        _pausedAtTicks = 0;
+        return _events.OrderBy(e => e.Timestamp).ToArray();
+    }
+
+    private void InstallHooks()
+    {
         _mouseHook = SetWindowsHookEx(WhMouseLl, _mouseProc, GetModuleHandle(null), 0);
         if (_mouseHook == 0) throw new InvalidOperationException($"鼠标录制钩子安装失败：{Marshal.GetLastWin32Error()}");
         _keyboardHook = SetWindowsHookEx(WhKeyboardLl, _keyboardProc, GetModuleHandle(null), 0);
@@ -49,22 +99,24 @@ internal sealed class GlobalRecorder : IDisposable
         _recording = true;
     }
 
-    public IReadOnlyList<RecordedInputEvent> Stop()
+    private void UninstallHooks()
     {
-        _recording = false;
         if (_mouseHook != 0) { UnhookWindowsHookEx(_mouseHook); _mouseHook = 0; }
         if (_keyboardHook != 0) { UnhookWindowsHookEx(_keyboardHook); _keyboardHook = 0; }
+    }
 
-        // Close any held physical input in the recording so the generated script is balanced.
-        var stopTimestamp = Stopwatch.GetTimestamp();
+    private void CloseHeldInputs(long timestamp)
+    {
         foreach (var held in _heldMouse.ToArray())
-            _events.Add(new RecordedInputEvent(stopTimestamp, RecordedEventKind.MouseUp, held.Value.X, held.Value.Y, held.Key));
+            Add(new RecordedInputEvent(timestamp, RecordedEventKind.MouseUp, held.Value.X, held.Value.Y, held.Key));
         foreach (var key in _heldKeys.ToArray())
-            _events.Add(new RecordedInputEvent(stopTimestamp, RecordedEventKind.KeyUp, Name: key));
+            Add(new RecordedInputEvent(timestamp, RecordedEventKind.KeyUp, Name: key));
         _heldMouse.Clear();
         _heldKeys.Clear();
-        return _events.OrderBy(e => e.Timestamp).ToArray();
     }
+
+    private long GetRecordingTimestamp() => Stopwatch.GetTimestamp() - _pausedTicks;
+    public IReadOnlyList<RecordedInputEvent> GetEventsSnapshot() => _events.OrderBy(e => e.Timestamp).ToArray();
 
     private nint MouseCallback(int code, nint wParam, nint lParam)
     {
@@ -76,11 +128,11 @@ internal sealed class GlobalRecorder : IDisposable
                 if ((data.Flags & InjectedFlag) == 0 && !IsOurWindowAtPoint(data.Point))
                 {
                     var kind = unchecked((int)wParam);
-                    var timestamp = Stopwatch.GetTimestamp();
+                    var timestamp = GetRecordingTimestamp();
                     switch (kind)
                     {
                         case WmMouseMove:
-                            AddMove(timestamp, data.Point.X, data.Point.Y);
+                            if (!_clickOnly) AddMove(timestamp, data.Point.X, data.Point.Y);
                             break;
                         case WmLeftDown: Add(new(timestamp, RecordedEventKind.MouseDown, data.Point.X, data.Point.Y, "left")); break;
                         case WmLeftUp: Add(new(timestamp, RecordedEventKind.MouseUp, data.Point.X, data.Point.Y, "left")); break;
@@ -112,7 +164,7 @@ internal sealed class GlobalRecorder : IDisposable
                     var name = KeyName(data.VirtualKey);
                     if (name is not null)
                     {
-                        var timestamp = Stopwatch.GetTimestamp();
+                        var timestamp = GetRecordingTimestamp();
                         if (kind is WmKeyDown or WmSysKeyDown)
                         {
                             // Ignore keyboard auto-repeat: one physical hold is one Down/Up pair.
@@ -172,7 +224,7 @@ internal sealed class GlobalRecorder : IDisposable
             Overflowed = true;
     }
 
-    public static string GenerateLua(IReadOnlyList<RecordedInputEvent> events)
+    public static string GenerateLua(IReadOnlyList<RecordedInputEvent> events, bool clickOnly = false)
     {
         var output = new System.Text.StringBuilder();
         output.AppendLine("-- 按键精灵 2026 自动录制脚本");
@@ -210,13 +262,16 @@ internal sealed class GlobalRecorder : IDisposable
                 };
             }
 
-            if (index > 0)
-            {
-                var gapMs = Math.Max(0, (int)Math.Round((current.Timestamp - lastEnd) * 1000.0 / Stopwatch.Frequency));
-                if (gapMs > 0) output.Append("Delay(").Append(gapMs).AppendLine(")");
-            }
-
-            if (current.Kind is RecordedEventKind.MouseDown or RecordedEventKind.Wheel)
+            var gapMs = index > 0
+                ? Math.Max(0, (int)Math.Round((current.Timestamp - lastEnd) * 1000.0 / Stopwatch.Frequency))
+                : 0;
+            var needsPosition = current.Kind is RecordedEventKind.MouseDown or RecordedEventKind.Wheel;
+            // In click-only mode, move to the exact click point first, then wait the recorded gap,
+            // then click. This removes shaky human cursor paths without losing action timing.
+            if (clickOnly && needsPosition)
+                output.Append("MoveTo(").Append(current.X).Append(", ").Append(current.Y).AppendLine(")");
+            if (gapMs > 0) output.Append("Delay(").Append(gapMs).AppendLine(")");
+            if (!clickOnly && needsPosition)
                 output.Append("MoveTo(").Append(current.X).Append(", ").Append(current.Y).AppendLine(")");
             if (!string.IsNullOrWhiteSpace(statement))
                 output.AppendLine(statement);
@@ -278,7 +333,11 @@ internal sealed class GlobalRecorder : IDisposable
         };
     }
 
-    public void Dispose() => Stop();
+    public void Dispose()
+    {
+        if (_sessionStarted) Stop();
+        else UninstallHooks();
+    }
 
     private delegate nint LowLevelProc(int code, nint wParam, nint lParam);
     [StructLayout(LayoutKind.Sequential)] private struct POINT { public int X, Y; }
