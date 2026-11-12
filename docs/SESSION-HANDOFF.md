@@ -11,7 +11,7 @@
 - v0.1.0-preview.4 发布包对应代码 commit：`08886d9e66c08ba24f6f1b7d9e91bbdaeba8a9e0`。
 - M3 当前 main 开发代码验收基线：`71fd493cad0fbed1451a4ffa46192752a18bd0a6`（Windows Actions run `43282795272` PASS）；接手时仍须重新核对 main HEAD。
 - main 分支可能继续产生文档提交；新 GPT 接手时必须重新查询 main 最新 HEAD，不要把 handoff 中的历史提交 SHA 当成分支当前头部。
-- 当前阶段：M0/M2/M3/M4/M5 代码与 Windows CI 验收均已完成；M5 run 43295924472 为 SUCCESS（37/37 tests、Release Build 0 warnings/0 errors、API check、win-x64 publish、ZIP/SHA256、artifact upload 全 PASS）。M1 Hook 与 M3/M4/M5 Windows 桌面手工验收仍需独立执行（NOT RUN）。
+- 当前阶段：M0/M2/M3/M4/M5/M6 代码与 Windows CI 验收均已完成；M6 最终 commit 4f9b2b2648fb154353ca55522e9c77fe77645506 对应 run 43300620614 SUCCESS（61/61 tests、Release Build 0 warnings/0 errors、API handbook check、win-x64 publish、ZIP/SHA256、artifact upload 全 PASS）。M1 Hook 与 M3/M4/M5/M6 Windows 桌面手工验收仍需独立执行（NOT RUN）。
 
 ## 完整产品目标已冻结（2026-11-13）
 - 产品范围基线：[docs/PRD-CN.md](PRD-CN.md)。
@@ -20,7 +20,7 @@
 - API 当前实现契约：[docs/LUA-API-CN.md](LUA-API-CN.md)。
 - 阶段路线图：[docs/ROADMAP-CN.md](ROADMAP-CN.md)。
 - 完整 IDE、窗口/坐标、图色/OCR、参数 UI、小精灵、插件及函数手册均为正式目标，不得再从大纲中删除或只标为可选远期项目。
-- 当前 main 已完成 M3 IDE、M4 基础调试器，并正在收尾 M5 结构化录制/动作列表；下一阶段按 ROADMAP 转入 M6 坐标系统与窗口自动化。公开 API 增改仍必须遵守 M2 单一注册表。
+- 当前 main 已完成 M3 IDE、M4 基础调试器、M5 结构化录制/动作列表和 M6 坐标系统/窗口 API；下一阶段转入 M7 控件与前后台能力适配。公开 API 增改仍必须遵守 M2 单一注册表。
 
 
 ## preview.4 窗口与托盘决策
@@ -48,6 +48,7 @@
 - 脚本本地存储、新建、打开、保存、重命名、复制、删除和右键菜单。
 - M3 Lua 编辑器（仅在当前 main 未发布开发版）：语法高亮、行号、注册表驱动 API 补全/签名提示、查找替换、多标签、语法只编译诊断与错误行导航；标签切换/关闭自动保存。v0.1.0-preview.4 发布包仍只有基础文本编辑器。
 - 全局鼠标/键盘录制，鼠标移动合并，录制过滤注入事件及本程序窗口事件，避免键盘自动重复污染；录制结束时补齐尚未释放的 Down/Up。
+- M6 坐标系统与窗口 API（仅 main 开发版，尚未发布）：screen/window/client/anchor/ratio 双向转换；窗口查找/枚举（含子窗口）、属性、显示状态/置顶/移动/尺寸/锚点对齐/等待；不透明窗口引用与销毁失效保护。MoveTo 绝对屏幕物理像素语义不变。
 - 录制数据生成 Lua 代码，点击按下时长与动作间隔分开保存。
 - NLua 1.7.9 / Lua 5.4 worker 子进程；named pipe IPC；指令钩子 Pause 检查点；Stop 可终止 CPU 无限循环 worker。
 - Windows SendInput / SetCursorPos 鼠标键盘输入、键状态追踪和停止清理。
@@ -94,7 +95,7 @@
 - 录制采用低级 Hook，需在用户电脑确认 Hook 采集工作正常、不会漏录或重复。
 - 代码折叠、独立 API 命令面板未实现；断点/单步/变量窗/调用栈属于下一阶段 M4。M3 Windows 桌面手工验收仍为 NOT RUN。
 - 没有可视化动作列表/动作参数编辑 UI，录制结束直接生成 Lua。
-- 不支持图像识别/OCR、窗口相对坐标、后台窗口注入、插件或云同步。
+- 尚未实现图像识别/OCR、标准控件读写、后台输入、插件或云同步。M6 的坐标转换 API 已实现，但 M5 Recorder 仍固定记录虚拟桌面屏幕物理像素，持久窗口选择器及相对窗口坐标录制/回放重定位尚未实现。
 
 ## preview.4 本轮变更与验证边界
 - preview.3 的“紧凑/完整模式”是同一个 MainForm 切换面板，导致悬浮窗并非独立窗口；本轮已拆为独立 FloatingForm。
@@ -221,6 +222,39 @@ M4 基础调试器已在 main 实现并通过 Windows CI。具体实现提交与
 - Windows 桌面手工验收 M5-01 至 M5-10、M1 Hook、M3 编辑器、M4 调试器均保持 NOT RUN；CI 不等于桌面实机验收。
 - 本次不创建新 Release；v0.1.0-preview.4 官方 Release/ZIP/SHA 不变。
 
+## M6 交付结果（main 已合并；桌面验收仍待执行）
+
+- 代码主体提交：`3479491d3e9f3c16dcab8f78399a5811f73f9fe1`。
+- 函数手册/规格同步：`8c143982ab49bf87c3461981205fe6d00757562d`。
+- 子窗口屏幕坐标与 isChild 修正：`c7cc5f7b2ee435ec13ece0846cf4ee5e64e03db5`。
+- HWND 销毁/进程退出校验竞态修正：`4f9b2b2648fb154353ca55522e9c77fe77645506`。
+- 最终 Windows CI run `43300620614` SUCCESS：Restore PASS；Build 0 warnings / 0 errors；61 passed / 0 failed / 0 skipped；API handbook --check、self-contained win-x64 publish、ZIP/SHA256、artifact upload 全 PASS。Artifact ID `13981497112`，51,857,145 bytes。无新 Release。
+- API version 0.3；注册表和函数手册均有 40 个公开函数，其中新增 18 个窗口/坐标 API。
+- M6-01..M6-10 Windows 桌面手工验收全部 NOT RUN。CI 不能替代多 DPI、多显示器、UIPI、窗口销毁/句柄复用和子窗口实际行为验证。
+- M5 Recorder 当前 schemaVersion 1 仍固定 `virtual-desktop-physical-pixels`；Lua generated block 使用 `MoveTo`。窗口相对录制/回放绑定尚未实现，切勿将其描述为支持窗口移动后自动跟随。
+- M6 不提供后台输入、控件值读写、UI Automation、图像/OCR，不绕过 UIPI/UAC/安全桌面。
+
 ## 下一会话接手指令
 
-先核对 main 最新 HEAD，再读取 AGENTS.md、README.md、本文件、docs/ROADMAP-CN.md 和 docs/RECORDER-DESIGN-CN.md。M4 基础调试器 Windows CI run 43291175992 SUCCESS（25/25 tests，0 warning / 0 errors，API check、win-x64 publish、ZIP/SHA256、artifact upload PASS）；M5 最终代码提交 ec06cf1d3a0e847267b9de251d5a6ff26c710c4f 对应 Windows CI run 43295924472 SUCCESS（37/37 tests，0 warning / 0 errors，API check、win-x64 publish、ZIP/SHA256、artifact upload PASS）。本地 build/test NOT RUN；M1 Hook 实机可靠性与 M3/M4/M5 Windows 桌面验收仍 NOT RUN。下一会话唯一开发任务为 M6：坐标系统与窗口自动化；开始前读取 PRD 第 2.5/2.6 节、FEATURE-MATRIX F11/F12/F13、ROADMAP M6 和现有 MoveTo/输入 API。M6 要新增 screen/window/client/anchor/ratio 显式坐标模型及双向转换，并实现安全的窗口查找/枚举/属性/激活/移动/尺寸/对齐/等待；必须保持 MoveTo(x,y) 现有 screen 绝对物理像素语义，不得改变旧脚本含义；窗口销毁/句柄复用时必须检测失效，超时/取消有明确结果，不绕过 UIPI/UAC/安全桌面。M6 不得扩展为后台输入、控件自动化、图像/OCR。按 F12/F13 的验收条件实现、测试、更新文件并提交 main；不建长期分支/PR，不创建新 Release。
+开始前必须重新核对 main 最新 HEAD，再读取 `AGENTS.md`、`README.md`、本文件、`docs/ROADMAP-CN.md`、`docs/PRD-CN.md`、`docs/FEATURE-MATRIX-CN.md`。按本 handoff 指定的唯一任务继续；不得重复询问仓库已有答案。默认直接在 main 小步提交，不创建长期分支/PR。
+
+**下一会话唯一开发任务：M7 — 控件自动化与前台/后台能力适配。** 严格以 PRD 第 2.6/2.7 节、FEATURE-MATRIX F14/F15、ROADMAP M7 和现有 M6 WindowFind/WindowEnumerate/WindowGetInfo/窗口引用 API 为准。
+
+### M7 实施范围
+1. **能力探测与报告**：建立后端能力模型，明确每个目标窗口对控件树、读取/设置文本、选择项、勾选状态、Invoke、前台鼠标/键盘、后台消息/自动化的逐项支持状态；不得只返回一个模糊的“支持后台”布尔值。API 查询目标窗口当前支持能力、后端名称、拒绝原因与限制。
+2. **标准控件自动化**：优先评估 Windows UI Automation / Accessibility 的公开能力；对真实支持的标准控件实现枚举、控件类型/名称/自动化 ID/矩形/可用模式，及 Text/Value/Selection/Toggle/Invoke 等适用模式的读取和操作。对不支持的控件返回明确 Unsupported/NotAvailable，不伪造成功。
+3. **前台/后台输入适配**：把既有 SendInput 前台实现作为明确的 foreground backend；仅在技术验证和目标控件类型确实支持时增加后台 provider（例如公开 UIA pattern 或经过测试的窗口消息 provider）。每个 provider 声明支持的窗口/控件类别与 mouse/key/text 能力，操作后返回真实结果和错误码。
+4. **窗口绑定与生命周期**：复用 M6 不透明 window ID；提供绑定/解绑与失效通知。不得把 HWND 暴露为用户脚本长期 ID。目标关闭/重建后必须重新查找并验证进程身份。
+5. **显式回退策略**：自动模式必须先探测能力；不支持时抛出明确错误，或仅在用户显式允许时切换到前台可见输入。禁止静默把后台调用假报成功。
+6. **安全边界**：普通用户权限运行；绝不绕过 UIPI/UAC、安全桌面、反作弊、DRM、受保护窗口或安全软件。高完整性目标不支持时如实返回拒绝原因。
+7. **测试与文档**：使用可控的自建测试窗体验证标准控件、不同控件 Pattern、前后台能力探测、绑定失效、回退、超时/取消、权限拒绝与错误码。更新 API 注册表、中文函数参考手册、LUA-API、架构、Feature Matrix、Acceptance、Roadmap、Development Log 和本文件。Windows CI 通过不等于桌面实机验收通过。
+
+### M7 明确不做
+- 不实现图像找图、找色、OCR 或截图调试层（后续 M8–M10）。
+- 不实现插件系统、参数 UI、独立小精灵或云同步（后续阶段）。
+- 不绕过任何 Windows 安全边界，不注入高权限进程、不使用内核驱动。
+- 不重写 M6 坐标系统；M7 复用既有窗口引用与 screen/window/client/anchor/ratio 合约。
+- 不擅自把 M5 Recorder 的屏幕绝对坐标改成相对窗口坐标；若要增加目标窗口随动录制，必须先设计可持久化窗口选择器和 sidecar schema 迁移，作为独立验收项处理。
+
+完成 M7 后，必须按 Roadmap 的 M7 验收条件实际构建/测试、更新交接和全部相关文档，再直接提交 main；不创建 Release，除非产品版本流程明确要求。
+

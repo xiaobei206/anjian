@@ -148,11 +148,12 @@ Lua 环境默认不开放任意 .NET 类型导入、程序集加载、文件系�
 - 启动时明确设置 Per-Monitor V2 DPI awareness。
 - 既有 MoveTo(x, y) 仍只使用虚拟桌面绝对物理像素，原点和范围以 Windows 虚拟桌面指标为准；负坐标合法。
 - M6 Core 提供 screen/window/client/anchor/ratio 纯转换算法；window 基于外框，client/ratio 基于客户区，anchor 基于外框九宫格。
-- M6 Win32 窗口管理器位于 Anjian.App.Services.WindowsWindowManager；Lua Worker 只传递不透明窗口 ID 与 JSON IPC，主进程执行 HWND 枚举/状态/布局/等待。窗口引用每轮运行清除，并结合 EVENT_OBJECT_DESTROY 与 PID/线程/类/进程启动时间验证。
+- M6 Win32 窗口管理器位于 Anjian.App.Services.WindowsWindowManager；Lua Worker 只传递不透明窗口 ID 与 JSON IPC，主进程执行 HWND 枚举/状态/布局/等待。窗口引用每轮运行清除，并结合 EVENT_OBJECT_DESTROY 与 PID/线程/类/进程启动时间验证。顶层/子窗口区分写入 `WindowInfo.isChild`；子窗口 Move/Resize/Align 的公开坐标仍是虚拟桌面屏幕物理像素，调用 SetWindowPos 前转换为父窗口客户区坐标。
 - 不假设 SendInput 或 SetWindowPos 对任何权限等级、受保护应用、游戏或安全桌面都有效；不绕过 UIPI/UAC/安全桌面。
 - 程序默认普通用户权限运行；发生 UIPI/权限限制时向用户说明。
 - 追踪本程序模拟的按键/鼠标按下状态，结束时发出对应释放动作。
 - 原始键盘扫描码、虚拟键码和 Unicode 文本输入需要分别定义，不混为一种操作。
+- M5 `RecorderDocument` 当前固定记录 `virtual-desktop-physical-pixels`，Lua 生成区块调用 `MoveTo`；M6 不重解释旧 sidecar。窗口选择器持久化、相对坐标录制和回放重定位尚未实现。
 
 ## 8. 录制器数据流
 

@@ -16,7 +16,7 @@
 | M3 完整 Lua IDE 基础 | DONE（Windows CI PASS，2026-11-13；桌面手工验收待执行） | 高亮、行号、补全、参数提示、诊断、查找/替换、多标签、错误行导航 |
 | M4 调试器 | DONE（基础能力 Windows CI PASS；桌面实机验收 NOT RUN） | 文件/行号断点、单步、运行到光标、变量快照、调用栈 |
 | M5 可视化录制/动作列表 | DONE（Windows CI PASS；桌面手工验收 NOT RUN） | 结构化原始事件/动作、虚拟化动作编辑器、参数/延时/分组/注释/启用状态、Lua 区块同步保护、sidecar 和单步试运行 |
-| M6 坐标系统与窗口自动化 | IN_PROGRESS（代码已进入 main；Windows CI Build PASS；函数手册同步后待完整复测；桌面验收 NOT RUN） | screen/window/client/anchor/ratio、双向坐标转换、安全窗口引用/枚举/属性/操作/等待 |
+| M6 坐标系统与窗口自动化 | DONE（按本 handoff 的 API/Win32 范围；最终 Windows CI PASS；桌面验收 NOT RUN） | screen/window/client/anchor/ratio、双向坐标转换、安全窗口引用/枚举/属性/操作/等待 |
 | M7 控件与前后台能力适配 | TODO | UI Automation/标准控件能力探测、后台输入适配、失败回退和边界说明 |
 | M8 截图、图色与模板资源 | TODO | 截图区域、找色、多点找色、找图、阈值/多结果和资源管理 |
 | M9 OCR 与文本识别 | TODO | 本地 OCR、语言/字库配置、文字区域/置信度与等待文本 |
@@ -142,29 +142,33 @@ M5 不代表 Hook 在 Windows 桌面已完成可靠性验收，不代表多坐�
 
 Windows CI 最终结果：run 43295924472 SUCCESS；37/37 tests、Release Build 0 warnings/0 errors、API handbook check、self-contained win-x64 publish、ZIP/SHA256 和 artifact upload 全部 PASS。Artifact ID 13979855824；内部 ZIP SHA256 `ddc08cfd78503d9e5e5c7995ff1202e3bc36abfcf1de6fa3ae9cc35a5baf531f`。所有 M5 桌面场景仍为 NOT RUN。
 
-## M6 — 坐标系统与窗口自动化（代码已接入 main，完整 CI 待手册同步复测）
+## M6 — 坐标系统与窗口自动化（代码范围 DONE；Windows CI PASS；桌面验收 NOT RUN）
 
-### 已实现代码范围
-- Core 坐标系统：screen/window/client/anchor/ratio 五种空间、双向屏幕转换、九宫格窗口锚点、归一化客户区坐标、物理像素取整和窗口工作区对齐算法。
-- 保持既有 MoveTo(x, y) 为虚拟桌面绝对物理像素；未改变旧 API 签名、输入消息或录制文件既有坐标含义。
-- Worker/Main IPC 新增窗口命令；窗口 API 通过不透明 GUID 引用传递，不向 Lua 暴露 HWND。
-- Win32 窗口枚举支持标题包含、类名精确、进程名、PID、可见性筛选；可枚举顶层窗口和最多 512 个子窗口后代。
-- 属性包括标题、类名、进程、外框、客户区、可见/最小化/最大化、前台/键盘焦点；支持激活、显示/隐藏、最小化/最大化/还原、置顶、移动、尺寸和工作区锚点对齐。
-- WindowWait 超时返回 nil；WindowWaitClosed 超时返回 false；两者都响应 Stop 取消。窗口引用在每轮 worker 结束时清除。
-- SetWinEventHook 跟踪 EVENT_OBJECT_DESTROY，并在每次调用前校验窗口句柄、PID、线程 ID、类名和进程启动时间；事件跟踪安装失败则拒绝创建引用，失效引用抛错，不重用旧句柄。
-- 不新增后台输入、控件读写、UI Automation、图像识别或 OCR；不绕过 UIPI/UAC/安全桌面。
+### 已交付
+- Core 坐标系统提供 screen/window/client/anchor/ratio 五种空间、双向屏幕转换、外框九宫格锚点、客户区归一化坐标、物理像素取整和显示器工作区锚点对齐。外框取 Win32 GetWindowRect，客户区通过 ClientToScreen 转为屏幕物理像素；矩形右/下边界不包含。
+- `MoveTo(x, y)` 的既有虚拟桌面绝对物理像素契约完全保留，副屏负坐标合法；M5 RecorderDocument 仍显式使用 `virtual-desktop-physical-pixels`，生成 Lua 仍调用 `MoveTo`，既有 sidecar / 录制内容没有被静默重解释。
+- 公开 API 新增 18 项，注册表 API version 0.3，总数 40；包括窗口查找/枚举/子窗口枚举/属性、激活/显示/隐藏/最小化/最大化/还原/置顶、移动/尺寸/工作区锚点对齐、等待出现/关闭和双向坐标转换。原有 22 项 API 的签名和行为不变。
+- 窗口引用为本轮运行内随机不透明 GUID，不向 Lua 暴露 HWND。枚举支持标题包含、类名精确、进程名、PID、可见性；顶层与子窗口后代各自最多 512 个结果。WindowGetInfo 返回 `isChild`、前台和键盘焦点标志，以及窗口外框/客户区矩形。
+- WindowMove/WindowResize/WindowAlign 对外统一使用虚拟桌面屏幕物理坐标；遇到子窗口时在 Win32 调用边界转换为父窗口客户区坐标，避免 SetWindowPos 对 WS_CHILD 坐标解释不同导致错位。
+- WindowWait 命中返回表、超时返回 nil；WindowWaitClosed 关闭返回 true、超时返回 false；Stop 可取消。窗口引用每轮 worker 结束清理。
+- EVENT_OBJECT_DESTROY 通过 SetWinEventHook 跟踪；每次使用校验 HWND、PID、线程 ID、类名和进程启动时间。校验中途遇到窗口销毁/进程退出按失效引用处理；销毁 hook 无法安装则拒绝创建引用。不会绕过 UIPI/UAC/安全桌面。
+- M6 不包含后台输入、控件读写、UI Automation、图像识别或 OCR；M5 当前仍没有将录制动作绑定到持久窗口选择器并自动转成 window/client/ratio 动作，录制坐标模式仍固定为 screen 物理像素。该剩余产品目标不得误写成已实现。
 
-### 自动化测试与初轮 CI
-- 新增 CoordinateSystemTests，覆盖负屏幕坐标、window/client 原点差异、九宫格锚点、ratio 正反向和越界、物理像素取整、工作区对齐及无效几何。
-- Lua API 注册表新增 18 个窗口/坐标 API，API version 0.3；旧 22 个函数不变。Lua API 测试检查公开全局绑定、隐藏内部桥接名和 Lua 表返回。
-- 初轮 Windows Actions run 43299445160（commit 3479491d3e9f3c16dcab8f78399a5811f73f9fe1）：Restore PASS；Release Build PASS（0 warnings / 0 errors）；Tests 60 passed / 1 failed / 0 skipped。唯一失败是 ManualGeneratedRegionMatchesCatalog：代码注册表已升级为 40 个函数，而本次代码提交尚未包含同步更新的函数手册生成区块；并非编译或坐标/窗口测试失败。API handbook check、publish 和打包步骤因 Test 失败而跳过，须在手册同步提交后重新跑完整 workflow。
-- 当前执行容器未安装 .NET SDK，本地 Restore/Build/Test 均 NOT RUN。Windows 桌面 DPI、多显示器、UIPI、窗口销毁和窗口实际操作验收也均 NOT RUN。
+### 自动化测试与 Windows CI
+- `CoordinateSystemTests` 覆盖负屏幕坐标、window/client 不同原点、9 个锚点、ratio 正反向和越界、物理像素取整、工作区对齐及无效矩形；Lua API 契约测试检查新 API 绑定、Lua 表返回和 `isChild` 字段；API 手册由注册表生成并通过 `--check`。
+- 首个代码提交 `3479491d3e9f3c16dcab8f78399a5811f73f9fe1` 对应 run `43299445160`：Restore / Release Build PASS（0 warnings / 0 errors），60 passed / 1 failed；唯一失败是测试手册生成区尚未与 40 项 registry 同步。该早期失败保留记录，不作为最终结论。
+- 手册同步提交 `8c143982ab49bf87c3461981205fe6d00757562d` 对应 run `43299954437`：61/61 tests PASS；Build 0 warnings / 0 errors；API handbook、win-x64 publish、ZIP/SHA256、artifact upload 全 PASS。
+- 子窗口屏幕坐标兼容修复提交 `c7cc5f7b2ee435ec13ece0846cf4ee5e64e03db5` 对应 run `43300453577`：61/61 tests PASS；Build 0 warnings / 0 errors；API handbook、win-x64 publish、ZIP/SHA256、artifact upload 全 PASS。
+- HWND 销毁/进程退出竞态修复提交 `4f9b2b2648fb154353ca55522e9c77fe77645506` 对应最终 Windows Actions run `43300620614`：**SUCCESS**。Restore PASS；Release Build PASS（0 warnings / 0 errors）；Core Tests 61 passed / 0 failed / 0 skipped；API handbook --check PASS；self-contained win-x64 publish PASS；ZIP/SHA256 package PASS；artifact upload PASS。Artifact ID `13981497112`，51,857,145 bytes；GitHub Actions 上传 artifact digest `f46eaaf66ee204c82129902e280eed7a80c7c9a4a86c825888729af5280143f3`。
+- Read release version / Create GitHub Release 因本次不是 release 提交而跳过；没有创建新 Release。v0.1.0-preview.4 资产未更改。
+- 当前容器没有 .NET SDK，本地 Restore/Build/Test：NOT RUN；以上实际构建与 61 项测试由 Windows GitHub Actions runner 执行。
 
-### 当前限制与完成门槛
-- M5 录制数据模型尚未自动把窗口引用/坐标空间写入新动作，M6 不擅自重写录制器。
-- 当前使用 Win32 顶层/子窗口枚举和基本窗口元数据；不读取或设置标准控件内容，也不执行后台输入。
-- 完整 CI（Build/Test/API handbook check/win-x64 publish/ZIP/SHA256/artifact）通过后，M6 代码阶段才记为 DONE；Windows 桌面手工验收继续单独保留 NOT RUN。
-- 预览版 v0.1.0-preview.4 未更新，本阶段不创建 Release。
+### 尚待实机验收与后续边界
+- M6-01 至 M6-10 的 Windows 10/11 桌面实机验收全部 NOT RUN，特别是 100–200% / 混合 DPI、多显示器负坐标、不同完整性级别、真实窗口销毁/句柄复用与子窗口定位。CI PASS 不代表桌面窗口行为已验收。
+- M5 录制仍固定保存 `virtual-desktop-physical-pixels`，生成 `MoveTo`；窗口相对录制/回放绑定（持久窗口选择器 + 每次执行重定位）仍是未实现的 PRD 目标。不得把 M6 坐标转换 API 描述为已经完成该录制器能力。
+- 不支持后台输入与控件读写；按 ROADMAP 进入 M7 前仍需按权限边界设计能力探测，不绕过 UIPI/UAC/安全桌面。
+- 本阶段未更新 VERSION / preview 版本，未创建 Release。
+
 
 ## M3–M7 — IDE、调试、录制、坐标与窗口
 

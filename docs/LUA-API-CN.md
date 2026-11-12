@@ -135,7 +135,7 @@ M6 已在 main 开发版提供以下显式坐标空间：
 
 ### 5.3 当前实现的窗口 API
 
-窗口引用是随机不透明字符串，不向 Lua 暴露原始 HWND。`WindowFind` / `WindowEnumerate` 支持标题包含匹配、类名精确匹配、进程名、PID 和可见性筛选；`WindowEnumerateChildren(id)` 枚举目标窗口的所有子窗口后代（最多 512 项）。`WindowGetInfo(id)` 返回标题、类名、进程、可见/最小化/最大化、前台/焦点标志、外框矩形、客户区屏幕矩形和销毁跟踪状态。
+窗口引用是随机不透明字符串，不向 Lua 暴露原始 HWND。`WindowFind` / `WindowEnumerate` 支持标题包含匹配、类名精确匹配、进程名、PID 和可见性筛选；`WindowEnumerateChildren(id)` 枚举目标窗口的所有子窗口后代（最多 512 项）。`WindowGetInfo(id)` 返回标题、类名、进程、可见/最小化/最大化、前台/焦点标志、`isChild`、外框矩形、客户区屏幕矩形和销毁跟踪状态。
 
 窗口操作函数：
 
@@ -145,9 +145,9 @@ M6 已在 main 开发版提供以下显式坐标空间：
 | `WindowShow(id)` / `WindowHide(id)` | 显示/隐藏 |
 | `WindowMinimize(id)` / `WindowMaximize(id)` / `WindowRestore(id)` | 最小化、最大化、还原 |
 | `WindowSetTopmost(id, enabled?)` | 置顶或取消置顶 |
-| `WindowMove(id, x, y)` | 按屏幕物理像素移动窗口外框左上角，允许负坐标 |
-| `WindowResize(id, width, height)` | 调整窗口外框物理像素宽高（1–32768） |
-| `WindowAlign(id, anchor?, offsetX?, offsetY?)` | 在目标窗口所在显示器的工作区按九宫格锚点对齐，可加偏移 |
+| `WindowMove(id, x, y)` | 按屏幕物理像素移动窗口外框左上角，允许负坐标；对子窗口会先换算为父客户区坐标再调用 SetWindowPos |
+| `WindowResize(id, width, height)` | 调整窗口外框物理像素宽高（1–32768）；对子窗口保留原屏幕位置并换算父客户区坐标 |
+| `WindowAlign(id, anchor?, offsetX?, offsetY?)` | 在目标窗口所在显示器的工作区按九宫格锚点对齐，可加偏移；对子窗口转换为父客户区坐标 |
 | `WindowWait(..., timeoutMs?)` | 等待窗口出现；超时返回 nil，默认 30000ms，最大 600000ms |
 | `WindowWaitClosed(id, timeoutMs?)` | 等待窗口关闭；关闭返回 true，超时返回 false |
 
@@ -157,7 +157,7 @@ M6 已在 main 开发版提供以下显式坐标空间：
 
 ### 5.4 录制与回放要求
 
-录制动作可保留坐标空间、目标窗口引用和必要的几何快照；当前 M6 未把 M5 原始录制器自动转换成窗口相对动作。窗口坐标转换成功并不意味着后台输入也一定成功；后台输入是后续阶段的独立能力和权限契约。
+当前 M5 的 `RecorderDocument.CoordinateSpace` 固定为 `virtual-desktop-physical-pixels`；`RecorderDocumentBuilder` 保存全局 Hook 捕获到的虚拟桌面屏幕物理像素，`RecorderLuaGenerator` 生成 `MoveTo(x, y)`。M6 没有改变该 sidecar schemaVersion 1 或既有录制文件的含义，也没有把临时窗口 GUID 写入文件（该 GUID 只在当前脚本运行期间有效）。因此目前录制/回放的定义是明确的 screen 绝对坐标模式；按键/鼠标原有动作不回归，但窗口移动后不会自动跟随窗口。持久窗口选择器、窗口/客户区/ratio 坐标录制及回放重定位仍未实现，后续需要设计可持久化的窗口匹配条件和 schema 迁移。`CoordinateToScreen` / `CoordinateFromScreen` 可供脚本在运行时显式换算，不能视为 Recorder 已支持相对录制。窗口坐标转换成功也不代表后台输入成功；后台输入属于后续阶段独立能力和权限契约。
 
 ## 6. 返回值与错误契约
 

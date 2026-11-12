@@ -475,3 +475,13 @@ M4 基础调试器与 M5 可视化录制/动作列表均已完成 Windows CI 验
 - 本地容器没有 .NET SDK，Restore/Build/Test：NOT RUN。Windows 桌面 M6-01..M6-10：NOT RUN；M1 Hook 与 M3/M4/M5 的桌面验收状态不变。
 - 未更新 VERSION/csproj 预览版本，未创建 Release；v0.1.0-preview.4 官方资产保持不变。
 
+
+### M6 代码审查修正与最终验收（追加记录）
+- 子窗口枚举会返回 WS_CHILD 后代；Windows 的 SetWindowPos 对子窗口解释的是父客户区坐标，而本项目公开 `WindowMove` / `WindowAlign` 契约必须始终是虚拟桌面屏幕物理像素。commit `c7cc5f7b2ee435ec13ece0846cf4ee5e64e03db5` 增加 `WindowInfo.isChild`，在 Win32 调用边界把子窗口的屏幕目标位置用 `ScreenToClient(parent)` 转换为父客户区坐标；`WindowResize` 保留既有屏幕位置。Lua contract 测试也覆盖 isChild 字段。
+- 对 `IsCurrent` 增加 Win32 句柄在校验期间销毁、进程退出竞态的异常收敛：`Win32Exception` / `ArgumentException` / `InvalidOperationException` 被作为引用失效返回；WaitClosed 不会因为查询与销毁并发而将关闭误报成普通脚本异常。commit `4f9b2b2648fb154353ca55522e9c77fe77645506`。
+- 修正注册表 `WindowActivate` 返回契约：Windows 前台锁定策略拒绝时实际返回 false，不描述为必然抛错；`WindowGetInfo` 手册补入 isChild；函数参考手册重新从 registry 生成。
+- run `43299954437` 对代码+首次手册同步 commit 通过：61/61 tests；run `43300453577` 对子窗口坐标修正通过：61/61 tests、0 warning / 0 error、API handbook / publish / package / artifact 全 PASS。
+- **最终验收基线 commit `4f9b2b2648fb154353ca55522e9c77fe77645506`，Windows Actions run `43300620614` SUCCESS**：Restore PASS；Release Build 0 warnings / 0 errors；61 passed / 0 failed / 0 skipped；API handbook --check PASS；self-contained win-x64 publish PASS；ZIP/SHA256 package PASS；artifact upload PASS。Artifact ID `13981497112`，51,857,145 bytes；GitHub Actions artifact digest `f46eaaf66ee204c82129902e280eed7a80c7c9a4a86c825888729af5280143f3`。
+- `Read release version` / `Create GitHub Release` 按非 release commit 预期跳过；无新 Release，VERSION、preview.4 Release ZIP 和 SHA256 未变化。
+- M6-01..M6-10 Windows 桌面验收仍全部 NOT RUN；M1 Hook 与 M3/M4/M5 桌面验收仍 NOT RUN。CI 不等于桌面实机通过。
+- M5 sidecar schemaVersion 1 的坐标字段仍固定为 `virtual-desktop-physical-pixels`，动作生成继续用 `MoveTo`。持久窗口选择器和相对窗口坐标录制/回放重定位尚未实现；这是明确保留的产品缺口，不纳入本次 M6 API/Win32 交付完成声明。
