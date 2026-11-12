@@ -34,8 +34,6 @@ public sealed class LuaDebugSessionTests
         var snapshots = new List<LuaDebugSnapshot>();
         var commands = new Queue<LuaDebugCommand>([
             LuaDebugCommand.Continue,
-            LuaDebugCommand.Continue,
-            LuaDebugCommand.Continue,
             LuaDebugCommand.StepInto,
             LuaDebugCommand.StepOver,
             LuaDebugCommand.StepOut,
@@ -55,17 +53,22 @@ public sealed class LuaDebugSessionTests
             """;
 
         using var lua = new NLua.Lua();
-        using var debugger = CreateDebugger(lua, path, [], snapshots, commands);
+        using var debugger = CreateDebugger(
+            lua,
+            path,
+            [new LuaDebugBreakpoint(path, 9)],
+            snapshots,
+            commands);
 
         lua.DoString(source, "@" + path);
         debugger.ThrowIfFaulted();
 
-        Assert.Equal(new[] { 1, 4, 8, 9, 5, 6, 10 }, snapshots.Select(snapshot => snapshot.Line));
-        Assert.True(snapshots[4].Frames.Count >= 2, "Step-into should stop inside the outer Lua function.");
-        Assert.Contains(snapshots[4].Frames, frame => frame.Name == "outer");
+        Assert.Equal(new[] { 3, 9, 5, 6, 10 }, snapshots.Select(snapshot => snapshot.Line));
+        Assert.True(snapshots[2].Frames.Count >= 2, "Step-into should stop inside the outer Lua function.");
+        Assert.Contains(snapshots[2].Frames, frame => frame.Name == "outer");
         Assert.DoesNotContain(snapshots, snapshot => snapshot.Line == 2);
-        Assert.Equal(2, snapshots[5].Frames.Count);
-        Assert.Single(snapshots[6].Frames);
+        Assert.Equal(2, snapshots[3].Frames.Count);
+        Assert.Single(snapshots[4].Frames);
     }
 
     [Fact]
