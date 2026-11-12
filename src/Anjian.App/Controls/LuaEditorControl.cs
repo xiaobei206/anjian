@@ -16,6 +16,7 @@ internal sealed class LuaEditorControl : UserControl
     private readonly System.Windows.Forms.Timer _highlightTimer = new() { Interval = 180 };
     private readonly ToolTip _signatureTip = new() { ShowAlways = true, InitialDelay = 350, ReshowDelay = 150 };
     private bool _formatting;
+    private int _textVersion;
     private IReadOnlyList<LuaApiCompletion> _completions = [];
 
     public RichTextBox TextBox => _editor;
@@ -72,11 +73,7 @@ internal sealed class LuaEditorControl : UserControl
         Controls.Add(_editor);
         Controls.Add(_gutter);
         Controls.Add(_completionList);
-        _highlightTimer.Tick += (_, _) =>
-        {
-            _highlightTimer.Stop();
-            ApplySyntaxColors();
-        };
+        _highlightTimer.Tick += async (_, _) => await HighlightAsync();
     }
 
     private void EditorTextChanged(object? sender, EventArgs e)
@@ -84,6 +81,7 @@ internal sealed class LuaEditorControl : UserControl
         if (_formatting)
             return;
 
+        _textVersion++;
         _highlightTimer.Stop();
         _highlightTimer.Start();
         _gutter.Invalidate();
@@ -252,7 +250,25 @@ internal sealed class LuaEditorControl : UserControl
         _signatureTip.Show(message, _editor, location, 1800);
     }
 
-    private void ApplySyntaxColors()
+    private async Task HighlightAsync()
+    {
+        _highlightTimer.Stop();
+        if (_editor.IsDisposed || _editor.TextLength == 0)
+        {
+            _gutter.Invalidate();
+            return;
+        }
+
+        var source = _editor.Text;
+        var version = _textVersion;
+        var tokens = await Task.Run(() => LuaEditorService.Tokenize(source, _registry));
+        if (IsDisposed || _editor.IsDisposed || version != _textVersion)
+            return;
+
+        ApplySyntaxColors(tokens);
+    }
+
+    private void ApplySyntaxColors(IReadOnlyList<LuaEditorToken> tokens)
     {
         if (_editor.IsDisposed || _editor.TextLength == 0)
         {
@@ -262,7 +278,6 @@ internal sealed class LuaEditorControl : UserControl
 
         var selectionStart = _editor.SelectionStart;
         var selectionLength = _editor.SelectionLength;
-        var tokens = LuaEditorService.Tokenize(_editor.Text, _registry);
         _formatting = true;
         try
         {
