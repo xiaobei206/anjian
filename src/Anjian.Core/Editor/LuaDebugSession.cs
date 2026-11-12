@@ -125,7 +125,8 @@ public sealed class LuaDebugSession : IDisposable
                 ? CountFrames()
                 : 0;
 
-            var shouldPause = !_started ||
+            var isMainScript = string.Equals(source, _scriptPath, StringComparison.OrdinalIgnoreCase);
+            var shouldPause = (!_started && isMainScript) ||
                 _breakpoints.Contains(BreakpointKey(source, line)) ||
                 (_mode == DebugMode.StepInto) ||
                 (_mode == DebugMode.StepOver && depth <= _stepDepth) ||
@@ -137,7 +138,8 @@ public sealed class LuaDebugSession : IDisposable
             if (!shouldPause)
                 return;
 
-            _started = true;
+            if (isMainScript)
+                _started = true;
             var snapshot = CaptureSnapshot(source, line);
             var command = _waitForCommand(snapshot) ??
                 throw new InvalidOperationException("调试器未返回下一步命令。");
@@ -193,8 +195,13 @@ public sealed class LuaDebugSession : IDisposable
         try
         {
             var count = 0;
-            while (count < MaximumFrames && state.GetStack(count, pointer) != 0)
+            while (count < MaximumFrames)
+            {
+                ClearDebugBuffer(pointer);
+                if (state.GetStack(count, pointer) == 0)
+                    break;
                 count++;
+            }
             return count;
         }
         finally
@@ -310,8 +317,8 @@ public sealed class LuaDebugSession : IDisposable
         if (value is string text)
         {
             var rendered = text
-                .Replace("\\r", "\\r", StringComparison.Ordinal)
-                .Replace("\\n", "\\n", StringComparison.Ordinal);
+                .Replace("\r", "\\r", StringComparison.Ordinal)
+                .Replace("\n", "\\n", StringComparison.Ordinal);
             var truncated = rendered.Length > MaximumStringLength;
             if (truncated)
                 rendered = rendered[..MaximumStringLength] + "…";
