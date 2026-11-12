@@ -8,6 +8,8 @@ v0.1.0-preview.4 已正式发布。Windows CI 的 Restore、Build、7 项测试�
 
 下载入口：[v0.1.0-preview.4 Release](https://github.com/xiaobei206/anjian/releases/tag/v0.1.0-preview.4)，[Windows x64 ZIP](https://github.com/xiaobei206/anjian/releases/download/v0.1.0-preview.4/Anjian2026-0.1.0-preview.4-win-x64.zip)，[SHA256 sidecar](https://github.com/xiaobei206/anjian/releases/download/v0.1.0-preview.4/Anjian2026-0.1.0-preview.4-win-x64.zip.sha256)。
 ZIP SHA256：`6b59ab27f825aa48b2ec5343cec826ad8b0ded759e9989af02d51f8b949f09aa`。
+
+**main 开发状态（未发布）：** M3 Lua IDE 基础已完成并通过 Windows CI（20 项测试）；包含语法高亮、行号、API 补全/签名提示、语法诊断、查找替换和多标签。上述功能尚未进入 v0.1.0-preview.4 Release ZIP，桌面手工验收仍待执行。详见 [M3 路线图](docs/ROADMAP-CN.md) 与 [验收清单](docs/ACCEPTANCE-TEST-CN.md)。
 使用说明：[首版使用说明](docs/USER-GUIDE-CN.md)。
 
 ## 项目完整大纲与接手资料
@@ -76,13 +78,13 @@ Log("本轮完成")
 
 - 唯一机器可读来源：`src/Anjian.Core/Api/lua-api-registry.json`，嵌入到 Anjian.Core 供运行时直接读取。
 - Lua 全局 API 由注册表生成；C# 内部桥接名不会作为公开 API 暴露。
-- 未来 IDE 补全/参数提示/命令面板应直接读取 `LuaApiRegistry.Load()`；对应 UI 尚未实现。
+- main 分支 M3 编辑器自动补全与签名提示已直接读取 `LuaApiRegistry.Load()` 的 `Categories` / `Apis`；不维护第二份函数、参数或说明清单。独立 API 命令面板仍未实现。此变化尚未发布到 preview.4。
 - 重新生成手册：`dotnet run --project tools/Anjian.ApiDocsGenerator -c Release -- --write`。
 - 检查手册漂移：`dotnet run --project tools/Anjian.ApiDocsGenerator -c Release -- --check`。
 
 ## 当前限制
 
-- 这是早期预览版，编辑器暂为基础文本编辑框，尚无语法高亮/补全。
+- v0.1.0-preview.4 Release 包中的编辑器仍为基础文本编辑框；M3 增强编辑器只在尚未发布的 main 开发版中。
 - 录制使用低级 Windows 输入钩子；如果系统策略、权限或安全软件拦截，录制可能不可用。
 - 前台输入受 Windows UIPI 和目标程序权限级别限制；本软件不会尝试绕过受保护桌面或更高权限边界。
 - 鼠标移动经过合并/采样，不保证逐像素还原高速轨迹。
