@@ -27,6 +27,7 @@ internal sealed class GlobalRecorder : IDisposable
     private long _pausedTicks;
 
     public bool Overflowed { get; private set; }
+    public long DroppedEventCount { get; private set; }
     public bool IsRecording => _recording;
     public bool HasSession => _sessionStarted;
 
@@ -43,6 +44,7 @@ internal sealed class GlobalRecorder : IDisposable
         _heldKeys.Clear();
         _heldMouse.Clear();
         Overflowed = false;
+        DroppedEventCount = 0;
         _clickOnly = clickOnly;
         _pausedTicks = 0;
         _pausedAtTicks = 0;
@@ -132,16 +134,16 @@ internal sealed class GlobalRecorder : IDisposable
                     switch (kind)
                     {
                         case WmMouseMove:
-                            if (!_clickOnly) AddMove(timestamp, data.Point.X, data.Point.Y);
+                            if (!_clickOnly) AddMove(timestamp, data.Point.X, data.Point.Y, data.Flags);
                             break;
-                        case WmLeftDown: Add(new(timestamp, RecordedEventKind.MouseDown, data.Point.X, data.Point.Y, "left")); break;
-                        case WmLeftUp: Add(new(timestamp, RecordedEventKind.MouseUp, data.Point.X, data.Point.Y, "left")); break;
-                        case WmRightDown: Add(new(timestamp, RecordedEventKind.MouseDown, data.Point.X, data.Point.Y, "right")); break;
-                        case WmRightUp: Add(new(timestamp, RecordedEventKind.MouseUp, data.Point.X, data.Point.Y, "right")); break;
-                        case WmMiddleDown: Add(new(timestamp, RecordedEventKind.MouseDown, data.Point.X, data.Point.Y, "middle")); break;
-                        case WmMiddleUp: Add(new(timestamp, RecordedEventKind.MouseUp, data.Point.X, data.Point.Y, "middle")); break;
+                        case WmLeftDown: Add(new(timestamp, RecordedEventKind.MouseDown, data.Point.X, data.Point.Y, "left", Flags: data.Flags)); break;
+                        case WmLeftUp: Add(new(timestamp, RecordedEventKind.MouseUp, data.Point.X, data.Point.Y, "left", Flags: data.Flags)); break;
+                        case WmRightDown: Add(new(timestamp, RecordedEventKind.MouseDown, data.Point.X, data.Point.Y, "right", Flags: data.Flags)); break;
+                        case WmRightUp: Add(new(timestamp, RecordedEventKind.MouseUp, data.Point.X, data.Point.Y, "right", Flags: data.Flags)); break;
+                        case WmMiddleDown: Add(new(timestamp, RecordedEventKind.MouseDown, data.Point.X, data.Point.Y, "middle", Flags: data.Flags)); break;
+                        case WmMiddleUp: Add(new(timestamp, RecordedEventKind.MouseUp, data.Point.X, data.Point.Y, "middle", Flags: data.Flags)); break;
                         case WmMouseWheel:
-                            Add(new(timestamp, RecordedEventKind.Wheel, data.Point.X, data.Point.Y, Delta: unchecked((short)(data.MouseData >> 16))));
+                            Add(new(timestamp, RecordedEventKind.Wheel, data.Point.X, data.Point.Y, Delta: unchecked((short)(data.MouseData >> 16)), Flags: data.Flags));
                             break;
                     }
                 }
@@ -169,12 +171,12 @@ internal sealed class GlobalRecorder : IDisposable
                         {
                             // Ignore keyboard auto-repeat: one physical hold is one Down/Up pair.
                             if (!_heldKeys.Contains(name))
-                                Add(new(timestamp, RecordedEventKind.KeyDown, Name: name));
+                                Add(new(timestamp, RecordedEventKind.KeyDown, Name: name, Flags: data.Flags));
                         }
                         else if (kind is WmKeyUp or WmSysKeyUp)
                         {
                             if (_heldKeys.Contains(name))
-                                Add(new(timestamp, RecordedEventKind.KeyUp, Name: name));
+                                Add(new(timestamp, RecordedEventKind.KeyUp, Name: name, Flags: data.Flags));
                         }
                     }
                 }
@@ -184,7 +186,7 @@ internal sealed class GlobalRecorder : IDisposable
         return CallNextHookEx(_keyboardHook, code, wParam, lParam);
     }
 
-    private void AddMove(long timestamp, int x, int y)
+    private void AddMove(long timestamp, int x, int y, uint flags)
     {
         if (_events.Count > 0 && _events[^1].Kind == RecordedEventKind.Move)
         {
@@ -193,11 +195,11 @@ internal sealed class GlobalRecorder : IDisposable
             var elapsedMs = (timestamp - previous.Timestamp) * 1000.0 / Stopwatch.Frequency;
             if (distance < 10 && elapsedMs < 50)
             {
-                _events[^1] = new RecordedInputEvent(timestamp, RecordedEventKind.Move, x, y);
+                _events[^1] = new RecordedInputEvent(timestamp, RecordedEventKind.Move, x, y, Flags: flags);
                 return;
             }
         }
-        Add(new(timestamp, RecordedEventKind.Move, x, y));
+        Add(new(timestamp, RecordedEventKind.Move, x, y, Flags: flags));
     }
 
     private void Add(RecordedInputEvent value)
@@ -221,7 +223,10 @@ internal sealed class GlobalRecorder : IDisposable
         if (_events.Count < MaximumEvents)
             _events.Add(value);
         else
+        {
             Overflowed = true;
+            DroppedEventCount++;
+        }
     }
 
     public static string GenerateLua(IReadOnlyList<RecordedInputEvent> events, bool clickOnly = false)

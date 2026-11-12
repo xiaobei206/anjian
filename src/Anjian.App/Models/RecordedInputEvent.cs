@@ -11,4 +11,5 @@ internal sealed record RecordedInputEvent(
     int X = 0,
     int Y = 0,
     string? Name = null,
-    int Delta = 0);
+    int Delta = 0,
+    uint Flags = 0);

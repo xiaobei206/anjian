@@ -1,5 +1,6 @@
 using Anjian.App.Models;
 using System.Text;
+using Anjian.Core.Recorder;
 
 namespace Anjian.App.Services;
 
@@ -58,21 +59,101 @@ public sealed class ScriptRepository
         if (File.Exists(target) && !string.Equals(target, entry.FullPath, StringComparison.OrdinalIgnoreCase))
             throw new IOException("同名脚本已经存在。");
         if (!string.Equals(target, entry.FullPath, StringComparison.OrdinalIgnoreCase))
-            File.Move(entry.FullPath, target);
+        {
+            var oldSidecar = RecorderDocumentStore.GetSidecarPath(entry.FullPath);
+            var newSidecar = RecorderDocumentStore.GetSidecarPath(target);
+            var oldBackup = oldSidecar + ".bak";
+            var newBackup = newSidecar + ".bak";
+            var oldScriptBackup = entry.FullPath + ".bak";
+            var newScriptBackup = target + ".bak";
+            if (File.Exists(newSidecar) || File.Exists(newBackup) || File.Exists(newScriptBackup))
+                throw new IOException("目标名称对应的脚本、录制动作文件或备份已经存在，拒绝覆盖。");
+
+            var scriptMoved = false;
+            var sidecarMoved = false;
+            var backupMoved = false;
+            var scriptBackupMoved = false;
+            try
+            {
+                File.Move(entry.FullPath, target);
+                scriptMoved = true;
+                if (File.Exists(oldSidecar))
+                {
+                    File.Move(oldSidecar, newSidecar);
+                    sidecarMoved = true;
+                }
+                if (File.Exists(oldBackup))
+                {
+                    File.Move(oldBackup, newBackup);
+                    backupMoved = true;
+                }
+                if (File.Exists(oldScriptBackup))
+                {
+                    File.Move(oldScriptBackup, newScriptBackup);
+                    scriptBackupMoved = true;
+                }
+            }
+            catch
+            {
+                if (scriptBackupMoved && File.Exists(newScriptBackup))
+                    File.Move(newScriptBackup, oldScriptBackup);
+                if (backupMoved && File.Exists(newBackup))
+                    File.Move(newBackup, oldBackup);
+                if (sidecarMoved && File.Exists(newSidecar))
+                    File.Move(newSidecar, oldSidecar);
+                if (scriptMoved && File.Exists(target))
+                    File.Move(target, entry.FullPath);
+                throw;
+            }
+        }
         return new ScriptEntry(safe, target);
     }
 
     public ScriptEntry Duplicate(ScriptEntry entry)
     {
         var copy = Create(entry.Name + "_副本");
-        File.Copy(entry.FullPath, copy.FullPath, overwrite: true);
-        return copy;
+        try
+        {
+            File.Copy(entry.FullPath, copy.FullPath, overwrite: true);
+            var sourceSidecar = RecorderDocumentStore.GetSidecarPath(entry.FullPath);
+            var copySidecar = RecorderDocumentStore.GetSidecarPath(copy.FullPath);
+            if (File.Exists(sourceSidecar))
+            {
+                File.Copy(sourceSidecar, copySidecar, overwrite: true);
+                try
+                {
+                    var document = RecorderDocumentStore.Load(copySidecar);
+                    RecorderDocumentStore.Save(copy.FullPath, document with
+                    {
+                        ScriptId = Guid.NewGuid().ToString("N"),
+                        RecordingId = Guid.NewGuid().ToString("N")
+                    });
+                }
+                catch (NotSupportedException)
+                {
+                    // Preserve a future schema byte-for-byte; never rewrite data we cannot migrate.
+                }
+            }
+            return copy;
+        }
+        catch
+        {
+            var copySidecar = RecorderDocumentStore.GetSidecarPath(copy.FullPath);
+            if (File.Exists(copySidecar)) File.Delete(copySidecar);
+            if (File.Exists(copy.FullPath)) File.Delete(copy.FullPath);
+            throw;
+        }
     }
 
     public void Delete(ScriptEntry entry)
     {
         if (File.Exists(entry.FullPath))
             File.Delete(entry.FullPath);
+        var sidecar = RecorderDocumentStore.GetSidecarPath(entry.FullPath);
+        if (File.Exists(sidecar))
+            File.Delete(sidecar);
+        if (File.Exists(sidecar + ".bak"))
+            File.Delete(sidecar + ".bak");
     }
 
     public string Read(ScriptEntry entry) => File.ReadAllText(entry.FullPath);

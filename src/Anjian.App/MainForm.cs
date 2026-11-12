@@ -4,6 +4,9 @@ using Anjian.App.Controls;
 using Anjian.Core;
 using Anjian.Core.Api;
 using Anjian.Core.Editor;
+using Anjian.Core.Recorder;
+using System.Diagnostics;
+using System.Text;
 
 namespace Anjian.App;
 
@@ -27,6 +30,7 @@ internal sealed class MainForm : Form
     private readonly Label _progress = new();
     private readonly Button _recordButton = new();
     private readonly Button _stopRecordButton = new();
+    private readonly Button _actionEditorButton = new();
     private readonly Button _playButton = new();
     private readonly Button _pauseButton = new();
     private readonly Button _stopButton = new();
@@ -65,6 +69,9 @@ internal sealed class MainForm : Form
         public TabPage Page { get; } = page;
         public LuaEditorControl Editor { get; } = editor;
         public bool Dirty { get; set; }
+        public RecorderDocument? RecorderDocument { get; set; }
+        public bool RecorderDocumentDirty { get; set; }
+        public bool RecorderDocumentLoadFailed { get; set; }
         public HashSet<int> Breakpoints { get; } = [];
     }
 
@@ -149,6 +156,10 @@ internal sealed class MainForm : Form
         _stopRecordButton.Enabled = false;
         _stopRecordButton.Click += (_, _) => StopRecording();
         toolbar.Controls.Add(_stopRecordButton);
+        _actionEditorButton.Text = "动作列表";
+        _actionEditorButton.Enabled = false;
+        _actionEditorButton.Click += (_, _) => OpenRecorderActionList();
+        toolbar.Controls.Add(_actionEditorButton);
 
         _playButton.Text = "▶ 播放";
         _playButton.Click += async (_, _) => await StartPlaybackAsync();
@@ -615,6 +626,24 @@ internal sealed class MainForm : Form
             editor.TextBox.Text = _repository.Read(entry);
             var page = new TabPage(entry.Name) { Tag = null, ToolTipText = entry.FullPath };
             var tab = new ScriptTab(entry, page, editor);
+            try
+            {
+                tab.RecorderDocument = RecorderDocumentStore.LoadIfExists(entry.FullPath);
+                if (tab.RecorderDocument is not null)
+                {
+                    var inspected = RecorderLuaGenerator.Inspect(editor.TextBox.Text, tab.RecorderDocument);
+                    if (inspected.SynchronizationState != tab.RecorderDocument.SynchronizationState)
+                    {
+                        tab.RecorderDocument = inspected;
+                        tab.RecorderDocumentDirty = true;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                tab.RecorderDocumentLoadFailed = true;
+                AppendLog($"录制动作文件读取失败，已保留原文件且不会覆盖：{entry.Name} — {ex.Message}");
+            }
             editor.SetBreakpoints(tab.Breakpoints);
             editor.BreakpointToggled += line =>
             {
@@ -632,6 +661,16 @@ internal sealed class MainForm : Form
                     _dirty = true;
                     UpdateTitle();
                 }
+                if (tab.RecorderDocument is not null)
+                {
+                    var inspected = RecorderLuaGenerator.Inspect(editor.TextBox.Text, tab.RecorderDocument);
+                    if (inspected.SynchronizationState != tab.RecorderDocument.SynchronizationState)
+                    {
+                        tab.RecorderDocument = inspected;
+                        tab.RecorderDocumentDirty = true;
+                    }
+                }
+                UpdateActionEditorButton();
             };
 
             _openTabs.Add(entry.FullPath, tab);
@@ -674,6 +713,7 @@ internal sealed class MainForm : Form
             _current = null;
             _dirty = false;
             UpdateTitle();
+            UpdateActionEditorButton();
         }
     }
 
@@ -692,6 +732,7 @@ internal sealed class MainForm : Form
         _dirty = tab.Dirty;
         SetScriptListSelection(tab.Entry);
         UpdateTitle();
+        UpdateActionEditorButton();
         if (_debugSnapshot is not null &&
             string.Equals(NormalizeScriptPath(_debugSnapshot.Source), NormalizeScriptPath(tab.Entry.FullPath),
                 StringComparison.OrdinalIgnoreCase))
@@ -755,6 +796,7 @@ internal sealed class MainForm : Form
         {
             SetScriptListSelection(null);
             UpdateTitle();
+            UpdateActionEditorButton();
         }
     }
 
@@ -844,17 +886,23 @@ internal sealed class MainForm : Form
     private bool SaveCurrent()
     {
         if (_recordSessionActive) return true;
-        if (_current is null || (!_dirty && _activeTab?.Dirty != true)) return true;
+        if (_current is null || _activeTab is null) return true;
+        var scriptDirty = _dirty || _activeTab.Dirty;
+        var actionsDirty = _activeTab.RecorderDocumentDirty;
+        if (!scriptDirty && !actionsDirty) return true;
         try
         {
-            _repository.Save(_current, _editor.Text);
+            if (scriptDirty)
+                _repository.Save(_current, _editor.Text);
+            if (actionsDirty && _activeTab.RecorderDocument is not null)
+                RecorderDocumentStore.Save(_current.FullPath, _activeTab.RecorderDocument);
+
             _dirty = false;
-            if (_activeTab is not null)
-            {
-                _activeTab.Dirty = false;
-                _activeTab.Page.Text = _activeTab.Entry.Name;
-            }
+            _activeTab.Dirty = false;
+            _activeTab.RecorderDocumentDirty = false;
+            _activeTab.Page.Text = _activeTab.Entry.Name;
             UpdateTitle();
+            UpdateActionEditorButton();
             return true;
         }
         catch (Exception ex)
@@ -1026,16 +1074,50 @@ internal sealed class MainForm : Form
         try
         {
             var events = _recorder.Stop();
+            if (_activeTab is null || _current is null)
+                throw new InvalidOperationException("录制脚本标签已不存在，无法保存动作。");
+            var eventInputs = events.Select(item => new RecorderEventInput(
+                TimestampTicks: item.Timestamp,
+                Kind: item.Kind switch
+                {
+                    RecordedEventKind.Move => RecorderRawEventKind.Move,
+                    RecordedEventKind.MouseDown => RecorderRawEventKind.MouseDown,
+                    RecordedEventKind.MouseUp => RecorderRawEventKind.MouseUp,
+                    RecordedEventKind.Wheel => RecorderRawEventKind.Wheel,
+                    RecordedEventKind.KeyDown => RecorderRawEventKind.KeyDown,
+                    RecordedEventKind.KeyUp => RecorderRawEventKind.KeyUp,
+                    _ => throw new ArgumentOutOfRangeException(nameof(item.Kind))
+                },
+                X: item.Kind is RecordedEventKind.KeyDown or RecordedEventKind.KeyUp ? null : item.X,
+                Y: item.Kind is RecordedEventKind.KeyDown or RecordedEventKind.KeyUp ? null : item.Y,
+                Name: item.Name,
+                Delta: item.Delta,
+                Source: "LowLevelHook",
+                Flags: item.Flags)).ToArray();
+            var document = RecorderDocumentBuilder.Create(
+                eventInputs,
+                _clickOnlyForSession,
+                Stopwatch.Frequency,
+                scriptId: _activeTab.RecorderDocument?.ScriptId,
+                droppedEventCount: _recorder.DroppedEventCount);
+            var generated = RecorderLuaGenerator.PrepareUpdate(string.Empty, document);
+            if (!generated.Success)
+                throw new InvalidOperationException(generated.Error ?? "录制 Lua 生成失败。");
+
             _editor.ReadOnly = false;
-            _editor.Text = GlobalRecorder.GenerateLua(events, _clickOnlyForSession);
+            _editor.Text = generated.ScriptText;
+            _activeTab.RecorderDocument = generated.Document;
+            _activeTab.RecorderDocumentDirty = true;
             _dirty = true;
             _recordSessionActive = false;
             _recording = false;
             _recordingPaused = false;
-            SaveCurrent();
-            AppendLog($"录制结束：采集 {events.Count} 个事件，已生成 Lua 脚本。");
+            var saved = SaveCurrent();
+            AppendLog(saved
+                ? $"录制结束：保留 {events.Count} 个原始事件，生成 {generated.Document.Actions.Count} 个结构化动作；Lua 与动作 sidecar 均已保存。"
+                : $"录制结束：已在编辑器中生成 {generated.Document.Actions.Count} 个动作；磁盘保存未完成，请修复保存错误后重试。");
             if (_recorder.Overflowed)
-                AppendLog("警告：录制事件达到 250000 条上限，后续事件未保存。");
+                AppendLog($"警告：录制事件队列达到 250000 条上限，另有 {_recorder.DroppedEventCount} 条事件未保存；动作文件已记录溢出标志。");
         }
         catch (Exception ex) { AppendLog("结束录制失败：" + ex.Message); }
         finally
@@ -1060,6 +1142,7 @@ internal sealed class MainForm : Form
         _status.Text = !_recordSessionActive ? "未运行" : _recordingPaused ? "录制已暂停" : "正在录制…";
         UpdateFloatingState();
         UpdateDebuggerButtons(isPaused: false);
+        UpdateActionEditorButton();
     }
 
     private async Task StartPlaybackAsync()
@@ -1157,6 +1240,151 @@ internal sealed class MainForm : Form
         _editorTabs.Enabled = true;
         UpdateRecordingUi();
         UpdateDebuggerButtons(isPaused: false);
+        UpdateActionEditorButton();
+    }
+
+
+    private void UpdateActionEditorButton()
+    {
+        if (_actionEditorButton.IsDisposed)
+            return;
+        _actionEditorButton.Enabled = !_recordSessionActive && !_playback.IsRunning &&
+            _activeTab is not null && !_activeTab.RecorderDocumentLoadFailed;
+        _actionEditorButton.Text = _activeTab?.RecorderDocument?.SynchronizationState switch
+        {
+            RecorderSynchronizationState.Detached => "动作列表（代码已手改）",
+            RecorderSynchronizationState.Missing => "动作列表（生成区缺失）",
+            RecorderSynchronizationState.Pending => "动作列表（待同步）",
+            RecorderSynchronizationState.Synchronized => "动作列表",
+            _ => "动作列表"
+        };
+    }
+
+    private void OpenRecorderActionList()
+    {
+        if (_recordSessionActive || _playback.IsRunning || _activeTab is null || _current is null)
+            return;
+        if (_activeTab.RecorderDocumentLoadFailed)
+        {
+            MessageBox.Show(this, "现有 .actions.json 无法读取或 schema 不兼容。为防止覆盖原文件，本次会话禁止编辑/重建动作数据。",
+                "录制动作不可用", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+        if (!SaveCurrent())
+            return;
+
+        var tab = _activeTab;
+        var document = tab.RecorderDocument ?? new RecorderDocument
+        {
+            ScriptId = Guid.NewGuid().ToString("N"),
+            RecordingId = Guid.NewGuid().ToString("N"),
+            GeneratedBlockId = Guid.NewGuid().ToString("N"),
+            SynchronizationState = RecorderSynchronizationState.Pending
+        };
+
+        using var editor = new RecorderActionEditorForm(document, _editor.Text, RunRecorderActionPreviewAsync);
+        if (editor.ShowDialog(this) == DialogResult.OK)
+        {
+            if (!string.Equals(_editor.Text, editor.UpdatedScriptText, StringComparison.Ordinal))
+            {
+                _editor.Text = editor.UpdatedScriptText;
+                tab.Dirty = true;
+                _dirty = true;
+            }
+            var updatedDocument = editor.UpdatedDocument;
+            tab.RecorderDocument = updatedDocument;
+            tab.RecorderDocumentDirty = true;
+            UpdateTitle();
+            if (SaveCurrent())
+            {
+                AppendLog($"动作列表已保存：{tab.Entry.Name}，共 {updatedDocument.Actions.Count} 个动作；同步状态={updatedDocument.SynchronizationState}。");
+                if (editor.RequestedNavigationActionId is { } actionId)
+                    NavigateToRecorderAction(actionId);
+            }
+        }
+        UpdateActionEditorButton();
+    }
+
+
+    private void NavigateToRecorderAction(string actionId)
+    {
+        var document = _activeTab?.RecorderDocument;
+        if (document is null)
+            return;
+
+        var blockStartMarker = $"-- <anjian:generated id=\"{document.GeneratedBlockId}\"";
+        var start = _editor.Text.IndexOf(blockStartMarker, StringComparison.Ordinal);
+        if (start < 0)
+            return;
+        var end = _editor.Text.IndexOf("-- </anjian:generated>", start, StringComparison.Ordinal);
+        if (end < 0)
+            return;
+        var actionMarker = $"-- <anjian:action id=\"{actionId}\"";
+        var position = _editor.Text.IndexOf(actionMarker, start, end - start, StringComparison.Ordinal);
+        if (position < 0)
+        {
+            AppendLog($"未在当前生成区找到动作代码映射：{actionId}");
+            return;
+        }
+
+        var line = _editor.GetLineFromCharIndex(position);
+        var lineStart = _editor.GetFirstCharIndexFromLine(line);
+        var lineEnd = _editor.Text.IndexOfAny(['\\r', '\\n'], lineStart);
+        if (lineEnd < 0)
+            lineEnd = _editor.TextLength;
+        _editor.Select(lineStart, Math.Max(0, lineEnd - lineStart));
+        _editor.ScrollToCaret();
+        _editor.Focus();
+    }
+
+    private async Task RunRecorderActionPreviewAsync(RecorderAction action)
+    {
+        if (_playback.IsRunning)
+            throw new InvalidOperationException("当前已有脚本在运行。");
+        if (!action.Enabled)
+            throw new InvalidOperationException("已禁用动作不能试运行。");
+
+        if (action.DelayMs < 0 || action.HoldMs < 0 ||
+            action.DelayMs > 60_000 || action.HoldMs > 60_000 ||
+            action.DelayMs > 60_000 - action.HoldMs)
+            throw new InvalidOperationException("单步试运行的动作间隔与按住时长合计不能超过 60000ms。");
+        if (action.Kind == RecorderActionKind.TypeText && (action.Text?.Length ?? 0) > 1_000)
+            throw new InvalidOperationException("单步试运行的文本输入最多允许 1000 个字符。");
+        var snippet = RecorderLuaGenerator.BuildActionSnippet(action);
+        if (string.IsNullOrWhiteSpace(snippet))
+            throw new InvalidOperationException("当前动作没有可执行的 Lua 语句。");
+
+        var choice = MessageBox.Show(
+            this,
+            $"即将真实执行以下动作：\n{RecorderLuaGenerator.Describe(action)}\n\n这会向当前桌面发送真实键盘/鼠标输入，可能改变目标程序状态。执行单步后会由现有 Worker 清理其持有的键鼠状态。\n\n确定继续？",
+            "步骤试运行风险确认",
+            MessageBoxButtons.YesNo,
+            MessageBoxIcon.Warning);
+        if (choice != DialogResult.Yes)
+            return;
+
+        var temporaryPath = Path.Combine(Path.GetTempPath(), "Anjian2026-Step-" + Guid.NewGuid().ToString("N") + ".lua");
+        try
+        {
+            File.WriteAllText(temporaryPath, snippet, new UTF8Encoding(false));
+            _playButton.Enabled = false;
+            _recordButton.Enabled = false;
+            _pauseButton.Enabled = true;
+            _stopButton.Enabled = true;
+            _pauseButton.Text = "暂停";
+            _status.Text = "正在试运行动作";
+            _runTask = _playback.RunAsync(
+                temporaryPath,
+                new PlaybackOptions { RepeatCount = 1, IntervalMilliseconds = 0 });
+            UpdateActionEditorButton();
+            await _runTask;
+        }
+        finally
+        {
+            _runTask = null;
+            SetIdle();
+            try { if (File.Exists(temporaryPath)) File.Delete(temporaryPath); } catch { }
+        }
     }
 
     private async Task StartDebugAsync()
