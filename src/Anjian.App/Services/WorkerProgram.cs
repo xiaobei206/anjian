@@ -25,7 +25,7 @@ internal static class WorkerProgram
 
             try
             {
-                using var lua = new Lua(openLibs: true);
+                using var lua = new NLua.Lua(openLibs: true);
                 var api = new WorkerLuaApi(client);
                 Register(lua, api);
                 lua.SetDebugHook(LuaHookMask.Count, 10_000);
