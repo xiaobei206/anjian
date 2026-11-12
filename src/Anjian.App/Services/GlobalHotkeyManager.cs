@@ -34,6 +34,7 @@ internal sealed class GlobalHotkeyManager : IDisposable
     ];
 
     private readonly nint _windowHandle;
+    private readonly Func<int, bool> _canHandleAction;
     private readonly LowLevelKeyboardProc _callback;
     private readonly HashSet<uint> _capturedKeys = [];
     private nint _hook;
@@ -41,9 +42,10 @@ internal sealed class GlobalHotkeyManager : IDisposable
     public int LastError { get; }
     public bool IsInstalled => _hook != 0;
 
-    public GlobalHotkeyManager(nint windowHandle)
+    public GlobalHotkeyManager(nint windowHandle, Func<int, bool> canHandleAction)
     {
         _windowHandle = windowHandle;
+        _canHandleAction = canHandleAction;
         _callback = KeyboardCallback;
         _hook = SetWindowsHookEx(WhKeyboardLl, _callback, GetModuleHandle(null), 0);
         if (_hook == 0)
@@ -85,7 +87,9 @@ internal sealed class GlobalHotkeyManager : IDisposable
                             _ => 0
                         };
 
-                        if (PostMessage(_windowHandle, WindowMessage, (nint)action, 0))
+                        // Do not steal function keys when the corresponding action is unavailable.
+                        if (_canHandleAction(action) &&
+                            PostMessage(_windowHandle, WindowMessage, (nint)action, 0))
                         {
                             _capturedKeys.Add(key);
                             return (nint)1;

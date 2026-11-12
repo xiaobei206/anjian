@@ -578,11 +578,18 @@ internal sealed class MainForm : Form
         catch (InvalidOperationException) { }
     }
 
+    private bool CanHandleGlobalHotkey(int action) => action switch
+    {
+        GlobalHotkeyManager.StartAction => !_recording && !_playback.IsRunning,
+        GlobalHotkeyManager.PauseResumeAction or GlobalHotkeyManager.StopAction => !_recording && _playback.IsRunning,
+        _ => false
+    };
+
     protected override void OnHandleCreated(EventArgs e)
     {
         base.OnHandleCreated(e);
         _hotkeyManager?.Dispose();
-        _hotkeyManager = new GlobalHotkeyManager(Handle);
+        _hotkeyManager = new GlobalHotkeyManager(Handle, CanHandleGlobalHotkey);
         if (_hotkeyManager.IsInstalled)
             AppendLog("全局快捷键已启用：F10 启动，F11 暂停/继续，F12 中止。");
         else
