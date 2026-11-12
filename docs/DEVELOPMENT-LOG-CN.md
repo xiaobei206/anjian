@@ -96,3 +96,11 @@ TV-01：Lua 5.4 / .NET 10 绑定与中断机制 PoC。
 
 ### 当前任务
 发布 GitHub prerelease v0.1.0-preview.1，并核验正式 Release 的 ZIP 和 SHA256 资产。
+
+
+### Release 工作流修复（13:05 UTC）
+- 首次 Release 工作流的构建、7 项测试、自包含发布、打包与上传全部成功；仅 PowerShell 输出文件步骤因误用 Set-Content -Append 失败。
+- 已改用 Add-Content 写入 GITHUB_OUTPUT。
+- 修复提交：21441470ca6f8de57df5cc04ba46359d2cb2b828。
+- 修复提交 Actions run：43223670738，结论 SUCCESS；Release 条件步骤按预期跳过（该提交不是 release: 前缀）。
+- 本次 release: 提交将触发 v0.1.0-preview.1 tag 和 prerelease 创建。
