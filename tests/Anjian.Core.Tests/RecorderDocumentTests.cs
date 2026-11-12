@@ -147,7 +147,7 @@ public sealed class RecorderDocumentTests
     [Fact]
     public void StoreRoundTripsAndRejectsUnknownSchemaWithoutChangingOriginalFile()
     {
-        using var directory = Directory.CreateTempSubdirectory();
+        var directory = Directory.CreateTempSubdirectory();
         var scriptPath = Path.Combine(directory.FullName, "test.lua");
         var document = DocumentWithActions(
         [
@@ -172,6 +172,7 @@ public sealed class RecorderDocumentTests
 
         Assert.Throws<NotSupportedException>(() => RecorderDocumentStore.Load(sidecar));
         Assert.Equal(original, File.ReadAllText(sidecar));
+        Directory.Delete(directory.FullName, recursive: true);
     }
 
     [Fact]

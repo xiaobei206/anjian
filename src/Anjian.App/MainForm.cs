@@ -1329,7 +1329,7 @@ internal sealed class MainForm : Form
 
         var line = _editor.GetLineFromCharIndex(position);
         var lineStart = _editor.GetFirstCharIndexFromLine(line);
-        var lineEnd = _editor.Text.IndexOfAny(['\\r', '\\n'], lineStart);
+        var lineEnd = _editor.Text.IndexOfAny(new[] { (char)13, (char)10 }, lineStart);
         if (lineEnd < 0)
             lineEnd = _editor.TextLength;
         _editor.Select(lineStart, Math.Max(0, lineEnd - lineStart));
