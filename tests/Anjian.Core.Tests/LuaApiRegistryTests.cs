@@ -33,7 +33,7 @@ public sealed class LuaApiRegistryTests
   Assert.True(pipe.Items.Any(m=>m.Type=="log"&&m.Text=="测试完成"),"Log should reach the runtime pipe.");
   var i=pipe.Items.FindIndex(m=>m.Type=="log"&&m.Text=="before-hotkey");
   Assert.True(i>=0,"Hotkey diagnostic marker was not recorded.");
-  Assert.Equal(new[]{("key-down","CTRL"),("key-down","SHIFT"),("key-down","S"),("key-up","S"),("key-up","SHIFT"),("key-up","CTRL")},pipe.Items.Skip(i+1).Take(6).Select(m=>(m.Type,m.Name)).ToArray());
+  Assert.Equal(new (string Type,string? Name)[]{("key-down","CTRL"),("key-down","SHIFT"),("key-down","S"),("key-up","S"),("key-up","SHIFT"),("key-up","CTRL")},pipe.Items.Skip(i+1).Take(6).Select(m=>(m.Type,m.Name)).ToArray());
  }
  [Fact] public void InvalidRangeFractionalWheelAndEmptyHotkeyFail(){using var lua=new Lua(openLibs:true);LuaApiRuntime.Register(lua,new WorkerLuaApi(new Recorder()));var r=lua.DoString("""local a=pcall(LeftClick,600001);local b=pcall(KeyPress,"ENTER",600001);local c=pcall(MouseWheel,1.5);local d=pcall(Hotkey);local e=pcall(RandomDelay,300,100);return a,b,c,d,e""");Assert.Equal(5,r.Length);Assert.All(r,x=>Assert.False(Convert.ToBoolean(x)));}
  [Fact] public void ManualGeneratedRegionMatchesCatalog(){var root=FindRoot();var m=File.ReadAllText(Path.Combine(root,"docs","FUNCTION-REFERENCE-CN.md"));Assert.Equal(LuaApiRegistry.NormalizeNewlines(m),LuaApiRegistry.NormalizeNewlines(LuaApiRegistry.Load().UpdateGeneratedReferenceSection(m)));Assert.Contains("MoveTo(x, y)",m,StringComparison.Ordinal);Assert.Contains("600000",m,StringComparison.Ordinal);Assert.Contains("完整产品目标中的函数类别",m,StringComparison.Ordinal);Assert.Contains("目标设计",m,StringComparison.Ordinal);}
