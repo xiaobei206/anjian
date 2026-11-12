@@ -16,6 +16,8 @@ ZIP SHA256：`6b59ab27f825aa48b2ec5343cec826ad8b0ded759e9989af02d51f8b949f09aa`�
 - [路线图与阶段状态](docs/ROADMAP-CN.md)
 - [技术架构与模块边界](docs/ARCHITECTURE-CN.md)
 - [Lua 5.4 命令 API 规格](docs/LUA-API-CN.md)
+- [完整功能矩阵（与经典 PC 功能对应）](docs/FEATURE-MATRIX-CN.md)
+- [中文函数与参数参考手册](docs/FUNCTION-REFERENCE-CN.md)
 - [录制器与动作/代码生成设计](docs/RECORDER-DESIGN-CN.md)
 - [架构决策记录（ADR）](docs/DECISIONS-CN.md)
 - [技术选型与 PoC 验证清单](docs/TECHNICAL-VALIDATION-CN.md)
@@ -25,7 +27,11 @@ ZIP SHA256：`6b59ab27f825aa48b2ec5343cec826ad8b0ded759e9989af02d51f8b949f09aa`�
 - [新 GPT 最短接手提示词](docs/SESSION-START-PROMPT-CN.md)
 - [累计开发日志](docs/DEVELOPMENT-LOG-CN.md)
 
-## 首版目标
+## 完整产品目标
+
+完整的 Windows 桌面自动化开发环境是本项目的正式目标：完整 Lua IDE/调试器、录制与可视化动作列表、多坐标空间、窗口/控件自动化、前后台能力适配、截图/找图/找色/OCR、脚本参数与自定义 UI、插件和独立“小精灵”打包，以及有统一来源的函数/参数手册。阶段状态与验收标准请以 [产品 PRD](docs/PRD-CN.md)、[功能矩阵](docs/FEATURE-MATRIX-CN.md) 和 [路线图](docs/ROADMAP-CN.md) 为准。以上不是 preview.4 已全部实现的声明。
+
+## 首版已实现功能（preview.4）
 
 - 本地 Lua 脚本列表：新建、打开、保存、重命名、复制、删除；支持右键菜单。
 - 全局鼠标/键盘录制，生成可编辑 Lua 脚本；录制会过滤本程序自身界面和注入输入。
