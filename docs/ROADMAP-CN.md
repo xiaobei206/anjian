@@ -14,7 +14,7 @@
 | M1 preview.4 实机基线与可靠性 | IN_PROGRESS | 实际 Windows 10/11 验收窗口/托盘/热键/Hook，进行长时运行、多显示器和 DPI 验证 |
 | M2 单一 API 注册表与文档生成 | DONE（Windows CI PASS，2026-11-13） | 建立机器可读 API 注册描述；以同一来源生成手册和后续 IDE 提示 |
 | M3 完整 Lua IDE 基础 | DONE（Windows CI PASS，2026-11-13；桌面手工验收待执行） | 高亮、行号、补全、参数提示、诊断、查找/替换、多标签、错误行导航 |
-| M4 调试器 | TODO | 断点、单步、运行到光标、变量观察、调用栈 |
+| M4 调试器 | IN PROGRESS（main 已接入基础实现；Windows CI 验证中，桌面手工验收 NOT RUN） | 文件/行号断点、单步、运行到光标、变量快照、调用栈 |
 | M5 可视化录制/动作列表 | TODO | 动作编辑、分组、排序、延时编辑、生成代码区块和同步状态 |
 | M6 坐标系统与窗口自动化 | TODO | screen/window/client/anchor/ratio、坐标转换、窗口查找/布局/对齐/等待 |
 | M7 控件与前后台能力适配 | TODO | UI Automation/标准控件能力探测、后台输入适配、失败回退和边界说明 |
@@ -82,6 +82,34 @@ M2 验收：当前实现中的 22 个公开函数均可在注册表和手册中�
 
 ### 下一步
 M3 已 DONE。下一会话唯一开发任务为 M4：Lua 调试器基础（真实断点/单步/运行到光标、变量观察和调用栈）；不能用日志展示冒充执行点控制。M1 preview.4 Windows 桌面实机验收继续保留为单独 NOT RUN 项，不阻塞 M4。
+
+## M4 — Lua 调试器基础（main 开发版，Windows CI 验证中）
+
+### 已接入的基础能力
+- [x] 基于 NLua/KeraLua 真实 Lua line hook，而不是模拟日志或静态行号展示；脚本首个执行位置和断点行会在执行前暂停。
+- [x] 文件/行号断点，编辑器 gutter 圆点标记和当前执行行标记。
+- [x] 继续、单步进入、单步越过、单步跳出和运行到光标；越过/跳出按真实调用栈深度判断。
+- [x] worker 内读取当前执行位置、调用栈、局部变量及可读全局变量；JSON 快照复制到主进程/UI。
+- [x] 调试状态与 Lua state 留在 worker 子进程，UI 不访问 NLua/KeraLua 对象；普通播放仍使用原有 count hook / IPC 路径。
+- [x] 变量按类型展示；字符串上限、局部变量/全局变量/栈帧数量设上限；表/函数/线程/userdata 当前不展开，不执行任意 watch 表达式。
+- [x] Core 自动测试覆盖断点行、嵌套调用单步顺序、运行到光标、变量快照、表不可展开和 hook dispose。
+
+### 当前限制
+- 断点只存在当前打开标签的内存模型中，关闭标签/退出后不保存。
+- 当前尚未提供命名 watch 表达式、表/对象展开、复杂对象属性求值或跨文件持久断点。
+- 调试固定执行一轮；不沿用普通播放的循环次数/轮间隔。
+- Core 自动测试通过前不得标记 DONE；Windows 桌面手工验收仍须独立执行，不能用 CI 代替。
+
+### 验证状态（本轮更新时）
+- Windows Actions run 43290120386 在 Build 阶段因测试项目 xUnit analyzer xUnit2031 阻断；Core 与 App 主项目已编译，自动化测试步骤未执行。
+- 已将两处 Assert.Single(collection.Where(...)) 改为谓词重载；修正后的 run 43290603954 与包含最新用户文档的 run 43290697650 正在排队/执行，最终结果须以后续成功运行 ID 更新。
+- 本地容器无 .NET SDK，Restore/Build/Test：NOT RUN。
+- Windows M1/M3/M4 桌面实机手工验收：NOT RUN；未创建新 Release，preview.4 资产未改变。
+
+### 验收门槛
+- 自动：Windows Restore/Build、所有 Core 自动测试、API 手册一致性检查、self-contained win-x64 publish、ZIP/SHA256 package、artifact upload 全部通过。
+- 手工：参照 docs/ACCEPTANCE-TEST-CN.md 的 M4-01 至 M4-10 执行并记录环境、操作、结果和日志。
+- 断点/单步/运行到光标必须确实控制 Lua 执行点；状态和变量视图不得访问 UI 线程外的 Lua state。
 
 ## M3–M7 — IDE、调试、录制、坐标与窗口
 
