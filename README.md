@@ -6,7 +6,7 @@ Windows 10/11 x64 桌面自动化工具，首版使用 WinForms + .NET 10 + Lua 
 
 首个 Windows x64 预览版 v0.1.0-preview.1 已完成 CI 构建与自动化测试，正在发布到 GitHub Releases。它不是完整 IDE，优先提供录制、Lua 编辑、播放控制和重复运行设置。
 
-下载入口：[GitHub Releases](https://github.com/xiaobei206/anjian/releases)。
+下载入口：[v0.1.0-preview.1 正式预览版](https://github.com/xiaobei206/anjian/releases/tag/v0.1.0-preview.1)，或直接下载 [Windows x64 ZIP](https://github.com/xiaobei206/anjian/releases/download/v0.1.0-preview.1/Anjian2026-0.1.0-preview.1-win-x64.zip) 和 [SHA256](https://github.com/xiaobei206/anjian/releases/download/v0.1.0-preview.1/Anjian2026-0.1.0-preview.1-win-x64.zip.sha256)。
 使用说明：[首版使用说明](docs/USER-GUIDE-CN.md)。
 
 ## 首版目标

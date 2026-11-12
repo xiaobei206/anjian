@@ -104,3 +104,26 @@ TV-01：Lua 5.4 / .NET 10 绑定与中断机制 PoC。
 - 修复提交：21441470ca6f8de57df5cc04ba46359d2cb2b828。
 - 修复提交 Actions run：43223670738，结论 SUCCESS；Release 条件步骤按预期跳过（该提交不是 release: 前缀）。
 - 本次 release: 提交将触发 v0.1.0-preview.1 tag 和 prerelease 创建。
+
+
+## 2026-11-12 — S002 — v0.1.0-preview.1 GitHub prerelease 正式发布
+
+### 最终发布信息
+- Release：<https://github.com/xiaobei206/anjian/releases/tag/v0.1.0-preview.1>
+- Tag：`v0.1.0-preview.1`
+- 发布提交：`cf24ac9292ea21dd1063ea9e9d65f18e3637442a`
+- Release workflow run：`43224009158`，结论 SUCCESS。
+- Assets：Windows x64 ZIP + SHA256 sidecar。
+- ZIP 大小：51,879,710 bytes。
+- SHA256：`80bfbf3ddbebafaf6e835bc8fb29148760662418b2c57de79f7ab7dbe88e6164`。
+- GitHub Release API 中 ZIP asset digest 与 Actions artifact 内实际 ZIP 文件 sha256、sidecar 三方一致。
+- Release ID：442961207，prerelease=true。
+
+### PowerShell 发布修复
+- 首次发布尝试中 PowerShell Set-Content 没有 -Append 参数，导致 output 变量步骤失败；构建、7 项测试和 ZIP 上传本身已成功。
+- 改为 Add-Content 写入 GITHUB_OUTPUT，修复提交 Actions SUCCESS。
+- 后续 release: 提交重新执行全流程，Read release version 和 Create GitHub Release 均 SUCCESS。
+
+### 验收边界
+- CI 编译和 7 项自动测试 PASS。
+- 用户 Windows 实机手工验收、2 小时稳定性、多屏/DPI 与具体目标程序兼容仍为 NOT RUN。
