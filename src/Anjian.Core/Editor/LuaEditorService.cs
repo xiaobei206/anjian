@@ -156,7 +156,7 @@ public static class LuaEditorService
                 continue;
             }
 
-            if ("+-*/%^#=<>~;:,().{}[]".Contains(current, StringComparison.Ordinal))
+            if ("+-*/%^#=<>~;:,().{}[]".IndexOf(current) >= 0)
             {
                 index++;
                 if (index < source.Length &&
@@ -176,6 +176,39 @@ public static class LuaEditorService
         }
 
         return tokens;
+    }
+
+    public static bool IsCaretInCommentOrString(string source, int caret)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        if (caret < 0 || caret > source.Length)
+            throw new ArgumentOutOfRangeException(nameof(caret));
+
+        var lineStart = caret == 0 ? 0 : source.LastIndexOfAny(['\r', '\n'], caret - 1) + 1;
+        var quote = '\0';
+        var escaped = false;
+
+        for (var index = lineStart; index < caret; index++)
+        {
+            var current = source[index];
+            if (quote != '\0')
+            {
+                if (escaped)
+                    escaped = false;
+                else if (current == '\\')
+                    escaped = true;
+                else if (current == quote)
+                    quote = '\0';
+                continue;
+            }
+
+            if (current == '-' && index + 1 < caret && source[index + 1] == '-')
+                return true;
+            if (current is '\'' or '"')
+                quote = current;
+        }
+
+        return quote != '\0';
     }
 
     public static string GetIdentifierPrefix(string source, int caret)
