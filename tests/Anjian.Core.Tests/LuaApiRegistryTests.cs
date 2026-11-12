@@ -29,7 +29,7 @@ public sealed class LuaApiRegistryTests
   Assert.True(pipe.Items.Any(m=>m.Type=="delay"&&m.Ms==100),"Default double-click gap expected Delay(100); actual commands: "+string.Join(" | ",pipe.Items.Select(m=>$"{m.Type}:{m.Name}:{m.Ms}:{m.Text}")));
   Assert.True(pipe.Items.Any(m=>m.Type=="key-press"&&m.Name=="ENTER"&&m.Ms==50),"KeyPress default duration should be 50ms.");
   Assert.True(pipe.Items.Any(m=>m.Type=="key-press"&&m.Name=="F24"&&m.Ms==600000),"KeyPress should accept the documented maximum duration.");
-  Assert.True(pipe.Items.Any(m=>m.Type=="type-text"&&m.Text=="按键精灵 2026"),"TypeText should preserve Unicode text.");
+  Assert.True(pipe.Items.Any(m=>m.Type=="type-text"&&m.Text=="按键精灵 2026"),"TypeText should preserve Unicode text. Actual: "+string.Join(" | ",pipe.Items.Select(m=>$"Type={m.Type}; Name={m.Name}; Text={m.Text}")));
   Assert.True(pipe.Items.Any(m=>m.Type=="log"&&m.Text=="测试完成"),"Log should reach the runtime pipe.");
   var i=pipe.Items.FindIndex(m=>m.Type=="log"&&m.Text=="before-hotkey");
   Assert.True(i>=0,"Hotkey diagnostic marker was not recorded.");
