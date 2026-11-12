@@ -4,7 +4,7 @@ Windows 10/11 x64 桌面自动化工具，首版使用 WinForms + .NET 10 + Lua 
 
 ## 当前进度
 
-Windows x64 预览版 v0.1.0-preview.3 本轮新增点击坐标录制、录制暂停/续录、紧凑悬浮窗、实时鼠标坐标和可选置顶。当前 Release 工作流正在进行最终构建与打包；这是早期预览版，不是完整 IDE。
+Windows x64 预览版 v0.1.0-preview.3 已发布，Windows CI 编译、7 项自动化测试、自包含发布、ZIP/SHA256 打包与 Release 上传全部成功。本轮新增点击坐标录制、录制暂停/续录、紧凑悬浮窗、实时鼠标坐标和可选置顶。这仍是早期预览版，不是完整 IDE。
 
 下载入口：[v0.1.0-preview.3 正式预览版](https://github.com/xiaobei206/anjian/releases/tag/v0.1.0-preview.3)，或直接下载 [Windows x64 ZIP](https://github.com/xiaobei206/anjian/releases/download/v0.1.0-preview.3/Anjian2026-0.1.0-preview.3-win-x64.zip) 和 [SHA256](https://github.com/xiaobei206/anjian/releases/download/v0.1.0-preview.3/Anjian2026-0.1.0-preview.3-win-x64.zip.sha256)。
 使用说明：[首版使用说明](docs/USER-GUIDE-CN.md)。

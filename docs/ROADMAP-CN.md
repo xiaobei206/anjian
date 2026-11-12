@@ -4,13 +4,13 @@
 |---|---|---|
 | M0 产品规格 | DONE | 首版交互、Lua API 和录制策略已确认 |
 | M1 Windows 预览版 v0.1.0-preview.2 | DONE | WinForms/Lua/键鼠录制和输入/重复播放；Release 已公开发布 |
-| M1.1 点击录制与紧凑悬浮窗 v0.1.0-preview.3 | IN_PROGRESS | 功能代码已实现，第一轮 CI SUCCESS；Release 工作流和实机验证待完成 |
+| M1.1 点击录制与紧凑悬浮窗 v0.1.0-preview.3 | RELEASED | 功能代码、CI 和 Release 资产已通过；等待用户实机验收 |
 | M2 用户实机验收与稳定性 | IN_PROGRESS | Windows 10/11 手工测试、2 小时稳定性、DPI 和多屏 |
 | M3 编辑器增强 | TODO | Lua 语法高亮、补全、参数提示、错误标记 |
 | M4 可视化录制增强 | TODO | 动作列表、动作编辑、代码同步 |
 | M5 P1 能力 | TODO | 找图/找色、窗口能力、断点调试 |
 
-## v0.1.0-preview.2 已交付
+## v0.1.0-preview.3 已交付
 
 - [x] Windows 10/11 x64 WinForms 应用，.NET 10 self-contained
 - [x] 脚本新建、打开、保存、重命名、复制、删除和右键菜单
@@ -28,7 +28,12 @@
 - [x] 7 项自动化测试通过（7/7）
 - [x] win-x64 self-contained ZIP 发布成功
 - [x] SHA256 sidecar 与实际发布 ZIP 复核一致
-- [x] GitHub prerelease v0.1.0-preview.2 已发布
+- [x] GitHub prerelease v0.1.0-preview.3 已发布
+- [x] 只记录点击坐标，生成 MoveTo -> 可选 Delay -> Click
+- [x] 录制暂停/继续，暂停期间时间不写入脚本
+- [x] 默认紧凑悬浮窗、脚本名、实时鼠标坐标
+- [x] 可选始终置顶和悬浮/完整模式切换
+- [ ] 用户 Windows 实机验收点击坐标、续录和悬浮窗
 - [ ] 用户 Windows 实机手工验收
 - [ ] 2 小时稳定性测试和 DPI/多显示器实测
 

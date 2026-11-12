@@ -218,3 +218,23 @@ TV-01：Lua 5.4 / .NET 10 绑定与中断机制 PoC。
 - Build、Test、self-contained publish、ZIP/SHA256 package、artifact upload 全部通过。
 - 随后在紧凑悬浮窗顶部增加“只录点击”勾选，commit `3d79665418869487405e74c12d0f4308f404bbf1`，其 CI run `43231710764` 已通过 Build/Test/Publish/Package。
 - 正在递增版本至 v0.1.0-preview.3，并由 Release workflow 对最终代码再次完整验证。
+
+
+## 2026-11-12 — S004.2 — v0.1.0-preview.3 正式发布
+
+### CI 与发布证据
+- 首轮 release run `43232299395` 因 `MainForm.cs(492,55)` nullable warning-as-error 失败，未发布资产。
+- 修复：录制期间恢复脚本列表选择时，对 `_current` 做 null 检查。修复提交 `2eacde0c12f9616e4f37d209c929c1b473edab43` 的 run `43232594517` SUCCESS。
+- 最终 release commit：`3938b1550f32cb98511b67cfb5642e6eaf78f8fe`。
+- Release run `43232898372` SUCCESS；Build/Test/Publish/Package/Artifact Upload/Read Release Version/Create GitHub Release 全部成功。
+- 自动化测试 7/7；构建 0 warnings / 0 errors。
+
+### 发布资产
+- Release：https://github.com/xiaobei206/anjian/releases/tag/v0.1.0-preview.3
+- ZIP：`Anjian2026-0.1.0-preview.3-win-x64.zip`，51,887,704 bytes。
+- SHA256：`b18071d5ecfb05435198e5ee900e59cc861ef7706328b413bee2412650acf188`。
+- 已从 Actions artifact 提取 ZIP 和 sidecar；`sha256sum -c` 输出 OK，GitHub asset digest 与实际文件 SHA256 一致。
+
+### 验收边界
+- CI / Release 资产：PASS。
+- 用户 Windows 实机点击坐标录制、暂停续录、紧凑 UI、置顶与坐标刷新：NOT RUN。

@@ -4,11 +4,11 @@
 - 项目：按键精灵 2026（暂定工作名）
 - 仓库：xiaobei206/anjian
 - 主分支：main
-- 已发布版本：**v0.1.0-preview.2**
-- Release：https://github.com/xiaobei206/anjian/releases/tag/v0.1.0-preview.2
-- 发布提交：`3e63ff38d8111181fa1a402547350c80e6ceb882`
-- 发布 Actions run：`43226666516`，结论 SUCCESS。
-- 当前开发：点击坐标模式、录制暂停/继续、紧凑悬浮窗、实时坐标和可选置顶已实现；第一轮 CI（commit `659db9836c1ab51c7e8812958eb1fee7166fa9ad`）SUCCESS，包含 Build/Test/Publish/Package。最终 UI 小修与 preview.3 Release 工作流正在验证；实机验收待用户完成。
+- 已发布版本：**v0.1.0-preview.3**
+- Release：https://github.com/xiaobei206/anjian/releases/tag/v0.1.0-preview.3
+- Release commit：`3938b1550f32cb98511b67cfb5642e6eaf78f8fe`
+- 发布 Actions run：`43232898372`，结论 SUCCESS。
+- 最新任务：用户在 Windows 10/11 实机验收新录制模式和悬浮窗交互；CI 成功不等于实机验收通过。
 
 ## 本轮新增需求与实现目标
 - 默认勾选“只记录点击坐标”：鼠标移动不生成 MoveTo 轨迹；点击使用真实按下坐标，生成 MoveTo -> 可选 Delay -> Click。
@@ -41,17 +41,17 @@
 - 全局快捷键：空闲时 F10 启动；运行/暂停时 F11 暂停/继续、F12 中止。低级键盘钩子过滤模拟注入事件；只有对应动作可执行时才截获功能键。代码提交 `e8e96cb26df1a254d2db45dd2a72b2c7ef11cd9f`，Windows CI 已通过；实机验收待用户完成。
 - self-contained win-x64 ZIP 和 SHA256 发布资产。
 
-## 最新 Release 资产：v0.1.0-preview.2
-- Release 页面：https://github.com/xiaobei206/anjian/releases/tag/v0.1.0-preview.2
-- ZIP：`Anjian2026-0.1.0-preview.2-win-x64.zip`
-- ZIP 下载：https://github.com/xiaobei206/anjian/releases/download/v0.1.0-preview.2/Anjian2026-0.1.0-preview.2-win-x64.zip
-- ZIP 大小：51,881,918 bytes。
-- SHA256 sidecar：`Anjian2026-0.1.0-preview.2-win-x64.zip.sha256`
-- SHA256 下载：https://github.com/xiaobei206/anjian/releases/download/v0.1.0-preview.2/Anjian2026-0.1.0-preview.2-win-x64.zip.sha256
-- ZIP SHA256：`41139ffeefd695bce3e1f00f232fc8d2fc1cb7b34b67f8bfb53d68019c0bd089`
-- 已从 Actions artifact 下载内层 ZIP 和 SHA sidecar；文件大小及 SHA256 三方核对通过（sidecar 与实际 ZIP 计算值一致，GitHub Release asset digest 与 ZIP SHA 一致）。
-- Release asset IDs：ZIP `739580318`；SHA256 `739580310`。
-- Release ID：`442980321`，prerelease=true。
+## 最新 Release 资产：v0.1.0-preview.3
+- Release 页面：https://github.com/xiaobei206/anjian/releases/tag/v0.1.0-preview.3
+- ZIP：`Anjian2026-0.1.0-preview.3-win-x64.zip`
+- ZIP 下载：https://github.com/xiaobei206/anjian/releases/download/v0.1.0-preview.3/Anjian2026-0.1.0-preview.3-win-x64.zip
+- ZIP 大小：51,887,704 bytes。
+- SHA256 sidecar：`Anjian2026-0.1.0-preview.3-win-x64.zip.sha256`
+- SHA256 下载：https://github.com/xiaobei206/anjian/releases/download/v0.1.0-preview.3/Anjian2026-0.1.0-preview.3-win-x64.zip.sha256
+- ZIP SHA256：`b18071d5ecfb05435198e5ee900e59cc861ef7706328b413bee2412650acf188`
+- Actions artifact 已下载并解包；运行 `sha256sum -c` 成功，sidecar、实际 ZIP 和 GitHub Release ZIP digest 一致。
+- Release asset IDs：ZIP `739709384`；SHA256 `739709386`。
+- Release ID：`443028031`，prerelease=true。
 
 ## 历史 Release：v0.1.0-preview.1
 - Release 页面：https://github.com/xiaobei206/anjian/releases/tag/v0.1.0-preview.1
@@ -60,15 +60,16 @@
 - Release ID：`442961207`，prerelease=true。
 
 ## Windows CI 验证
-- v0.1.0-preview.2 Release workflow run：`43226666516`，SUCCESS；所有 job/step 均成功。
-- 最终快捷键代码提交 `e8e96cb26df1a254d2db45dd2a72b2c7ef11cd9f` 对应 run：`43226322656`，SUCCESS。
-- Release 构建、测试、自包含 win-x64 publish、ZIP/SHA256 package、artifact upload、GitHub Release creation：全部 SUCCESS。
+- v0.1.0-preview.3 Release workflow run：`43232898372`，SUCCESS；所有 job/step 均成功。
+- 修复空值边界后的 CI run：`43232594517`，SUCCESS。
+- 最终 Release 构建、7 项自动化测试、自包含 win-x64 publish、ZIP/SHA256 package、artifact upload、GitHub Release creation：全部 SUCCESS。
 - 自动化测试：7 passed / 0 failed / 0 skipped（测试项目现有 7 项）。
 - 测试包括：播放次数/轮间隔默认值、100 轮 99 次间隔、0 无限循环、边界值校验；Lua 5.4 版本确认、Lua 调用 C# 全局函数、Lua instruction-count hook 触发。
 - self-contained win-x64 publish：SUCCESS。
 - ZIP/SHA256 package：SUCCESS。
 - Release ZIP SHA256 已通过实际解包 Actions artifact 并运行 `sha256sum -c` 核验。
-- 正式 prerelease v0.1.0-preview.2 已成功创建。
+- 正式 prerelease v0.1.0-preview.3 已成功创建。
+- 第一轮 Release 构建曾因 `MainForm.cs` 的 nullable warning-as-error 失败；加上 `_current is null` 守卫后，修复提交 `2eacde0c12f9616e4f37d209c929c1b473edab43` 的 CI 通过，随后以新 release commit 完成发布。
 
 ## 仍未完成（务必如实）
 - 用户 Windows 实机手工验收：NOT RUN。
@@ -80,9 +81,12 @@
 - 不支持图像识别/OCR、窗口相对坐标、后台窗口注入、插件或云同步。
 
 ## 下一步唯一任务
-用户下载并在 Windows 10/11 电脑实测：
-1. 启动、创建/保存/重命名/复制/删除脚本。
-2. 全局录制鼠标移动、左右中键、滚轮、键盘和长按，结束录制后生成 Lua。
+用户下载 v0.1.0-preview.3 并在 Windows 10/11 电脑实测：
+1. 启动后确认默认是紧凑悬浮窗，拖动标题区、实时坐标、置顶切换和完整模式/返回均正常。
+2. 默认勾选“只录点击”，移动鼠标再点击多个目标，确认脚本只生成准确点击坐标，顺序为 MoveTo -> 可选 Delay -> Click；取消勾选后再确认移动轨迹会被记录。
+3. 录制几组动作，暂停数秒后继续，再结束录制；确认前后事件都保留且暂停时间不生成 Delay。
+4. 启动、创建/保存/重命名/复制/删除脚本。
+5. 全局录制鼠标移动、左右中键、滚轮、键盘和长按，结束录制后生成 Lua。
 3. 手写 `MoveTo`、`LeftClick(50)`、`KeyPress`、`Hotkey`、`TypeText`、`Delay` 测试。
 4. 重复次数设置 100，确认完整执行 100 轮；每轮间隔 0/1000/2000ms，确认只在两轮之间发生等待。
 5. 设置 0 无限循环并执行 Stop；测试 CPU 无限循环 Stop、Delay 中 Stop、Pause/Resume 和输入释放。
