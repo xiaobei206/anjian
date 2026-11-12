@@ -1,9 +1,10 @@
 # 技术架构与模块边界
 
-- 版本：Architecture Draft 0.2
+- 版本：Architecture 0.3
 - 目标框架：net10.0-windows
 - 平台：Windows x64
-- 状态：逻辑边界已定义；Lua 绑定和部分 Win32 采集 API 需技术验证
+- 状态：preview.4 实际实现已确认；后续模块化架构仍按路线图渐进演进。
+- 注意：本文件同时记录已采用实现和未来目标，不能把“拟定”模块视为当前已有项目。
 
 ## 1. 总体架构原则
 
@@ -16,27 +17,34 @@
 7. 所有跨模块事件和可保存数据都有版本/类型定义。
 8. 每个模块可独立单元测试；平台依赖放在 Windows 集成测试中。
 
-## 2. 解决方案结构（拟定）
+## 2. 当前仓库结构与目标拆分
+
+### 2.1 preview.4 实际存在的项目
 
     Anjian2026/
     ├── src/
-    │   ├── Anjian.App/                 # WinForms 桌面壳、主窗体、应用组合根
-    │   ├── Anjian.Core/                # DTO、枚举、错误类型、公共接口
-    │   ├── Anjian.Scripting/           # Lua Host、API 注册、受限环境、调试信息
-    │   ├── Anjian.Automation/          # 运行协调器、状态机、调度、暂停/停止
-    │   ├── Anjian.Windows.Input/       # SendInput、坐标、按键状态跟踪
-    │   ├── Anjian.Recorder/            # Raw Input/Hook 采集适配、事件队列、动作整理
-    │   ├── Anjian.CodeGeneration/      # Action Model -> Lua 代码生成
-    │   ├── Anjian.ProjectSystem/       # 工程模型、保存、加载、迁移、原子写入
-    │   └── Anjian.Imaging/             # P1：截图、找图、找色（暂不实现）
-    └── tests/
-        ├── Anjian.Core.Tests/
-        ├── Anjian.Scripting.Tests/
-        ├── Anjian.Automation.Tests/
-        ├── Anjian.Recorder.Tests/
-        └── Anjian.Windows.IntegrationTests/
+    │   ├── Anjian.App/                 # WinForms：MainForm、FloatingForm、托盘、Hook、脚本与播放协调
+    │   └── Anjian.Core/                # 播放选项等共享模型
+    ├── tests/
+    │   └── Anjian.Core.Tests/          # 当前 7 项自动化测试
+    ├── docs/                           # 产品、架构、API、录制、验收和交接资料
+    └── .github/workflows/              # Windows CI / self-contained 发布流程
 
-实际创建项目文件前，先验证 WinForms、Lua 绑定、编辑器和输入采集依赖；不要为了让目录看起来完整而提前创建未验证的项目引用。
+目前没有独立的 Anjian.Scripting、Anjian.Automation、Anjian.Recorder、Anjian.ProjectSystem 或 Imaging 项目；NLua Host、播放、录制和输入适配目前主要位于 Anjian.App 中。不要在接手时假设这些拆分项目已经存在。
+
+### 2.2 后续目标模块（规划，不代表当前已落地）
+
+    App
+      ├── Core
+      ├── Scripting
+      ├── Automation
+      ├── Windows.Input
+      ├── Recorder
+      ├── CodeGeneration
+      ├── ProjectSystem
+      └── Imaging（P1）
+
+只有在一个模块需要独立测试、复用或明确隔离时才逐步拆分；避免为追求目录结构而一次性重构。
 
 ## 3. 依赖方向
 
@@ -139,7 +147,7 @@ Lua 环境默认不开放任意 .NET 类型导入、程序集加载、文件系�
 
 物理输入源 -> 标准化 InputEvent -> 有界队列 -> 配对与动作合并 -> RecorderDocument -> 动作列表 UI / Lua Code Generator。
 
-低级钩子回调可能因超时被系统移除；官方文档建议回调轻量并快速转交处理，且许多场景应评估 Raw Input。因此录制输入源最终选型必须经 PoC，不预先认定一定采用低级钩子。
+preview.4 当前采用低级鼠标/键盘 Hook，已纳入 Windows CI 编译与自动化发布；CI 不验证实际桌面钩子是否稳定安装。低级钩子回调可能因超时被系统移除，用户必须实测漏录/重复、Hook 安装与卸载、长时间录制和安全软件冲突。若实机暴露可靠性问题，再将 Raw Input 作为下一轮技术替代方案，不要在没有复现证据时重写采集器。
 
 ## 9. 工程与脚本存储
 
@@ -166,8 +174,9 @@ Lua 环境默认不开放任意 .NET 类型导入、程序集加载、文件系�
 ## 10. 依赖策略
 
 - 目标框架 net10.0-windows / WinForms / win-x64。
-- Lua 绑定、编辑器组件、Dock 组件、图像库都必须做小型可运行 PoC。
-- 通过 PoC 后才锁定具体 NuGet 版本，并记录许可证、上游地址、原生依赖、运行时兼容性和更新策略。
+- Lua 绑定当前采用 NLua 1.7.9，已验证运行时为 Lua 5.4、C# 全局函数注册调用和 instruction-count hook；Windows CI 测试通过。
+- 当前编辑器是 WinForms RichTextBox 基础文本框，没有语法高亮/补全；Scintilla 等编辑器尚未采用。
+- 后续引入编辑器/Dock/图像库时仍需先做 PoC 并记录许可证、原生依赖和发布兼容性。
 - 不在业务层直接调用第三方 Lua/编辑器类型。
 - 发布时优先 self-contained win-x64 文件夹 ZIP；单文件发布作为单独验证项。
 

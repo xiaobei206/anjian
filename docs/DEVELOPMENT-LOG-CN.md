@@ -240,7 +240,7 @@ TV-01：Lua 5.4 / .NET 10 绑定与中断机制 PoC。
 - 用户 Windows 实机点击坐标录制、暂停续录、紧凑 UI、置顶与坐标刷新：NOT RUN。
 
 
-## 2026-11-12 — S005 — 独立悬浮窗、系统托盘与应用图标（preview.4 开发中）
+## 2026-11-12 — S005 — 独立悬浮窗、系统托盘与应用图标（preview.4 已发布）
 
 ### 用户反馈与产品决策
 - preview.3 的“悬浮模式/完整模式”其实是同一个 MainForm 中切换面板，悬浮窗不独立；完整模式会让悬浮面板消失。
@@ -263,9 +263,10 @@ TV-01：Lua 5.4 / .NET 10 绑定与中断机制 PoC。
 - ZIP：`Anjian2026-0.1.0-preview.4-win-x64.zip`，51,910,925 bytes；SHA256 `6b59ab27f825aa48b2ec5343cec826ad8b0ded759e9989af02d51f8b949f09aa`。
 - Windows 10/11 实机窗口、托盘和图标验收仍为 NOT RUN。
 
-### 验证
-- 源码结构检查：已完成。
-- Windows 构建、测试、打包：待执行。
-- Windows 10/11 实机窗口/托盘/图标验收：NOT RUN。
-
-- CI 通过后的发布触发提交：`release: publish v0.1.0-preview.4`；Release workflow 再次从该提交构建并创建 prerelease。
+### 最终验证与发布结论
+- 代码/构建/测试/便携发布/ZIP/SHA256/Release：PASS。
+- Release workflow run：`43253611158`，SUCCESS。
+- Release：<https://github.com/xiaobei206/anjian/releases/tag/v0.1.0-preview.4>
+- ZIP：`Anjian2026-0.1.0-preview.4-win-x64.zip`，51,910,925 bytes。
+- ZIP SHA256：`6b59ab27f825aa48b2ec5343cec826ad8b0ded759e9989af02d51f8b949f09aa`。
+- Windows 10/11 实机窗口、托盘、图标、Hook、长时间稳定性验收：NOT RUN。

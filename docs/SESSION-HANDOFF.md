@@ -8,8 +8,9 @@
 - Release：https://github.com/xiaobei206/anjian/releases/tag/v0.1.0-preview.4
 - Release commit：`08886d9e66c08ba24f6f1b7d9e91bbdaeba8a9e0`
 - 发布 Actions run：`43253611158`，结论 SUCCESS。
-- 最新代码提交：`08886d9e66c08ba24f6f1b7d9e91bbdaeba8a9e0`。
-- 当前唯一未完成事项：用户在 Windows 10/11 实机验收窗口、托盘与图标行为。
+- 最新产品代码/release commit：`08886d9e66c08ba24f6f1b7d9e91bbdaeba8a9e0`。
+- 当前最新 main HEAD（文档校准提交前）：`b477c387ca87b0f72acf804b54f0b64f4cf84aad`。
+- 当前阶段：preview.4 的 CI/发布已完成；下一步优先 Windows 实机验收和稳定性验证，不要默认用户已经完成验收。
 
 ## preview.4 窗口与托盘决策
 - 悬浮窗和完整主窗口必须是两个独立顶层窗口，可以同时显示；打开主窗口不替换或隐藏悬浮窗。
@@ -72,7 +73,7 @@
 - self-contained win-x64 publish：SUCCESS。
 - ZIP/SHA256 package：SUCCESS。
 - Release ZIP SHA256 已通过实际解包 Actions artifact 并运行 `sha256sum -c` 核验。
-- 正式 prerelease v0.1.0-preview.3 已成功创建。
+- 正式 prerelease v0.1.0-preview.3 已成功创建（历史版本）。
 - 第一轮 Release 构建曾因 `MainForm.cs` 的 nullable warning-as-error 失败；加上 `_current is null` 守卫后，修复提交 `2eacde0c12f9616e4f37d209c929c1b473edab43` 的 CI 通过，随后以新 release commit 完成发布。
 
 ## 仍未完成（务必如实）
@@ -90,7 +91,8 @@
 - 主窗口右上角 × 与“返回悬浮窗”都隐藏主窗口并移除任务栏按钮，不退出进程；托盘菜单负责恢复窗口或退出。
 - 悬浮窗可直接设置循环次数与轮间隔，并与主窗口共用设置及持久化。
 - 自定义多尺寸 ICO 已提交为 `src/Anjian.App/Resources/Anjian2026.ico`；csproj 设置 `ApplicationIcon`，主窗体、悬浮窗和 NotifyIcon 使用相同 EXE 图标资源。Windows CI 已成功编译，实机小尺寸可辨性仍待用户确认。
-- 当前代码尚未经过 Windows CI 编译、自动化测试和 Windows 实机验收，不能标记为通过。
+- Windows CI 编译、7 项自动化测试、self-contained 发布、ZIP/SHA256 和 Release 创建：PASS（Actions run `43253611158`）。
+- Windows 10/11 实机手工验收：NOT RUN；CI 成功不代表桌面窗口、托盘、Hook 或图标实机通过。
 
 ## 下一步唯一任务
 用户下载 v0.1.0-preview.4，在 Windows 10/11 实机验收：

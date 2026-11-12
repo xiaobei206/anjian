@@ -10,6 +10,21 @@ v0.1.0-preview.4 已正式发布。Windows CI 的 Restore、Build、7 项测试�
 ZIP SHA256：`6b59ab27f825aa48b2ec5343cec826ad8b0ded759e9989af02d51f8b949f09aa`。
 使用说明：[首版使用说明](docs/USER-GUIDE-CN.md)。
 
+## 项目完整大纲与接手资料
+
+- [产品需求与完整功能范围（PRD）](docs/PRD-CN.md)
+- [路线图与阶段状态](docs/ROADMAP-CN.md)
+- [技术架构与模块边界](docs/ARCHITECTURE-CN.md)
+- [Lua 5.4 命令 API 规格](docs/LUA-API-CN.md)
+- [录制器与动作/代码生成设计](docs/RECORDER-DESIGN-CN.md)
+- [架构决策记录（ADR）](docs/DECISIONS-CN.md)
+- [技术选型与 PoC 验证清单](docs/TECHNICAL-VALIDATION-CN.md)
+- [验收测试清单](docs/ACCEPTANCE-TEST-CN.md)
+- [当前会话交接（新 GPT 必读）](docs/SESSION-HANDOFF.md)
+- [GPT 会话协作协议](docs/SESSION-PROTOCOL-CN.md)
+- [新 GPT 最短接手提示词](docs/SESSION-START-PROMPT-CN.md)
+- [累计开发日志](docs/DEVELOPMENT-LOG-CN.md)
+
 ## 首版目标
 
 - 本地 Lua 脚本列表：新建、打开、保存、重命名、复制、删除；支持右键菜单。

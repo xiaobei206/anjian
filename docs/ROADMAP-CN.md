@@ -49,5 +49,5 @@
 - [x] 系统托盘菜单提供重新打开主窗口、显示/隐藏悬浮窗和退出程序
 - [x] 悬浮窗直接编辑循环次数与轮间隔，设置与主窗口双向同步
 - [x] 自定义多尺寸 ICO 已嵌入 EXE，并用于主窗体和托盘
-- [x] Windows CI 编译、7 项测试、self-contained 发布和 ZIP/SHA256 打包通过（run 43253075450）
+- [x] Windows Release workflow 编译、7 项测试、self-contained 发布、ZIP/SHA256 和 prerelease 创建通过（run 43253611158）
 - [ ] Windows 实机验收：窗口切换、托盘退出、DPI/多屏位置和图标可见性

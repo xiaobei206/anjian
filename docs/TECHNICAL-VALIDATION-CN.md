@@ -1,16 +1,19 @@
 # 技术选型与 PoC 验证清单
 
-## 1. 当前技术路线（候选，不代表所有依赖已经冻结）
+- 当前可运行版本：v0.1.0-preview.4。
+- 本文区分“已采用并验证”“已采用但待实机验收”“未来候选”，旧 PoC 计划不代表当前依赖仍未选型。
+
+## 1. 当前技术路线
 
 | 层 | 当前候选 | 状态 |
 |---|---|---|
 | Framework | .NET 10 LTS / net10.0-windows | 已确认目标大版本 |
 | UI | WinForms | 已确认方向 |
 | Lua | Lua 5.4 | 已确认语言版本 |
-| Lua/.NET 绑定 | NLua + KeraLua | 待 PoC |
-| 代码编辑器 | Scintilla.NET 系列候选 | 待比较/PoC |
+| Lua/.NET 绑定 | NLua 1.7.9 / Lua 5.4 | 已采用；Lua 版本、C# 注册函数、指令计数钩子在 Windows CI 测试通过 |
+| 代码编辑器 | WinForms RichTextBox | 当前基础编辑器；无高亮/补全，后续可做 Scintilla PoC |
 | 输入 | Windows SendInput | 已确定首版前台输入方向 |
-| 录制 | Raw Input 与低级钩子比较 | 待 PoC |
+| 录制 | WH_MOUSE_LL / WH_KEYBOARD_LL 低级钩子 | 当前已实现；实际 Windows Hook 稳定性待用户验收；Raw Input 是备选改进方向 |
 | 图像 | 截屏 + 模板匹配 | P1，暂不选库 |
 
 禁止只凭 NuGet 包页面或 README 宣称组件兼容。每个候选都要在真实 net10.0-windows x64 WinForms 小程序中构建、运行、发布并验证。
@@ -24,6 +27,12 @@
 - https://learn.microsoft.com/dotnet/core/releases-and-support
 
 ## 3. Lua 运行时 PoC（任务 TV-01）
+
+### 当前验证结论（preview.4）
+- NLua 1.7.9 已接入项目，脚本运行在独立 worker 子进程中，使用 named pipe 与主进程通信。
+- Windows CI 已验证 Lua 5.4 运行时、Lua 调用 C# 注册的全局函数，以及 instruction-count hook。
+- 当前 7 项自动化测试覆盖播放选项/循环间隔和 Lua 运行时基础行为。
+- 尚未由此证明 2 小时稳定性、所有异常路径或恶意脚本隔离；本机脚本环境不是安全沙箱。
 
 候选：
 - Lua 5.4 官方手册：https://www.lua.org/manual/5.4/
@@ -68,6 +77,11 @@
 输出：对比表、最小 POC 工程、构建日志、许可证链接、推荐结果。未经验证不锁定组件。
 
 ## 5. Windows 输入 PoC（任务 TV-03）
+
+### 当前验证结论（preview.4）
+- 输入注入已采用 SendInput / SetCursorPos，并维护按下状态，在停止/退出路径执行释放。
+- 录制和全局快捷键已采用低级 Windows Hook；CI 只验证编译，不等于 Hook 实机稳定性通过。
+- Raw Input 不属于当前实现；如实机测试出现漏录、重复或 Hook 被系统移除，再依据日志和复现条件开展替换评估。
 
 官方文档：
 - SendInput：https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-sendinput
