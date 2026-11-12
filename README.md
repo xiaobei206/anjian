@@ -72,6 +72,14 @@ Log("本轮完成")
 
 长按使用 LeftDown() / Delay(500) / LeftUp()。Delay() 可暂停和停止；点击和按键动作收到停止请求时会在清理路径中释放。
 
+## API 注册表与函数手册生成
+
+- 唯一机器可读来源：`src/Anjian.Core/Api/lua-api-registry.json`，嵌入到 Anjian.Core 供运行时直接读取。
+- Lua 全局 API 由注册表生成；C# 内部桥接名不会作为公开 API 暴露。
+- 未来 IDE 补全/参数提示/命令面板应直接读取 `LuaApiRegistry.Load()`；对应 UI 尚未实现。
+- 重新生成手册：`dotnet run --project tools/Anjian.ApiDocsGenerator -c Release -- --write`。
+- 检查手册漂移：`dotnet run --project tools/Anjian.ApiDocsGenerator -c Release -- --check`。
+
 ## 当前限制
 
 - 这是早期预览版，编辑器暂为基础文本编辑框，尚无语法高亮/补全。
@@ -87,6 +95,8 @@ PowerShell commands:
 dotnet restore Anjian2026.sln
 dotnet build Anjian2026.sln -c Release --no-restore
 dotnet test tests/Anjian.Core.Tests/Anjian.Core.Tests.csproj -c Release
+dotnet run --project tools/Anjian.ApiDocsGenerator -c Release -- --write
+dotnet run --project tools/Anjian.ApiDocsGenerator -c Release -- --check
 dotnet publish src/Anjian.App/Anjian.App.csproj -c Release -r win-x64 --self-contained true
 
 版本号见 VERSION。Windows 构建与测试由 .github/workflows/windows-build.yml 执行。

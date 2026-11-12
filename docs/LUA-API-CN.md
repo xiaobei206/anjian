@@ -154,6 +154,12 @@ end
 
 ## 8. API 注册与兼容
 
+- 唯一机器可读来源：`src/Anjian.Core/Api/lua-api-registry.json`，登记 22 个当前公开函数的稳定 ID、分类、签名、参数 schema、默认值/范围、返回值/错误、暂停/取消、坐标/权限、示例、实现状态和版本。
+- `Anjian.Core.Api.LuaApiRuntime` 从该注册表生成 Lua 全局包装；内部 `__...` 桥接绑定在包装闭包建立后隐藏。
+- `docs/FUNCTION-REFERENCE-CN.md` 第 2 节由 `tools/Anjian.ApiDocsGenerator` 生成；使用 `--write` 更新，`--check` 验证是否漂移。
+- 注册表只包含真实当前实现。窗口、图色、OCR 等候选仍在目标设计区，不会被标记为当前可用。
+- 后续 IDE 补全/参数提示/命令面板应读取 `LuaApiRegistry.Load().Categories` 与 `.Apis`，禁止另建静态函数清单。
+
 - API 注册中心维护命令标识、中文名、分类、参数 schema、默认值、返回值、示例、最低 API 版本和弃用状态。
 - 编辑器补全、参数提示、命令面板和文档从同一注册描述生成。
 - 已发布 API 不随意改名或改变参数语义。

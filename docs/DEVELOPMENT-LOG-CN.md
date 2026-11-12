@@ -319,3 +319,24 @@ TV-01：Lua 5.4 / .NET 10 绑定与中断机制 PoC。
 
 ### 下一会话唯一任务
 M2：实现单一机器可读 API 注册表，并使函数/参数手册可以自动生成/一致性校验。先盘点当前真实 Lua 绑定；不要因计划手册列出了候选函数就添加空壳或宣称功能可用。用自动化测试核对公开函数、注册表、参数默认值和生成文档。
+
+
+## 2026-11-13 — M2 — 单一机器可读 API 注册表与手册生成（CI 待确认）
+
+### 真实实现盘点
+- `WorkerProgram.cs` 当前向脚本公开 22 个全局函数；`__MoveTo` 等属于内部 IPC 桥接，不是用户 API。
+- `MoveTo(x, y)` 保持虚拟桌面绝对物理像素语义，副屏负坐标合法。
+- 发现 `MouseWheel(delta)` 旧实现会截断小数，且 `Hotkey()` 允许空参数无动作。本轮改为拒绝非整数滚轮增量，且组合键至少需要一个按键。
+
+### 实现内容
+- 新增嵌入式注册表 `src/Anjian.Core/Api/lua-api-registry.json`，记录 22 个真实 API 的稳定 ID、分类、签名、参数顺序/类型/必填/默认值/范围/单位/枚举、返回值、错误、执行/取消/坐标/权限语义、示例、状态和引入版本。
+- Core 新增注册表模型、校验器和运行时 binder；worker 不再独立维护 API 绑定表。公开包装函数及内部桥接绑定由注册表驱动，内部桥接全局随后隐藏。
+- 把 Lua bridge 与窄 IPC 接口移入 Core，以记录型管道替身测试真实 NLua 调用，不会发送真实键鼠输入。
+- 新增 `tools/Anjian.ApiDocsGenerator` 的 `--write`/`--check` 命令；函数手册第 2 节生成式维护，规划函数仍位于目标设计章节。
+- 新增公开函数、运行时全局、桥接隐藏、默认参数、600000ms 边界、MouseWheel 整数契约、Hotkey 空参数和手册漂移测试；Windows workflow 增加生成文档一致性检查。
+
+### 验证状态
+- 实现提交：`0f7a80c24f18789833d7fbb92e4979da65ed261d`（`feat: add registry-driven Lua API contracts and handbook`）。
+- 当前执行环境无 .NET SDK，不能本地 Restore/Build/Test；本地验证：NOT RUN。
+- Windows Actions 对该提交/后续文档提交的 Restore/Build/Test/API 手册检查/self-contained publish/ZIP/SHA 结果待查询后补录。
+- Windows 10/11 实机验收、DPI/多屏及 2 小时稳定性仍为 NOT RUN；CI 不代替实机验收。
