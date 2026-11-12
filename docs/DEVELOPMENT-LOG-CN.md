@@ -392,3 +392,42 @@ M2 已 DONE。下一开发任务为 M3：完整 Lua IDE 基础。编辑器补全
 
 ### 下一步
 M3 已 DONE。下一会话唯一任务为 M4：Lua 调试器基础。必须实现真实断点、单步、运行到光标、变量观察和调用栈，禁止仅用日志显示冒充调试。M1 Windows 实机验收作为独立未完成事项继续保留，不阻塞 M4。
+
+
+## 2026-11-13 — M4 — Lua 调试器基础（实现已接入，Windows CI 验证中）
+
+### 实现内容
+- 新增 Core 调试模型与会话：LuaDebugBreakpoint / LaunchOptions / Command / Variable / Frame / Snapshot；使用 NLua 1.7.9 的 Lua Line + Count hook，断点在对应行执行前暂停。
+- 断点匹配规范化后的源码文件路径和 1-based 行号；支持 Continue、Step Into、Step Over、Step Out 和 Run To Cursor。Step Over / Out 基于当前 Lua 调用栈深度判断，不用固定延时或伪造行号。
+- 暂停时通过 KeraLua GetStack / GetInfo / GetLocal 读取真实栈帧与局部值，并读取 _G 中可读全局值；只把名称/类型/格式化文本快照发出，不把 LuaTable/LuaFunction 等对象暴露给 UI。
+- 快照限制：最多 32 个调用栈帧、每帧 96 个局部变量、100 个全局变量、字符串最多 512 个字符；table/function/thread/userdata 不展开并显示原因；不执行用户输入的 watch 表达式。
+- Worker 在启动握手中接收调试配置，暂停时通过同一命名管道发送 JSON 快照并等待 JSON 调试命令；Lua state 始终留在 worker 子进程/执行线程。
+- PlaybackRunner 增加调试挂起、命令提交、停止取消与结束事件；保留普通播放原有 Count hook、暂停检查点、Stop 杀 worker 以及 ReleaseAllOwnedInputs。
+- WinForms 编辑器 gutter 提供断点圆点和当前执行行标记；主窗口新增调试按钮、调用栈和局部/全局变量面板。
+- 新增 LuaDebugSessionTests：断点命中行、嵌套调用 Step Into/Over/Out 顺序、Run To Cursor、局部/全局变量快照、table 不展开和 DebugHook 清理。
+
+### 关键实现提交（均直接提交 main）
+- Core 调试会话：067f2d53f425bfd362b0581ff51feaff78c4befa。
+- Core 调试自动测试：7655d136f1cc8c1a5402171074c7a4cfa1a5ebf9。
+- Worker 调试握手：bfd5a2a2596e892abf2590db97b8060626c1127c。
+- Runner 命令/暂停 IPC：92bf7c6e11505836feaeaf1f6ff3d8268800a690。
+- IPC 消息 DTO：de0454980ab425c3edc893c833355bde420d86ad。
+- 编辑器断点 gutter：3e1e9fcc017f844321996f7ad9870744967273c2。
+- 主窗口调试面板：f34daf3c40374c6e72e71eeb0afbc54198cbecc9。
+- 调试工具栏状态/变量显示修正：128d51d5472604b7aef5f6b7d49ce5f3b8c5c933、7e7b93a5abf42ac43d4e1882215e5b4d21a7b859。
+- 单步嵌套测试和空脚本边界修正：46e1f21ef15644e54e6be3b0d3e4953755e3a0b7、7cdceee2884ad9c38aeb006dfdf99406dac2b86f。
+- CI 命名冲突修复：66eebe01cd73ab921438a4bde507af045f514c5e。
+- Lua 行号预期 / xUnit Assert.Single analyzer 修复：de3fcf78c2e7cd1d63c77fc24d26517164d052e0、edac117255cefbad94874b0c34329325e7c41678。
+- M4 功能矩阵/架构/验收/路线图/用户指南文档提交：e3aacc49c5010093b42aefc5769a497ecb9a31da、bc7f39d2a961dcb2a25feaa02c7bb97d0f407039、0f8738c986afb8620eb26204ca16b26307663575、f58e54df72c12329a8a8a0002710b4b80fb71982、d73c6474682ad9e321bb14386fdc1663a1e9555d。
+
+### Windows CI 反馈与当前状态
+- Actions run 43289601917 首次编译反馈 Core 代码中 LuaFunction 同时来自 KeraLua 与 NLua；以 NLua.LuaFunction 限定后，Core 和 App 项目可继续编译。
+- Actions run 43290120386 的 Restore PASS，Core/App 编译通过，但测试项目 Build 被 xUnit2031 analyzer 阻断：两处 Assert.Single(collection.Where(...)) 必须使用 Assert.Single(collection, predicate)；已在 commit edac117255cefbad94874b0c34329325e7c41678 修复。
+- 修复后 Actions run 43290603954（commit edac117255cefbad94874b0c34329325e7c41678）与 run 43290697650（commit f58e54df72c12329a8a8a0002710b4b80fb71982）曾显示 in progress；随后路线图提交 d73c6474682ad9e321bb14386fdc1663a1e9555d 也触发了新的 Windows workflow。最终通过/失败结果尚需回读 Actions，不得把前述编译部分通过写成整体验收通过。
+- 本轮本地执行容器没有 .NET SDK（dotnet command not found），本地 Restore/Build/Test：NOT RUN。真实构建和测试由 Windows GitHub Actions 执行。
+- Windows 桌面手工验收尚未执行：M1 preview.4 窗口/托盘/Hook/DPI/多屏/长时稳定性、M3 编辑器交互、M4 断点/变量面板均为 NOT RUN。CI 不代表桌面实机验收。
+- 本轮未创建新 Release；v0.1.0-preview.4 的 Release/ZIP/SHA256 不变。
+- 当前 M4 只提供基础 scalar snapshot；断点不跨关闭标签/重启持久化，watch 表达式和表展开未实现。功能矩阵 F05 仍标记“部分实现”，不得描述为完整调试器交付。
+
+### 下一步
+先等待最新 main HEAD 对应的 Windows Actions 全流程结果。若 Build/Test/PUBLISH/PACKAGE 全部通过，再把 M4 基础能力标为 CI DONE（桌面验收仍 NOT RUN）并将下一会话唯一任务切换到 M5 可视化录制/动作列表；若失败，继续修复 M4，不启动 M5。
