@@ -30,6 +30,16 @@ internal sealed class MainForm : Form
     private readonly Button _playButton = new();
     private readonly Button _pauseButton = new();
     private readonly Button _stopButton = new();
+    private readonly Button _debugStartButton = new();
+    private readonly Button _debugContinueButton = new();
+    private readonly Button _debugStepIntoButton = new();
+    private readonly Button _debugStepOverButton = new();
+    private readonly Button _debugStepOutButton = new();
+    private readonly Button _debugRunToCursorButton = new();
+    private readonly ListBox _debugCallStack = new();
+    private readonly DataGridView _debugVariables = new();
+    private readonly Label _debugSummary = new();
+    private LuaDebugSnapshot? _debugSnapshot;
     private readonly Panel _fullModePanel = new() { Dock = DockStyle.Fill };
     private readonly CheckBox _clickOnlyCheck = new() { Text = "只记录点击坐标", AutoSize = true, Checked = true };
     private readonly CheckBox _alwaysOnTopCheck = new() { Text = "悬浮窗始终置顶", AutoSize = true };
@@ -55,6 +65,7 @@ internal sealed class MainForm : Form
         public TabPage Page { get; } = page;
         public LuaEditorControl Editor { get; } = editor;
         public bool Dirty { get; set; }
+        public HashSet<int> Breakpoints { get; } = [];
     }
 
     public MainForm()
@@ -79,6 +90,8 @@ internal sealed class MainForm : Form
         });
         _playback.IterationChanged += (current, total) => Ui(() =>
             _progress.Text = total == 0 ? $"正在执行第 {current} 轮（无限）" : $"正在执行第 {current}/{total} 轮");
+        _playback.DebugPaused += snapshot => Ui(() => ShowDebugSnapshot(snapshot));
+        _playback.DebugSessionCompleted += () => Ui(ClearDebuggerView);
         _scripts.SelectedIndexChanged += (_, _) => SelectScript();
         _editorTabs.SelectedIndexChanged += (_, _) => HandleEditorTabSelectionChanged();
         _repeatCount.ValueChanged += (_, _) =>
@@ -152,6 +165,30 @@ internal sealed class MainForm : Form
         toolbar.Controls.Add(MakeButton("查找/替换", (_, _) => ShowSearchReplace()));
         toolbar.Controls.Add(MakeButton("检查语法", async (_, _) => await CheckCurrentSyntaxAsync()));
         toolbar.Controls.Add(MakeButton("关闭标签", (_, _) => CloseCurrentTab()));
+
+        _debugStartButton.Text = "启动调试";
+        _debugStartButton.Click += async (_, _) => await StartDebugAsync();
+        toolbar.Controls.Add(_debugStartButton);
+        _debugContinueButton.Text = "继续";
+        _debugContinueButton.Enabled = false;
+        _debugContinueButton.Click += (_, _) => SubmitDebugCommand(LuaDebugCommand.Continue);
+        toolbar.Controls.Add(_debugContinueButton);
+        _debugStepIntoButton.Text = "单步进入";
+        _debugStepIntoButton.Enabled = false;
+        _debugStepIntoButton.Click += (_, _) => SubmitDebugCommand(LuaDebugCommand.StepInto);
+        toolbar.Controls.Add(_debugStepIntoButton);
+        _debugStepOverButton.Text = "单步越过";
+        _debugStepOverButton.Enabled = false;
+        _debugStepOverButton.Click += (_, _) => SubmitDebugCommand(LuaDebugCommand.StepOver);
+        toolbar.Controls.Add(_debugStepOverButton);
+        _debugStepOutButton.Text = "单步跳出";
+        _debugStepOutButton.Enabled = false;
+        _debugStepOutButton.Click += (_, _) => SubmitDebugCommand(LuaDebugCommand.StepOut);
+        toolbar.Controls.Add(_debugStepOutButton);
+        _debugRunToCursorButton.Text = "运行到光标";
+        _debugRunToCursorButton.Enabled = false;
+        _debugRunToCursorButton.Click += (_, _) => RunToCursor();
+        toolbar.Controls.Add(_debugRunToCursorButton);
 
         toolbar.Controls.Add(new Label { Text = "重复次数", AutoSize = true, Margin = new Padding(12, 8, 2, 0) });
         _repeatCount.Minimum = 0;
@@ -230,10 +267,11 @@ internal sealed class MainForm : Form
         split.Panel1.Controls.Add(sideButtons);
 
         split.Panel2.Padding = new Padding(8, 6, 8, 6);
-        var right = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3 };
+        var right = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4 };
         right.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
-        right.RowStyles.Add(new RowStyle(SizeType.Percent, 70));
-        right.RowStyles.Add(new RowStyle(SizeType.Percent, 30));
+        right.RowStyles.Add(new RowStyle(SizeType.Percent, 57));
+        right.RowStyles.Add(new RowStyle(SizeType.Percent, 25));
+        right.RowStyles.Add(new RowStyle(SizeType.Percent, 18));
 
         var editorHeader = new Panel { Dock = DockStyle.Fill };
         var fileName = new Label
@@ -254,6 +292,50 @@ internal sealed class MainForm : Form
         _editorTabs.Padding = new Point(12, 4);
         _editorTabs.ShowToolTips = true;
         right.Controls.Add(_editorTabs, 0, 1);
+
+        var debugPanel = new Panel { Dock = DockStyle.Fill };
+        var debugHeader = new Panel { Dock = DockStyle.Top, Height = 26 };
+        debugHeader.Controls.Add(new Label
+        {
+            Text = "调试器：单击编辑器行号槽左侧圆点设置/取消断点",
+            Dock = DockStyle.Left,
+            AutoSize = true,
+            Font = new Font(Font, FontStyle.Bold)
+        });
+        _debugSummary.Dock = DockStyle.Right;
+        _debugSummary.AutoSize = true;
+        debugHeader.Controls.Add(_debugSummary);
+
+        var debugSplit = new SplitContainer
+        {
+            Dock = DockStyle.Fill,
+            Size = new Size(900, 160),
+            SplitterDistance = 270,
+            Panel1MinSize = 180,
+            Panel2MinSize = 300
+        };
+        _debugCallStack.Dock = DockStyle.Fill;
+        _debugCallStack.IntegralHeight = false;
+        _debugCallStack.SelectedIndexChanged += (_, _) => RefreshDebugVariables();
+        debugSplit.Panel1.Controls.Add(_debugCallStack);
+
+        _debugVariables.Dock = DockStyle.Fill;
+        _debugVariables.ReadOnly = true;
+        _debugVariables.AllowUserToAddRows = false;
+        _debugVariables.AllowUserToDeleteRows = false;
+        _debugVariables.AllowUserToResizeRows = false;
+        _debugVariables.RowHeadersVisible = false;
+        _debugVariables.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+        _debugVariables.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+        _debugVariables.Columns.Add("Scope", "范围");
+        _debugVariables.Columns.Add("Name", "变量");
+        _debugVariables.Columns.Add("Type", "类型");
+        _debugVariables.Columns.Add("Value", "值");
+        _debugVariables.Columns.Add("Limitation", "说明");
+        debugSplit.Panel2.Controls.Add(_debugVariables);
+        debugPanel.Controls.Add(debugSplit);
+        debugPanel.Controls.Add(debugHeader);
+        right.Controls.Add(debugPanel, 0, 2);
 
         var logPanel = new Panel { Dock = DockStyle.Fill };
         var logHeader = new Panel { Dock = DockStyle.Top, Height = 26 };
@@ -279,7 +361,7 @@ internal sealed class MainForm : Form
         _log.BackColor = Color.FromArgb(247, 248, 250);
         logPanel.Controls.Add(_log);
         logPanel.Controls.Add(logHeader);
-        right.Controls.Add(logPanel, 0, 2);
+        right.Controls.Add(logPanel, 0, 3);
 
         split.Panel2.Controls.Add(right);
         _fullModePanel.Controls.Add(split);
@@ -532,6 +614,12 @@ internal sealed class MainForm : Form
             editor.TextBox.Text = _repository.Read(entry);
             var page = new TabPage(entry.Name) { Tag = null, ToolTipText = entry.FullPath };
             var tab = new ScriptTab(entry, page, editor);
+            editor.SetBreakpoints(tab.Breakpoints);
+            editor.BreakpointToggled += line =>
+            {
+                if (!tab.Breakpoints.Add(line))
+                    tab.Breakpoints.Remove(line);
+            };
             page.Tag = tab;
             page.Controls.Add(editor);
             editor.ContentChanged += (_, _) =>
@@ -603,6 +691,13 @@ internal sealed class MainForm : Form
         _dirty = tab.Dirty;
         SetScriptListSelection(tab.Entry);
         UpdateTitle();
+        if (_debugSnapshot is not null &&
+            string.Equals(NormalizeScriptPath(_debugSnapshot.Source), NormalizeScriptPath(tab.Entry.FullPath),
+                StringComparison.OrdinalIgnoreCase))
+            tab.Editor.SetCurrentExecutionLine(_debugSnapshot.Line);
+        else
+            tab.Editor.SetCurrentExecutionLine(null);
+        UpdateDebuggerButtons(isPaused: _debugSnapshot is not null);
     }
 
     private void SetScriptListSelection(ScriptEntry? entry)
@@ -1055,7 +1150,150 @@ internal sealed class MainForm : Form
         _pauseButton.Text = "暂停";
         _status.Text = !_recordSessionActive ? "未运行" : _recordingPaused ? "正在录制…" : "录制已暂停";
         _progress.Text = "";
+        _scripts.Enabled = !_recordSessionActive;
+        _editorTabs.Enabled = true;
         UpdateRecordingUi();
+        UpdateDebuggerButtons(isPaused: false);
+    }
+
+    private async Task StartDebugAsync()
+    {
+        if (_recordSessionActive || _playback.IsRunning || _activeTab is null || _current is null || !SaveCurrent())
+            return;
+
+        var tab = _activeTab;
+        var scriptPath = tab.Entry.FullPath;
+        var breakpoints = tab.Breakpoints
+            .Order()
+            .Select(line => new LuaDebugBreakpoint(scriptPath, line))
+            .ToArray();
+        var launchOptions = new LuaDebugLaunchOptions(breakpoints);
+        var playbackOptions = new PlaybackOptions { RepeatCount = 1, IntervalMilliseconds = 0 };
+
+        ClearDebuggerView();
+        _scripts.Enabled = false;
+        _editorTabs.Enabled = false;
+        _status.Text = "正在启动调试…";
+        _debugSummary.Text = "等待 Lua 首个执行行…";
+        _stopButton.Enabled = true;
+        UpdateDebuggerButtons(isPaused: false);
+        AppendLog($"开始调试：{Path.GetFileName(scriptPath)}；断点 {breakpoints.Length} 个。");
+
+        try
+        {
+            _runTask = _playback.RunAsync(scriptPath, playbackOptions, launchOptions);
+            UpdateFloatingState();
+            await _runTask;
+        }
+        catch (Exception ex)
+        {
+            AppendLog("调试运行失败：" + ex);
+            MessageBox.Show(this, ex.Message, "调试失败", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+        finally
+        {
+            _runTask = null;
+            ClearDebuggerView();
+            SetIdle();
+        }
+    }
+
+    private void SubmitDebugCommand(LuaDebugCommand command)
+    {
+        if (!_playback.IsDebugging || _debugSnapshot is null)
+            return;
+
+        _debugSummary.Text = "继续执行中…";
+        _debugContinueButton.Enabled = false;
+        _debugStepIntoButton.Enabled = false;
+        _debugStepOverButton.Enabled = false;
+        _debugStepOutButton.Enabled = false;
+        _debugRunToCursorButton.Enabled = false;
+        _playback.SubmitDebugCommand(command);
+    }
+
+    private void RunToCursor()
+    {
+        if (_current is null || _activeTab is null)
+            return;
+
+        SubmitDebugCommand(LuaDebugCommand.RunToCursor(_current.FullPath, _activeTab.Editor.CaretLine));
+    }
+
+    private void ShowDebugSnapshot(LuaDebugSnapshot snapshot)
+    {
+        _debugSnapshot = snapshot;
+        _debugCallStack.BeginUpdate();
+        _debugCallStack.Items.Clear();
+        foreach (var frame in snapshot.Frames)
+        {
+            var location = string.IsNullOrWhiteSpace(frame.Source)
+                ? "(无源码位置)"
+                : $"{Path.GetFileName(frame.Source)}:{frame.Line}";
+            _debugCallStack.Items.Add($"{frame.Index}: {frame.Name} — {location}");
+        }
+        _debugCallStack.EndUpdate();
+        if (_debugCallStack.Items.Count > 0)
+            _debugCallStack.SelectedIndex = 0;
+
+        if (_activeTab is not null &&
+            string.Equals(NormalizeScriptPath(snapshot.Source), NormalizeScriptPath(_activeTab.Entry.FullPath),
+                StringComparison.OrdinalIgnoreCase))
+            _activeTab.Editor.SetCurrentExecutionLine(snapshot.Line);
+        else if (_activeTab is not null)
+            _activeTab.Editor.SetCurrentExecutionLine(null);
+
+        _debugSummary.Text = $"暂停于 {Path.GetFileName(snapshot.Source)}:{snapshot.Line}";
+        _status.Text = "调试已暂停";
+        AppendLog($"调试暂停：{Path.GetFileName(snapshot.Source)} 第 {snapshot.Line} 行。");
+        RefreshDebugVariables();
+        UpdateDebuggerButtons(isPaused: true);
+    }
+
+    private void RefreshDebugVariables()
+    {
+        _debugVariables.Rows.Clear();
+        if (_debugSnapshot is null)
+            return;
+
+        var selectedIndex = Math.Clamp(_debugCallStack.SelectedIndex, 0, Math.Max(0, _debugSnapshot.Frames.Count - 1));
+        if (_debugSnapshot.Frames.Count > 0)
+        {
+            foreach (var variable in _debugSnapshot.Frames[selectedIndex].Locals)
+                _debugVariables.Rows.Add("局部", variable.Name, variable.Type, variable.Value, variable.Limitation ?? "");
+        }
+
+        foreach (var variable in _debugSnapshot.Globals)
+            _debugVariables.Rows.Add("全局", variable.Name, variable.Type, variable.Value, variable.Limitation ?? "");
+    }
+
+    private void ClearDebuggerView()
+    {
+        _debugSnapshot = null;
+        _debugCallStack.Items.Clear();
+        _debugVariables.Rows.Clear();
+        _debugSummary.Text = "";
+        foreach (var tab in _openTabs.Values)
+            tab.Editor.SetCurrentExecutionLine(null);
+        UpdateDebuggerButtons(isPaused: false);
+    }
+
+    private void UpdateDebuggerButtons(bool isPaused)
+    {
+        var running = _playback.IsRunning;
+        var debugging = _playback.IsDebugging;
+        _debugStartButton.Enabled = !_recordSessionActive && !running && _activeTab is not null;
+        _debugContinueButton.Enabled = debugging && isPaused;
+        _debugStepIntoButton.Enabled = debugging && isPaused;
+        _debugStepOverButton.Enabled = debugging && isPaused;
+        _debugStepOutButton.Enabled = debugging && isPaused;
+        _debugRunToCursorButton.Enabled = debugging && isPaused && _activeTab is not null;
+    }
+
+    private static string NormalizeScriptPath(string path)
+    {
+        try { return Path.GetFullPath(path.TrimStart('@')); }
+        catch { return path; }
     }
 
     private void AppendLog(string text)
