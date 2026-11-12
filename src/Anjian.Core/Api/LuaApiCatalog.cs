@@ -117,7 +117,7 @@ public static class LuaApiRuntime
 {
  public static void Register(Lua lua,object bridge)
  {
-  ArgumentNullException.ThrowIfNull(lua);ArgumentNullException.ThrowIfNull(bridge);var r=LuaApiRegistry.Load();var bindings=r.Apis.SelectMany(a=>a.Runtime.Bindings).ToArray();var names=new HashSet<string>(StringComparer.Ordinal);
+  ArgumentNullException.ThrowIfNull(lua);ArgumentNullException.ThrowIfNull(bridge);lua.State.Encoding=Encoding.UTF8;var r=LuaApiRegistry.Load();var bindings=r.Apis.SelectMany(a=>a.Runtime.Bindings).ToArray();var names=new HashSet<string>(StringComparer.Ordinal);
   foreach(var b in bindings){if(!names.Add(b.Name))throw new InvalidDataException($"Duplicate bridge: {b.Name}");var method=bridge.GetType().GetMethod(b.Method,BindingFlags.Instance|BindingFlags.Public)??throw new InvalidDataException($"Missing bridge method: {b.Method}");if(method.ReturnType!=typeof(void))throw new InvalidDataException($"Bridge must return void: {b.Method}");lua.RegisterFunction(b.Name,bridge,method);}
   var source=new StringBuilder();foreach(var b in bindings)source.Append("local ").Append(b.LocalName).Append(" = ").Append(b.Name).Append('\n');if(!string.IsNullOrWhiteSpace(r.Runtime.Prelude))source.AppendLine(r.Runtime.Prelude);foreach(var a in r.Apis)source.Append(a.Name).Append(" = ").Append(a.Runtime.Definition).Append('\n');
   lua.DoString(source.ToString(),"@Anjian2026.ApiRegistry");foreach(var n in bindings.Select(b=>b.Name).Concat(r.Runtime.DisabledGlobals).Distinct(StringComparer.Ordinal))lua[n]=null;lua["luanet"]=null;
