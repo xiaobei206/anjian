@@ -346,25 +346,35 @@ internal sealed class WindowsWindowManager : IDisposable
 
     private bool IsCurrent(WindowReference reference)
     {
-        if (Volatile.Read(ref reference.Destroyed) != 0 || !IsWindow(reference.Handle))
-            return false;
-
-        var threadId = GetWindowThreadProcessId(reference.Handle, out var processId);
-        if (threadId != reference.ThreadId || processId != reference.ProcessId)
-            return false;
-
-        if (!string.Equals(ReadClassName(reference.Handle), reference.ClassName, StringComparison.Ordinal))
-            return false;
-
-        if (reference.ProcessStartTicks == 0)
-            return true;
-
         try
         {
+            if (Volatile.Read(ref reference.Destroyed) != 0 || !IsWindow(reference.Handle))
+                return false;
+
+            var threadId = GetWindowThreadProcessId(reference.Handle, out var processId);
+            if (threadId != reference.ThreadId || processId != reference.ProcessId)
+                return false;
+
+            if (!string.Equals(ReadClassName(reference.Handle), reference.ClassName, StringComparison.Ordinal))
+                return false;
+
+            if (reference.ProcessStartTicks == 0)
+                return true;
+
             using var process = Process.GetProcessById(checked((int)reference.ProcessId));
             return process.StartTime.ToUniversalTime().Ticks == reference.ProcessStartTicks;
         }
-        catch
+        catch (Win32Exception)
+        {
+            // The HWND may be destroyed between IsWindow and one of the metadata calls.
+            return false;
+        }
+        catch (ArgumentException)
+        {
+            // The owning process may exit while validating its reference.
+            return false;
+        }
+        catch (InvalidOperationException)
         {
             return false;
         }
