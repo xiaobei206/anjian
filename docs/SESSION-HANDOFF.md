@@ -8,7 +8,8 @@
 - Release：https://github.com/xiaobei206/anjian/releases/tag/v0.1.0-preview.4
 - Release commit：`08886d9e66c08ba24f6f1b7d9e91bbdaeba8a9e0`
 - 发布 Actions run：`43253611158`，结论 SUCCESS。
-- 最新产品代码/release commit：`08886d9e66c08ba24f6f1b7d9e91bbdaeba8a9e0`。
+- v0.1.0-preview.4 发布包对应代码 commit：`08886d9e66c08ba24f6f1b7d9e91bbdaeba8a9e0`。
+- M3 当前 main 开发代码验收基线：`71fd493cad0fbed1451a4ffa46192752a18bd0a6`（Windows Actions run `43282795272` PASS）；接手时仍须重新核对 main HEAD。
 - main 分支可能继续产生文档提交；新 GPT 接手时必须重新查询 main 最新 HEAD，不要把 handoff 中的历史提交 SHA 当成分支当前头部。
 - 当前阶段：M0/M2/M3 已完成；M1 Windows 实机验收仍 IN_PROGRESS/NOT RUN；M3 Lua IDE 基础已通过 Windows CI，桌面手工验收待执行；下一开发阶段为 M4 Lua 调试器。
 

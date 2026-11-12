@@ -70,7 +70,7 @@ M2 验收：当前实现中的 22 个公开函数均可在注册表和手册中�
 ### Windows CI 验证
 - 最终代码验收基线：`71fd493cad0fbed1451a4ffa46192752a18bd0a6`；Actions run `43282795272`：SUCCESS。
 - Restore PASS；Release Build PASS（0 warnings / 0 errors）；自动化测试 **20 passed / 0 failed / 0 skipped**；API handbook `--check` PASS；self-contained win-x64 publish PASS；ZIP/SHA256 package PASS；artifact upload PASS。
-- 前期测试曾因签名提示测试夹具把光标前的字符串逗号误算为外层参数，出现 1 项断言失败；修正夹具后又补上表构造器 `{} ` 及 `[]` / `()` 嵌套逗号处理与回归测试，最终主线运行全部通过。UI 集成相关 Build 均通过。
+- 前期测试曾因签名提示测试夹具把光标前的字符串逗号误算为外层参数，出现 1 项断言失败；修正夹具后又补上表构造器 `{}`、`[]` / `()` 嵌套逗号处理与回归测试，最终主线运行全部通过。UI 集成相关 Build 均通过。
 - 本执行环境未安装 .NET SDK，故本地 Restore/Build/Test 为 NOT RUN；上述结果仅来自 Windows GitHub Actions runner。
 - 本轮没有创建 release，已发布的 v0.1.0-preview.4 资产没有更新；新 IDE 功能目前只在 main 未发布代码中。
 
