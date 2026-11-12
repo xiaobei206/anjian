@@ -394,7 +394,7 @@ M2 已 DONE。下一开发任务为 M3：完整 Lua IDE 基础。编辑器补全
 M3 已 DONE。下一会话唯一任务为 M4：Lua 调试器基础。必须实现真实断点、单步、运行到光标、变量观察和调用栈，禁止仅用日志显示冒充调试。M1 Windows 实机验收作为独立未完成事项继续保留，不阻塞 M4。
 
 
-## 2026-11-13 — M4 — Lua 调试器基础（实现已接入，Windows CI 验证中）
+## 2026-11-13 — M4 — Lua 调试器基础（Windows CI PASS；桌面验收 NOT RUN）
 
 ### 实现内容
 - 新增 Core 调试模型与会话：LuaDebugBreakpoint / LaunchOptions / Command / Variable / Frame / Snapshot；使用 NLua 1.7.9 的 Lua Line + Count hook，断点在对应行执行前暂停。
@@ -423,12 +423,13 @@ M3 已 DONE。下一会话唯一任务为 M4：Lua 调试器基础。必须实�
 ### Windows CI 反馈与当前状态
 - Actions run 43289601917 首次编译反馈 Core 代码中 LuaFunction 同时来自 KeraLua 与 NLua；以 NLua.LuaFunction 限定后，Core 和 App 项目可继续编译。
 - Actions run 43290120386 的 Restore PASS，Core/App 编译通过，但测试项目 Build 被 xUnit2031 analyzer 阻断：两处 Assert.Single(collection.Where(...)) 必须使用 Assert.Single(collection, predicate)；已在 commit edac117255cefbad94874b0c34329325e7c41678 修复。
-- 修复后 Actions run 43290603954（commit edac117255cefbad94874b0c34329325e7c41678）Restore/Build PASS（0 warnings / 0 errors），但 25 项测试为 24 passed / 1 failed。run 43290697650（commit f58e54df72c12329a8a8a0002710b4b80fb71982）重复得到相同测试结果。唯一失败为 StepIntoOverAndOutFollowNestedLuaCallFrames：测试一开始只发送 Continue，未设置后续断点，实际运行只在初始停点暂停一次；问题属于测试用例未在后续执行点建立控制入口，不是 CI 编译故障。
+- 修复后 Actions run 43290603954 / 43290697650 的 Restore/Build 均 PASS（0 warnings / 0 errors），但初版单步测试夹具未在 Continue 后设置后续断点，导致 24 passed / 1 failed。该失败是测试未提供下一步控制停点，并非运行时编译问题；随后在 commit ca56ef49feb531ab314b7ac446bddf1f99dc8fb5 将真实断点加在外层函数调用行，再按 Step Into / Step Over / Step Out 验证完整停点序列。
 - 本轮本地执行容器没有 .NET SDK（dotnet command not found），本地 Restore/Build/Test：NOT RUN。真实构建和测试由 Windows GitHub Actions 执行。
-- 已在 commit ca56ef49feb531ab314b7ac446bddf1f99dc8fb5 将嵌套步进测试修正为在 main 脚本第 9 行设置真实断点，之后依次执行 Step Into / Step Over / Step Out，并验证最终停点为外层函数后及主脚本后续行。该测试修正对应 Actions run 43291044845；本轮更新时尚未完成，必须继续核实。
+- 已在 commit ca56ef49feb531ab314b7ac446bddf1f99dc8fb5 将嵌套步进测试修正为在 main 脚本第 9 行设置真实断点，之后依次执行 Step Into / Step Over / Step Out，并验证最终停点为外层函数后及主脚本后续行。Actions run 43291044845：SUCCESS（Restore / Build / Test / API check / win-x64 publish / ZIP+SHA256 / artifact upload 全部 PASS）；25 passed / 0 failed / 0 skipped。
+- 最终主线验证：commit ab90b96f59deb173874c8aba819a9fc95288f8cf 对应 Windows Actions run 43291175992：SUCCESS。Restore PASS；Release Build 0 warnings / 0 errors；自动化测试 25 passed / 0 failed / 0 skipped；API handbook --check PASS；self-contained win-x64 publish PASS；ZIP/SHA256 PASS；artifact upload PASS。SHA256：1d37a3210e22646fd781a2803a17f40058d97f5c1e16845cef7d5d24059af8c4；Artifact ID 13976519155，51,794,098 bytes。Release version / Create Release 因本轮非 release 提交而跳过；preview.4 资产未改变。
 - Windows 桌面手工验收尚未执行：M1 preview.4 窗口/托盘/Hook/DPI/多屏/长时稳定性、M3 编辑器交互、M4 断点/变量面板均为 NOT RUN。CI 不代表桌面实机验收。
 - 本轮未创建新 Release；v0.1.0-preview.4 的 Release/ZIP/SHA256 不变。
 - 当前 M4 只提供基础 scalar snapshot；断点不跨关闭标签/重启持久化，watch 表达式和表展开未实现。功能矩阵 F05 仍标记“部分实现”，不得描述为完整调试器交付。
 
 ### 下一步
-先等待最新 main HEAD 对应的 Windows Actions 全流程结果。若 Build/Test/PUBLISH/PACKAGE 全部通过，再把 M4 基础能力标为 CI DONE（桌面验收仍 NOT RUN）并将下一会话唯一任务切换到 M5 可视化录制/动作列表；若失败，继续修复 M4，不启动 M5。
+M4 基础调试器已完成 Windows CI 验收。下一会话唯一任务切换为 M5：可视化录制/动作列表。M1、M3、M4 的 Windows 桌面实机验收仍分别保留为 NOT RUN。

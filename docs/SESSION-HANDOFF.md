@@ -149,34 +149,67 @@
 - 早期有一项签名提示测试因测试夹具逗号位置错误失败；修正夹具后最终 run `43282795272` 通过。前期错误不隐藏，最终状态以该次最新成功运行作为验收依据。
 - M3 未创建 Release，v0.1.0-preview.4 Release ZIP/SHA256 未改变。代码折叠不在该 handoff 强制范围，功能矩阵 F04 仍为部分实现；M4 调试器未实现。
 
-### 下一会话唯一任务（M4：完成 Lua 调试器基础验收）
+### M4 完成记录（基础调试器 CI DONE；桌面实机验收 NOT RUN）
 
-M4 的基础代码已经接入 main，当前请继续围绕 M4 收尾，不要提前开始 M5。已经实现的内容和提交索引见 docs/DEVELOPMENT-LOG-CN.md 的 M4 小节。
+M4 基础调试器已在 main 实现并通过 Windows CI。具体实现提交与早期失败/修复记录见 docs/DEVELOPMENT-LOG-CN.md 的 M4 小节。
 
-#### 已接入的代码能力
-- Core LuaDebugSession 使用 NLua/KeraLua 真实 Line + Count hook；首行暂停、文件/行号断点、Continue、Step Into/Over/Out、Run To Cursor。
-- 调试快照在 worker 的 Lua 执行线程读取，序列化后通过现有命名管道送到主 UI；UI 不接触 Lua state 或 NLua/KeraLua 对象。
-- 局部变量、可读全局变量和调用栈快照；标量格式化、数量/字符串上限；table/function/thread/userdata 不展开。
-- 编辑器断点 gutter 和当前行标记，MainForm 调试控制、调用栈及变量窗。
-- 已有 Core 自动测试覆盖断点、嵌套函数步进、Run To Cursor、变量快照、不可展开值和 Hook Dispose。
+#### 已交付
+- Core LuaDebugSession 使用 NLua/KeraLua 真实 Line + Count hook，支持首个执行行暂停、文件/行号断点、Continue、Step Into / Step Over / Step Out 和 Run To Cursor。
+- 暂停后获取当前执行行、调用栈、局部变量和可读全局变量；快照转成纯文本数据后通过命名管道发送给 UI。Lua state 始终留在 worker 执行线程。
+- 编辑器 gutter 断点圆点、当前执行行标记；MainForm 调试控制、调用栈和变量窗。
+- 标量变量安全格式化；32 栈帧、每帧 96 局部变量、100 全局变量、512 字符上限；table/function/thread/userdata 不展开，不执行任意 watch 表达式。
+- 正常播放继续使用既有 worker IPC / Count hook / 暂停检查点；调试停止路径终止 worker，并走输入释放和 UI 状态清理。
 
-#### 必须先完成的 CI 收尾
-1. Actions run 43290120386：Restore PASS，Core/App Build 曾因 LuaFunction 命名冲突失败；修复后 run 43290603954 的 Restore/Build PASS（0 warnings / 0 errors），但 25 项测试中 24 PASS / 1 FAIL。xUnit2031 两处 analyzer 已由 commit edac117255cefbad94874b0c34329325e7c41678 修复。
-2. run 43290697650（commit f58e54df72c12329a8a8a0002710b4b80fb71982）同样 Restore/Build PASS，24 passed / 1 failed。唯一失败为嵌套步进测试没有在首个 Continue 之后设置断点，因而未产生后续单步控制停点。
-3. 已在 commit ca56ef49feb531ab314b7ac446bddf1f99dc8fb5 修正该测试：在 main 脚本第 9 行设置真实断点，再按 Step Into / Step Over / Step Out 验证真实停点顺序。读取 Actions run 43291044845 及其后最新 main 对应 run；确保 Restore / Release Build / 全部自动测试 / API handbook --check / self-contained win-x64 publish / ZIP+SHA256 / artifact upload 全部通过；若失败，读取日志继续修复，不要跳去 M5。
-3. 当前文档路线上 M4 标为 IN PROGRESS（CI 验证中），不能写 DONE，直到一条覆盖最终 main HEAD 的完整 Windows workflow SUCCESS。
-4. 本地容器没有 .NET SDK，本地 Restore/Build/Test = NOT RUN。Windows desktop manual = NOT RUN。CI 通过也不代表 M4/M3/M1 桌面实机验收通过。
-5. 不创建 Release、不改版本号；v0.1.0-preview.4 的已有资产和 SHA256 保持不变。
+#### Windows CI 验收
+- 最终验证 main 代码基线：ab90b96f59deb173874c8aba819a9fc95288f8cf。
+- Windows Actions run 43291175992：SUCCESS（https://github.com/xiaobei206/anjian/actions/runs/43291175992）。
+- Restore PASS；Release Build PASS（0 warnings / 0 errors）；自动测试 25 passed / 0 failed / 0 skipped；API handbook --check PASS；self-contained win-x64 publish PASS；ZIP/SHA256 PASS；artifact upload PASS。
+- 发布包 SHA256：1d37a3210e22646fd781a2803a17f40058d97f5c1e16845cef7d5d24059af8c4；Artifact ID 13976519155；ZIP 51,794,098 bytes。
+- Read release version / Create GitHub Release 因不是 release 提交而跳过；未创建新 Release，preview.4 资产不变。
+- 本地容器没有 .NET SDK，本地 Restore/Build/Test：NOT RUN。Windows CI 是唯一实际构建/测试证据。
+- M1 preview.4、M3 编辑器与 M4 调试器的 Windows 桌面手工验收仍全部 NOT RUN；不把 CI 当作实机验收。
 
-#### 仍待完善（如 CI 通过也必须如实保留）
-- 断点仅保存在当前打开标签内存态，不跨关闭标签或应用重启保留。
-- 尚无命名 Watch 表达式和表/对象展开；复杂值只显示不可展开说明。
-- Windows 实机的断点点击、行标记、调用栈/变量 UI、中文路径和 100–200% DPI 验收尚未执行。
-- M1 preview.4 的窗口/托盘/Hook/DPI/多屏/2 小时稳定性，以及 M3 多标签/补全/输入法/大文件手工验收仍为 NOT RUN。
+#### 已知限制（不阻塞进入 M5）
+- 断点只保存在当前打开标签的内存模型中，关闭标签/退出程序不会保留。
+- 暂无命名 Watch 表达式、table/object 展开和复杂对象属性求值。
+- M4-01 至 M4-10 的桌面测试仍需在用户 Windows 10/11 环境执行。
 
-只有最终 main HEAD 完整 Windows CI 通过后，才能把 M4 基础交付记为 CI DONE，并将下一会话唯一任务切到 M5 可视化录制/动作列表。M5 目标以 PRD 2.3、功能矩阵 F09/F10 和路线图为准：动作列表可插入/删除/复制/排序/分组/注释/启用禁用/编辑参数与延时/批量编辑/步骤试运行；结构化动作与原始事件分离存储；Lua 生成区块具有稳定 ID/schema/dirty-detached 状态，手工修改不得静默覆盖，重生成先预览并确认。
+### 下一会话唯一任务（M5：可视化录制/动作列表）
+
+严格按 docs/PRD-CN.md 第 2.3 节、docs/RECORDER-DESIGN-CN.md、docs/FEATURE-MATRIX-CN.md 的 F09/F10 和 docs/ROADMAP-CN.md 实施 M5。不得把当前简单的 Lua 文本生成或原始事件列表冒充结构化可视化动作列表。
+
+#### 开始前必须先读现状
+1. 核对 main 最新 HEAD，再读取 AGENTS.md、README.md、docs/SESSION-HANDOFF.md、docs/ROADMAP-CN.md、docs/RECORDER-DESIGN-CN.md。
+2. 检查当前 GlobalRecorder、RecordedInputEvent、MainForm 录制流程、现有 Lua GenerateLua() 以及全部 recorder / input tests。以现有 hook 录制能力为基线，保留已工作的暂停/续录、click-only、注入事件过滤、鼠标移动合并、Down/Up 配对、溢出状态和脚本播放功能。
+3. M1 的 Hook / Raw Input / DPI 实机可靠性验收仍为 NOT RUN；不要借 M5 重写输入采集器或声称 Hook 实机已通过。优先完成动作模型、UI、持久化和生成区同步。
+
+#### M5 唯一实施范围
+1. 建立结构化 RecorderDocument / RecorderAction 模型，与原始 RecordedInputEvent 分层；actionId 稳定，明确类型、参数、上一动作后的间隔 delayMs、按键/鼠标 holdMs、原始事件引用和来源元数据。
+2. 从原始事件转成可编辑动作，保留单调时间戳与原始事件；Down/Up 配对后形成 MouseClick / KeyPress，holdMs 与相邻动作间隔独立；Move 按现有合并策略形成 MouseMove，Wheel/组合键等顺序不能丢。
+3. 提供可视化动作列表基础 UI：插入、删除、复制、排序、分组、注释、启用/禁用、参数编辑、延时编辑和批量编辑；布局应适合大动作量，避免每条事件都触发完整重绘。
+4. 允许选中动作生成/更新可读 Lua 代码；采用 docs/RECORDER-DESIGN-CN.md 指定的 generated block ID / schemaVersion 标记，支持动作列表与代码视图定位/关联。
+5. 必须实现同步保护：用户只编辑生成区块外代码时保留用户代码；手工改动 generated block 后标记 dirty/detached；从动作列表重生成前展示将被替换的区块预览并要求明确确认，禁止静默覆盖。首版不做任意 Lua 反向解析。
+6. 保存 <script>.actions.json，至少含 schemaVersion、recorderVersion、scriptId、recordingId、createdAtUtc、coordinateSpace、events、actions、generatedBlockId、synchronizationState；使用安全写入和显式 schema migration，不兼容时不得覆盖原文件。
+7. 步骤试运行至少能对选中/指定动作执行有边界的预览或单步执行，并明确提示输入风险；不能绕过既有执行/停止与 ReleaseAllOwnedInputs 清理。
+8. 原始事件、动作列表、generated Lua block 三者必须有可测试的稳定关联；未知/无法配对事件不能被静默丢弃。
+
+#### 自动化验收
+- Raw event -> action 的顺序、稳定 ID、Down/Up 配对、holdMs、delayMs 独立计算、负坐标、Wheel/KeyDown/KeyUp 与移动合并规则。
+- 动作插入/删除/复制/重排/参数和 delay 编辑后的模型状态。
+- disabled action 不生成执行语句；注释/分组/元数据按设计保存。
+- actions.json round-trip、schemaVersion 检查、兼容迁移失败时原文件不被覆盖。
+- generated block ID/schema 稳定；块外手写 Lua 保持不变；块内手改进入 detached/dirty；重新生成必须 preview + confirm，取消不修改脚本。
+- 生成代码能够被 NLua 编译；点击 holdMs 不重复生成同一段 Delay，动作间隔与 holdMs 不混淆。
+- Windows CI 运行所有 tests、API handbook check、self-contained publish、ZIP/SHA256 和 artifact upload；CI 不代替 M1 实机采集 Hook 稳定性验收。
+
+#### M5 完成条件与边界
+- 编辑动作后，动作列表中的结构化数据和生成区代码一致。
+- 手工修改 generated block 可检测脱离同步，重生成有差异预览和显式确认。
+- 块外手写 Lua、原始事件和动作元数据不被覆盖或丢失。
+- F09/F10、Recorder 设计文档、用户指南、路线图、development log 与 handoff 同步更新；main 小步提交，不建长期分支或 PR。
+- M1、M3、M4 Windows 桌面验收仍为 NOT RUN，不因 M5 CI 成功而标记实机通过。
 
 
 ## 下一会话接手指令
 
-先核对 main 最新 HEAD，再读取本文件、AGENTS.md、README.md、docs/ROADMAP-CN.md。M3 Windows Actions run 43282795272 已通过；M4 基础调试器已接入 main，但截至本 handoff 更新时，最终代码的 Windows CI 尚未完成验收（xUnit2031 两处 analyzer 已修复，修复后 workflow 正在排队/执行）。下一会话唯一开发任务仍为 M4 收尾：先查最新 main HEAD 对应的 Windows Actions 完整结果，失败则读取日志并修复；只有最终 HEAD 的 Restore/Build/Test/API-docs check/self-contained publish/package/artifact 全通过后，才标记 M4 CI DONE 并把唯一任务切至 M5。直接在 main 小步提交，不创建长期分支或 PR。v0.1.0-preview.4 发布资产不变；M1、M3、M4 Windows 桌面手工验收均须保留为 NOT RUN，CI 不可代替实机验收。
+先核对 main 最新 HEAD，再读取 AGENTS.md、README.md、本文件、docs/ROADMAP-CN.md 和 docs/RECORDER-DESIGN-CN.md。M4 基础调试器已完成 Windows CI 验收：Actions run 43291175992 SUCCESS（25/25 tests，Release Build 0 warnings / 0 errors，API check、win-x64 publish、ZIP/SHA256、artifact upload 全部 PASS）；本地构建/测试 NOT RUN，Windows M1/M3/M4 桌面手工验收仍 NOT RUN。下一会话唯一开发任务为 M5 可视化录制/动作列表，严格按本文件 M5 范围/自动化验收执行，不重复询问仓库已有答案。直接在 main 小步提交，不创建长期分支或 PR，不创建新 Release/不改 preview.4 资产。
