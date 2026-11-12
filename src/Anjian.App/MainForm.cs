@@ -23,42 +23,34 @@ internal sealed class MainForm : Form
     private readonly Button _pauseButton = new();
     private readonly Button _stopButton = new();
     private readonly Panel _fullModePanel = new() { Dock = DockStyle.Fill };
-    private readonly Panel _miniModePanel = new() { Dock = DockStyle.Fill, BackColor = Color.FromArgb(245, 247, 250) };
     private readonly CheckBox _clickOnlyCheck = new() { Text = "只记录点击坐标", AutoSize = true, Checked = true };
-    private readonly CheckBox _miniClickOnlyCheck = new() { Text = "只录点击", AutoSize = true, Checked = true, Margin = new Padding(4, 5, 8, 0) };
-    private readonly CheckBox _alwaysOnTopCheck = new() { Text = "始终置顶", AutoSize = true };
-    private readonly Button _miniRecordButton = new();
-    private readonly Button _miniStopRecordButton = new();
-    private readonly Button _miniPlayButton = new();
-    private readonly Button _miniPauseButton = new();
-    private readonly Button _miniStopButton = new();
-    private readonly Button _miniTopmostButton = new();
-    private readonly Label _miniScriptLabel = new();
-    private readonly Label _coordinatesLabel = new();
-    private readonly System.Windows.Forms.Timer _coordinateTimer = new() { Interval = 100 };
+    private readonly CheckBox _alwaysOnTopCheck = new() { Text = "悬浮窗始终置顶", AutoSize = true };
     private bool _recordSessionActive;
     private bool _recordingPaused;
     private bool _clickOnlyForSession;
-    private bool _compactMode = true;
     private bool _loadingSettings;
-    private Size _fullModeSize = new(1180, 780);
-    private bool _dragging;
-    private Point _dragCursor;
-    private Point _dragForm;
     private GlobalHotkeyManager? _hotkeyManager;
     private ScriptEntry? _current;
     private bool _loading;
     private bool _recording;
     private bool _dirty;
     private Task? _runTask;
+    private FloatingForm? _floating;
+    private NotifyIcon? _trayIcon;
+    private Icon? _applicationIcon;
+    private bool _allowExit;
 
     public MainForm()
     {
-        Text = "按键精灵 2026 · Preview";
+        Text = "按键精灵 2026";
         MinimumSize = new Size(980, 650);
         Size = new Size(1180, 780);
         StartPosition = FormStartPosition.CenterScreen;
         Font = new Font("Microsoft YaHei UI", 9F);
+        ShowInTaskbar = false;
+        Opacity = 0;
+        _applicationIcon = LoadApplicationIcon();
+        Icon = (Icon)_applicationIcon.Clone();
         BuildUi();
 
         _playback.Log += message => Ui(() =>
@@ -72,21 +64,33 @@ internal sealed class MainForm : Form
             _progress.Text = total == 0 ? $"正在执行第 {current} 轮（无限）" : $"正在执行第 {current}/{total} 轮");
         _scripts.SelectedIndexChanged += (_, _) => SelectScript();
         _editor.TextChanged += (_, _) => { if (!_loading) { _dirty = true; UpdateTitle(); } };
-        _repeatCount.ValueChanged += (_, _) => SaveSettings();
-        _repeatInterval.ValueChanged += (_, _) => SaveSettings();
+        _repeatCount.ValueChanged += (_, _) =>
+        {
+            _floating?.SetRepeatCount((int)_repeatCount.Value);
+            SaveSettings();
+        };
+        _repeatInterval.ValueChanged += (_, _) =>
+        {
+            _floating?.SetRepeatInterval((int)_repeatInterval.Value);
+            SaveSettings();
+        };
         _clickOnlyCheck.CheckedChanged += (_, _) =>
         {
-            if (_miniClickOnlyCheck.Checked != _clickOnlyCheck.Checked) _miniClickOnlyCheck.Checked = _clickOnlyCheck.Checked;
+            _floating?.SetClickOnlyRecording(_clickOnlyCheck.Checked);
             SaveSettings();
         };
         _alwaysOnTopCheck.CheckedChanged += (_, _) => SetAlwaysOnTop(_alwaysOnTopCheck.Checked);
-        _coordinateTimer.Tick += (_, _) => UpdateMiniStatus();
 
         LoadSettings();
         RefreshScripts();
-        SetCompactMode(_compactMode);
-        UpdateMiniStatus();
-        _coordinateTimer.Start();
+        InitializeFloatingAndTray();
+        UpdateFloatingState();
+        Shown += (_, _) =>
+        {
+            Hide();
+            Opacity = 1;
+            ShowFloatingWindow();
+        };
         AppendLog("就绪。脚本保存在：" + _repository.RootDirectory);
         AppendLog("播放设置：次数 1=执行一次，0=无限；间隔只在每轮之间等待。");
         AppendLog("全局快捷键：F10 启动，F11 暂停/继续，F12 立即中止。");
@@ -155,7 +159,7 @@ internal sealed class MainForm : Form
         toolbar.Controls.Add(_clickOnlyCheck);
         _alwaysOnTopCheck.Margin = new Padding(4, 7, 4, 0);
         toolbar.Controls.Add(_alwaysOnTopCheck);
-        toolbar.Controls.Add(MakeButton("悬浮模式", (_, _) => SetCompactMode(true)));
+        toolbar.Controls.Add(MakeButton("返回悬浮窗", (_, _) => HideMainWindow()));
         _fullModePanel.Controls.Add(toolbar);
 
         var split = new SplitContainer
@@ -263,9 +267,7 @@ internal sealed class MainForm : Form
 
         split.Panel2.Controls.Add(right);
         _fullModePanel.Controls.Add(split);
-        BuildMiniUi();
         Controls.Add(_fullModePanel);
-        Controls.Add(_miniModePanel);
         KeyPreview = true;
         KeyDown += (_, e) =>
         {
@@ -291,131 +293,111 @@ internal sealed class MainForm : Form
         return button;
     }
 
-    private void BuildMiniUi()
+    private static Icon LoadApplicationIcon()
     {
-        var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, Padding = new Padding(8, 5, 8, 4) };
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 34));
-        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        var header = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false, FlowDirection = FlowDirection.LeftToRight, Margin = Padding.Empty };
-        var brand = new Label { Text = "按键精灵 2026", AutoSize = true, Font = new Font("Microsoft YaHei UI", 10F, FontStyle.Bold), ForeColor = Color.FromArgb(35, 48, 66), Margin = new Padding(1, 4, 12, 0) };
-        header.Controls.Add(brand);
-        header.Controls.Add(_miniClickOnlyCheck);
-        _miniClickOnlyCheck.CheckedChanged += (_, _) =>
+        try
         {
-            if (_clickOnlyCheck.Checked != _miniClickOnlyCheck.Checked) _clickOnlyCheck.Checked = _miniClickOnlyCheck.Checked;
-        };
-        _miniTopmostButton.Text = "置顶";
-        header.Controls.Add(_miniTopmostButton);
-        _miniTopmostButton.Click += (_, _) => _alwaysOnTopCheck.Checked = !_alwaysOnTopCheck.Checked;
-        header.Controls.Add(MakeButton("完整模式 ↗", (_, _) => SetCompactMode(false)));
-        header.Controls.Add(MakeButton("—", (_, _) => WindowState = FormWindowState.Minimized));
-        header.Controls.Add(MakeButton("×", (_, _) => Close()));
-        AttachDrag(header);
-        AttachDrag(brand);
-
-        var actions = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false, FlowDirection = FlowDirection.LeftToRight, Margin = Padding.Empty };
-        _miniRecordButton.Text = "● 开始录制";
-        _miniRecordButton.Click += (_, _) => ToggleRecording();
-        actions.Controls.Add(_miniRecordButton);
-        _miniStopRecordButton.Text = "■ 结束录制";
-        _miniStopRecordButton.Enabled = false;
-        _miniStopRecordButton.Click += (_, _) => StopRecording();
-        actions.Controls.Add(_miniStopRecordButton);
-        _miniPlayButton.Text = "▶ 播放";
-        _miniPlayButton.Click += async (_, _) => await StartPlaybackAsync();
-        actions.Controls.Add(_miniPlayButton);
-        _miniPauseButton.Text = "Ⅱ";
-        _miniPauseButton.Enabled = false;
-        _miniPauseButton.Click += (_, _) => TogglePause();
-        actions.Controls.Add(_miniPauseButton);
-        _miniStopButton.Text = "■";
-        _miniStopButton.Enabled = false;
-        _miniStopButton.Click += async (_, _) => await StopPlaybackAsync();
-        actions.Controls.Add(_miniStopButton);
-
-        var footer = new Panel { Dock = DockStyle.Fill, Margin = Padding.Empty };
-        _miniScriptLabel.Text = "脚本：未选择";
-        _miniScriptLabel.AutoEllipsis = true;
-        _miniScriptLabel.Dock = DockStyle.Fill;
-        _miniScriptLabel.TextAlign = ContentAlignment.MiddleLeft;
-        _coordinatesLabel.Text = "X 0, Y 0";
-        _coordinatesLabel.Dock = DockStyle.Right;
-        _coordinatesLabel.Width = 120;
-        _coordinatesLabel.TextAlign = ContentAlignment.MiddleRight;
-        _coordinatesLabel.Font = new Font("Consolas", 9F, FontStyle.Bold);
-        footer.Controls.Add(_miniScriptLabel);
-        footer.Controls.Add(_coordinatesLabel);
-        layout.Controls.Add(header, 0, 0);
-        layout.Controls.Add(actions, 0, 1);
-        layout.Controls.Add(footer, 0, 2);
-        _miniModePanel.Controls.Add(layout);
-        _miniModePanel.DoubleClick += (_, _) => SetCompactMode(false);
-        layout.DoubleClick += (_, _) => SetCompactMode(false);
-    }
-
-    private void AttachDrag(Control control)
-    {
-        control.MouseDown += (_, e) =>
-        {
-            if (e.Button != MouseButtons.Left) return;
-            _dragging = true;
-            _dragCursor = Cursor.Position;
-            _dragForm = Location;
-        };
-        control.MouseMove += (_, _) =>
-        {
-            if (_dragging && _compactMode)
-                Location = new Point(_dragForm.X + Cursor.Position.X - _dragCursor.X, _dragForm.Y + Cursor.Position.Y - _dragCursor.Y);
-        };
-        control.MouseUp += (_, _) => _dragging = false;
-    }
-
-    private void UpdateMiniStatus()
-    {
-        var point = Cursor.Position;
-        _coordinatesLabel.Text = $"X {point.X}, Y {point.Y}";
-        _miniScriptLabel.Text = $"脚本：{_current?.Name ?? "未选择"}";
-        _miniTopmostButton.Text = TopMost ? "置顶 ✓" : "置顶";
-    }
-
-    private void SetCompactMode(bool compact)
-    {
-        if (!compact && _compactMode && Width > 500) _fullModeSize = Size;
-        _compactMode = compact;
-        _miniModePanel.Visible = compact;
-        _fullModePanel.Visible = !compact;
-        if (compact)
-        {
-            FormBorderStyle = FormBorderStyle.None;
-            ShowInTaskbar = true;
-            MinimizeBox = false;
-            MaximizeBox = false;
-            MinimumSize = System.Drawing.Size.Empty;
-            MaximumSize = System.Drawing.Size.Empty;
-            ClientSize = new Size(480, 106);
+            return Icon.ExtractAssociatedIcon(Application.ExecutablePath) ?? (Icon)SystemIcons.Application.Clone();
         }
-        else
+        catch
         {
-            FormBorderStyle = FormBorderStyle.Sizable;
-            ShowInTaskbar = true;
-            MinimizeBox = true;
-            MaximizeBox = true;
-            MinimumSize = new Size(980, 650);
-            MaximumSize = System.Drawing.Size.Empty;
-            ClientSize = _fullModeSize.Width >= 980 ? _fullModeSize : new Size(1180, 780);
-            StartPosition = FormStartPosition.CenterScreen;
-            CenterToScreen();
+            return (Icon)SystemIcons.Application.Clone();
         }
+    }
+
+    private void InitializeFloatingAndTray()
+    {
+        _floating = new FloatingForm((Icon)_applicationIcon!.Clone());
+        _floating.RecordToggleRequested += ToggleRecording;
+        _floating.StopRecordingRequested += StopRecording;
+        _floating.PlayRequested += () => _ = StartPlaybackAsync();
+        _floating.PauseRequested += TogglePause;
+        _floating.StopPlaybackRequested += () => _ = StopPlaybackAsync();
+        _floating.OpenMainRequested += ShowMainWindow;
+        _floating.HideRequested += HideFloatingWindow;
+        _floating.RepeatCountChanged += value =>
+        {
+            if (_repeatCount.Value != value) _repeatCount.Value = Math.Clamp(value, (int)_repeatCount.Minimum, (int)_repeatCount.Maximum);
+        };
+        _floating.RepeatIntervalChanged += value =>
+        {
+            if (_repeatInterval.Value != value) _repeatInterval.Value = Math.Clamp(value, (int)_repeatInterval.Minimum, (int)_repeatInterval.Maximum);
+        };
+        _floating.ClickOnlyRecordingChanged += value =>
+        {
+            if (_clickOnlyCheck.Checked != value) _clickOnlyCheck.Checked = value;
+        };
+        _floating.AlwaysOnTopChanged += value =>
+        {
+            if (_alwaysOnTopCheck.Checked != value) _alwaysOnTopCheck.Checked = value;
+        };
+        _floating.SetSettings((int)_repeatCount.Value, (int)_repeatInterval.Value,
+            _clickOnlyCheck.Checked, _alwaysOnTopCheck.Checked);
+
+        var trayMenu = new ContextMenuStrip();
+        trayMenu.Items.Add("打开主窗口", null, (_, _) => ShowMainWindow());
+        trayMenu.Items.Add("显示悬浮窗", null, (_, _) => ShowFloatingWindow());
+        trayMenu.Items.Add("隐藏悬浮窗", null, (_, _) => HideFloatingWindow());
+        trayMenu.Items.Add(new ToolStripSeparator());
+        trayMenu.Items.Add("退出按键精灵 2026", null, (_, _) => ExitApplication());
+
+        _trayIcon = new NotifyIcon
+        {
+            Icon = (Icon)_applicationIcon.Clone(),
+            Text = "按键精灵 2026",
+            ContextMenuStrip = trayMenu,
+            Visible = true
+        };
+        _trayIcon.DoubleClick += (_, _) => ShowMainWindow();
+    }
+
+    private void ShowMainWindow()
+    {
+        ShowInTaskbar = true;
+        if (!Visible) Show();
+        if (WindowState == FormWindowState.Minimized) WindowState = FormWindowState.Normal;
+        BringToFront();
+        Activate();
+    }
+
+    private void HideMainWindow()
+    {
+        SaveCurrent();
         SaveSettings();
-        if (compact) UpdateMiniStatus();
+        ShowInTaskbar = false;
+        Hide();
+        ShowFloatingWindow();
+    }
+
+    private void ShowFloatingWindow()
+    {
+        if (_floating is null || _floating.IsDisposed) return;
+        if (!_floating.Visible) _floating.Show();
+        _floating.UpdateState(_current?.Name ?? "未选择", _recordSessionActive, _recording,
+            _recordingPaused, _playback.IsRunning, _playback.IsPaused);
+    }
+
+    private void HideFloatingWindow()
+    {
+        if (_floating is { IsDisposed: false }) _floating.Hide();
+    }
+
+    private void ExitApplication()
+    {
+        _allowExit = true;
+        Close();
+    }
+
+    private void UpdateFloatingState()
+    {
+        _floating?.UpdateState(_current?.Name ?? "未选择", _recordSessionActive, _recording,
+            _recordingPaused, _playback.IsRunning, _playback.IsPaused);
     }
 
     private void SetAlwaysOnTop(bool enabled)
     {
-        TopMost = enabled;
         if (_alwaysOnTopCheck.Checked != enabled) _alwaysOnTopCheck.Checked = enabled;
-        _miniTopmostButton.Text = enabled ? "置顶 ✓" : "置顶";
+        _floating?.SetAlwaysOnTop(enabled);
         SaveSettings();
     }
 
@@ -428,7 +410,6 @@ internal sealed class MainForm : Form
         _clickOnlyCheck.Checked = settings.ClickOnlyRecording;
         _alwaysOnTopCheck.Checked = settings.AlwaysOnTop;
         TopMost = settings.AlwaysOnTop;
-        _compactMode = settings.CompactMode;
         _loadingSettings = false;
     }
 
@@ -443,7 +424,7 @@ internal sealed class MainForm : Form
                 IntervalMilliseconds = (int)_repeatInterval.Value,
                 ClickOnlyRecording = _clickOnlyCheck.Checked,
                 AlwaysOnTop = _alwaysOnTopCheck.Checked,
-                CompactMode = _compactMode
+                CompactMode = true
             });
         }
         catch (Exception ex) { AppendLog("设置保存失败：" + ex.Message); }
@@ -717,17 +698,13 @@ internal sealed class MainForm : Form
     {
         var buttonText = !_recordSessionActive ? "● 开始录制" : _recordingPaused ? "▶ 继续录制" : "Ⅱ 暂停录制";
         _recordButton.Text = buttonText;
-        _miniRecordButton.Text = buttonText;
         _stopRecordButton.Enabled = _recordSessionActive;
-        _miniStopRecordButton.Enabled = _recordSessionActive;
         _recordButton.Enabled = !_playback.IsRunning;
-        _miniRecordButton.Enabled = !_playback.IsRunning;
         _scripts.Enabled = !_recordSessionActive;
         _clickOnlyCheck.Enabled = !_recordSessionActive;
-        _miniClickOnlyCheck.Enabled = !_recordSessionActive;
         _playButton.Enabled = !_recordSessionActive && !_playback.IsRunning;
-        _miniPlayButton.Enabled = _playButton.Enabled;
         _status.Text = !_recordSessionActive ? "未运行" : _recordingPaused ? "录制已暂停" : "正在录制…";
+        UpdateFloatingState();
     }
 
     private async Task StartPlaybackAsync()
@@ -754,15 +731,12 @@ internal sealed class MainForm : Form
 
         SaveSettings();
         _playButton.Enabled = false;
-        _miniPlayButton.Enabled = false;
         _recordButton.Enabled = false;
-        _miniRecordButton.Enabled = false;
         _pauseButton.Enabled = true;
-        _miniPauseButton.Enabled = true;
         _stopButton.Enabled = true;
-        _miniStopButton.Enabled = true;
         _pauseButton.Text = "暂停";
         _status.Text = "正在运行";
+        UpdateFloatingState();
         AppendLog($"开始播放：{Path.GetFileNameWithoutExtension(scriptPath)}；次数={(options.IsInfinite ? "无限" : options.RepeatCount)}；每轮间隔={options.IntervalMilliseconds}ms。");
 
         try
@@ -789,7 +763,6 @@ internal sealed class MainForm : Form
         {
             _playback.Resume();
             _pauseButton.Text = "暂停";
-            _miniPauseButton.Text = "Ⅱ";
             _status.Text = "正在运行";
             AppendLog("已恢复。");
         }
@@ -797,10 +770,10 @@ internal sealed class MainForm : Form
         {
             _playback.Pause();
             _pauseButton.Text = "继续";
-            _miniPauseButton.Text = "继续";
             _status.Text = "已暂停";
             AppendLog("已请求暂停；当前鼠标/键盘原子操作完成后暂停生效。");
         }
+        UpdateFloatingState();
     }
 
     private async Task StopPlaybackAsync()
@@ -818,13 +791,9 @@ internal sealed class MainForm : Form
     private void SetIdle()
     {
         _playButton.Enabled = !_recordSessionActive;
-        _miniPlayButton.Enabled = !_recordSessionActive;
         _pauseButton.Enabled = false;
-        _miniPauseButton.Enabled = false;
         _stopButton.Enabled = false;
-        _miniStopButton.Enabled = false;
         _pauseButton.Text = "暂停";
-        _miniPauseButton.Text = "Ⅱ";
         _status.Text = !_recordSessionActive ? "未运行" : _recordingPaused ? "正在录制…" : "录制已暂停";
         _progress.Text = "";
         UpdateRecordingUi();
@@ -841,7 +810,7 @@ internal sealed class MainForm : Form
     private void UpdateTitle()
     {
         Text = $"按键精灵 2026 · {(_current?.Name ?? "未选择脚本")}{(_dirty ? " *" : "")}";
-        _miniScriptLabel.Text = $"脚本：{_current?.Name ?? "未选择"}";
+        UpdateFloatingState();
     }
 
     private void Ui(Action action)
@@ -907,13 +876,30 @@ internal sealed class MainForm : Form
 
     protected override void OnFormClosing(FormClosingEventArgs e)
     {
-        _coordinateTimer.Stop();
+        if (!_allowExit && e.CloseReason == CloseReason.UserClosing)
+        {
+            e.Cancel = true;
+            HideMainWindow();
+            return;
+        }
+
         if (_recordSessionActive) StopRecording();
         SaveSettings();
         SaveCurrent();
         _playback.Stop();
         _playback.Dispose();
         _recorder.Dispose();
+
+        _floating?.CloseForExit();
+        _floating = null;
+        if (_trayIcon is not null)
+        {
+            _trayIcon.Visible = false;
+            _trayIcon.Dispose();
+            _trayIcon = null;
+        }
+        _applicationIcon?.Dispose();
+        _applicationIcon = null;
         base.OnFormClosing(e);
     }
 }
