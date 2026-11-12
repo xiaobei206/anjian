@@ -409,7 +409,6 @@ internal sealed class MainForm : Form
         _repeatInterval.Value = Math.Clamp(settings.IntervalMilliseconds, (int)_repeatInterval.Minimum, (int)_repeatInterval.Maximum);
         _clickOnlyCheck.Checked = settings.ClickOnlyRecording;
         _alwaysOnTopCheck.Checked = settings.AlwaysOnTop;
-        TopMost = settings.AlwaysOnTop;
         _loadingSettings = false;
     }
 
@@ -742,6 +741,7 @@ internal sealed class MainForm : Form
         try
         {
             _runTask = _playback.RunAsync(scriptPath, options);
+            UpdateFloatingState();
             await _runTask;
         }
         catch (Exception ex)
