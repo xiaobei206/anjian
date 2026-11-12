@@ -1,9 +1,9 @@
 # 技术架构与模块边界
 
-- 版本：Architecture Draft 0.1
+- 版本：Architecture Draft 0.2
 - 目标框架：net10.0-windows
 - 平台：Windows x64
-- 状态：逻辑边界已定义；NuGet 依赖和部分 Win32 采集 API 需技术验证
+- 状态：逻辑边界已定义；Lua 绑定和部分 Win32 采集 API 需技术验证
 
 ## 1. 总体架构原则
 
@@ -20,7 +20,7 @@
 
     Anjian2026/
     ├── src/
-    │   ├── Anjian.App/                 # WinForms 桌面壳、主窗体、Dock 面板、应用组合根
+    │   ├── Anjian.App/                 # WinForms 桌面壳、主窗体、应用组合根
     │   ├── Anjian.Core/                # DTO、枚举、错误类型、公共接口
     │   ├── Anjian.Scripting/           # Lua Host、API 注册、受限环境、调试信息
     │   ├── Anjian.Automation/          # 运行协调器、状态机、调度、暂停/停止
@@ -59,18 +59,19 @@
 
 ## 4. 核心接口草案
 
-接口名称可随验证调整，但职责必须保留。
-
 ### IInputController
 - MoveMouse(x, y)
-- Click(button)
-- DoubleClick(button)
+- Click(button, holdMs)：按下指定按钮 holdMs 毫秒后释放；缺省时长由用户 API 层填入 50 ms。
+- DoubleClick(button, holdMs, gapMs)
 - MouseDown(button) / MouseUp(button)
 - Scroll(delta)
-- KeyPress(key) / KeyDown(key) / KeyUp(key)
+- KeyPress(key, holdMs)：按下指定键 holdMs 毫秒后释放；缺省时长由用户 API 层填入 50 ms。
+- KeyDown(key) / KeyUp(key)
 - Hotkey(keys)
 - TypeText(text)
 - ReleaseAllOwnedInputs()
+
+输入控制器内部追踪注入按下状态。Click / KeyPress 的释放必须放入 finally 清理路径；取消请求打断保持时长后应立即释放。暂停请求在当前原子 Click / KeyPress 动作完成后生效。
 
 ### IScriptRuntime
 - RunAsync(ScriptRequest, CancellationToken)
@@ -128,6 +129,7 @@ Lua 环境默认不开放任意 .NET 类型导入、程序集加载、文件系�
 - 默认使用 Windows SendInput 实现前台键鼠注入。
 - 启动时明确设置 Per-Monitor V2 DPI awareness。
 - 坐标统一为虚拟桌面物理像素，原点和范围以 Windows 虚拟桌面指标为准；负坐标合法。
+- 首版脚本 API 不提供窗口相对坐标。
 - 不假设 SendInput 对任何权限等级、受保护应用、游戏或安全桌面都有效。
 - 程序默认普通用户权限运行；发生 UIPI/权限限制时向用户说明。
 - 追踪本程序模拟的按键/鼠标按下状态，结束时发出对应释放动作。

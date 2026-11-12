@@ -1,6 +1,6 @@
 # 开发总路线图与会话任务板
 
-- 当前版本：Roadmap 0.1
+- 当前版本：Roadmap 0.2
 - 任务状态只允许：TODO / IN_PROGRESS / BLOCKED / DONE
 - 更新规则：每个会话结束时更新本文件和 SESSION-HANDOFF.md。
 - 任务分配原则：一个 GPT 会话优先负责一个清晰、可验证的任务。
@@ -9,7 +9,7 @@
 
 | 里程碑 | 内容 | 状态 | 结果 |
 |---|---|---|---|
-| M0 | 仓库初始化与项目文档框架 | DONE | 已建立规范、需求、架构、API、验收和交接文件 |
+| M0 | 仓库初始化与项目文档框架 | DONE | 已建立规范、需求、API、验收和交接文件 |
 | M1 | 技术验证 PoC | TODO | 锁定 Lua 绑定、编辑器、输入采集和发布方式 |
 | M2 | .NET 解决方案与空壳程序 | TODO | 可启动的 WinForms 主程序和测试结构 |
 | M3 | Core 数据模型与工程文件 | TODO | 工程/脚本/动作模型及可靠保存 |
@@ -21,7 +21,7 @@
 | M9 | P0 功能集成与稳定性 | TODO | P0 全链路验收通过 |
 | M10 | 首个可用版本 | TODO | self-contained ZIP、说明、测试报告、SHA256 |
 
-## 1. M0 — 仓库初始化与文档（已完成）
+## 1. M0 — 仓库初始化与产品交互规格（已完成）
 
 | 任务 ID | 内容 | 状态 | 验收 |
 |---|---|---|---|
@@ -34,27 +34,23 @@
 ## 2. M1 — 技术验证 PoC
 
 ### TV-01：Lua 5.4 / .NET 绑定与取消机制
-- 状态：TODO（下一会话任务）
+- 状态：TODO（当前唯一下一任务）
 - 范围：只做最小 PoC，不做正式应用 UI。
 - 输出：poc/LuaRuntime 或同等清晰目录；记录精确 NuGet 版本、许可证、Lua 版本、Win-x64 发布结果。
-- 验证：C# 注册 API、Lua 错误行号、Lua 指令钩子、无限循环停止、可取消 Delay、暂停/恢复。
+- 验证：C# 注册全局 API、Lua 错误行号、Lua 指令钩子、CPU 无限循环停止、可取消 Delay、暂停/恢复。
 - 验收：TECHNICAL-VALIDATION-CN.md 第 3 节逐项有结果；关键取消目标有重复实测数据；所有包版本和来源写明。
 
 ### TV-02：WinForms Lua 编辑器组件
 - 状态：TODO
-- 依赖：无，可与 TV-01 由不同会话处理，但合并前先读取最新 main。
 - 输出：候选控件对比和最小 PoC；确认中文、Lua lexer、补全扩展、DPI、self-contained 原生依赖。
-- 验收：明确采用/淘汰方案和理由，不锁定未验证包。
 
 ### TV-03：Windows 输入与录制采集源
 - 状态：TODO
 - 输出：SendInput 鼠标键盘 PoC；Raw Input 与低级钩子对比；坐标、DPI、Unicode、注入过滤、UIPI 和清理测试。
-- 验收：形成正式采集/注入接口决策，更新架构文档和 ADR。
 
 ### TV-04：便携发布
 - 状态：TODO
-- 输出：net10.0-windows win-x64 self-contained ZIP 最小 PoC。
-- 验收：干净环境、中文/空格路径、无网、非管理员启动。
+- 输出：net10.0-windows win-x64 self-contained ZIP 最小 PoC；确认依赖和干净环境启动。
 
 ## 3. M2 — 解决方案骨架
 
@@ -100,7 +96,7 @@
 - REC-01：采集源、标准化事件和有界队列。
 - REC-02：Down/Up 配对、动作模型、移动合并。
 - REC-03：动作列表编辑器。
-- CODEGEN-01：Action Model 到 Lua 生成。
+- CODEGEN-01：Action Model 到 Lua 代码生成。
 - CODEGEN-02：Generated Block ID、dirty/detached 状态和覆盖确认。
 - REC-04：工程保存、恢复和异常录制测试。
 

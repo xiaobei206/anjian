@@ -7,61 +7,60 @@
 - 项目：按键精灵 2026（暂定名）
 - 仓库：xiaobei206/anjian
 - 主分支：main
-- 当前阶段：M0 文档框架已完成；尚无应用代码
+- 当前阶段：M0 文档与产品交互规格完成；尚无应用代码
 - 当前版本：未发布（不要创建虚假版本/发布资产）
-- 最近一次完整产品/规格基线提交：a595e1dd9e937e2e63b697526a5944497b7c13a1
-- 之后可能存在 handoff / log 等文档收尾提交；新会话必须先查询 main 最新 HEAD，不要把本字段理解为当前 HEAD 的自引用。
+- 本次规格冻结提交：本文件所在提交（以 GitHub main HEAD 为准）
 
-## 当前会话
+## 本会话 S001
 
-- 会话编号：S000
-- 任务：BOOT-01 至 BOOT-05，初始化仓库规范、需求文档和 GPT 会话交接机制。
-- 状态：DONE
-- 已完成：README、AGENTS、PRD、架构、Lua API、录制设计、验收标准、技术验证清单、路线图、决策记录、会话协议、短提示词、开发日志、src/tests 结构说明。
-- 没有编写功能代码，没有创建 .sln，也没有声称应用可运行。
+- 主题：首版交互确认与 Lua API 语义冻结
+- 状态：DONE（文档决策已提交；功能开发尚未开始）
+- 用户明确确认：A/A/A
+  1. Lua 函数调用语法，例如 `MoveTo(122, 100)`。
+  2. 录制时合并鼠标移动，保留必要路径点和终点。
+  3. 首版采用全屏绝对坐标，不做窗口相对坐标。
+- 用户补充确认的 API 语义：
+  - `LeftClick(50)` = 左键按下 50 ms 后释放。
+  - `LeftClick()` 默认 50 ms。
+  - 右键、中键点击和 `KeyPress` 同样默认 50 ms。
+  - 显式 0 表示不增加等待；超过 60,000 ms 的长按使用 Down / Delay / Up。
+  - Stop 必须中断点击保持并释放输入；Pause 在当前完整 Click / KeyPress 动作完成后生效。
 
-## 已确认产品方向
+## 已确认的首版用户层 API
 
-- 首版 Windows 10/11 x64。
-- WinForms + .NET 10 LTS。
-- Lua 5.4 + 自定义自动化命令 API。
-- 动作列表和 Lua 代码两种模式；不承诺任意代码无损双向转换。
-- 便携版优先，本地文件存储。
-- P0：前台键鼠输入、录制、动作列表、Lua 编辑/执行、暂停/恢复/停止、日志与可靠保存。
-- 旧版 Q 语言兼容、Android、OCR、后台消息注入、云服务不在首版范围。
+- 鼠标：`MoveTo`、`LeftClick`、`RightClick`、`MiddleClick`、`Left/Right/MiddleDown`、`Left/Right/MiddleUp`、`MouseWheel`、`GetMousePosition`。
+- 键盘：`KeyPress`、`KeyDown`、`KeyUp`、`Hotkey`、`TypeText`。
+- 时间/日志：`Delay`、`RandomDelay`、`Log`。
+- 标准 Lua 5.4 语法；API 全局函数形式，不要求 Mouse / Keyboard 命名空间。
+- 时间统一为毫秒。坐标使用虚拟桌面物理像素，负坐标合法。
 
-## 当前文档事实
+## 已更新的权威文档
 
-- PRD：首版功能分级和用户流程已列出。
-- Architecture：模块边界、依赖方向、线程模型、存储约定已列出。
-- Lua API：Mouse / Keyboard / Delay / Log 的 v0.1 草案已列出。
-- Recorder：事件模型、动作模型、代码生成区块和 dirty/detached 规则已列出。
-- Acceptance：A/B/C/D 测试表和 P0 门槛已列出。
-- Technical Validation：Lua、编辑器、输入采集、便携发布 PoC 清单已列出。
-- 具体 Lua NuGet 绑定和编辑器组件尚未冻结。
-- 录制采集源优先验证 Raw Input，再决定是否需要低级钩子。
-- 首版先采用同进程独立执行线程，不先引入独立 Worker 进程。
+- `docs/LUA-API-CN.md`：API 0.2，函数命名、点击按下时长、默认值和坐标语义。
+- `docs/RECORDER-DESIGN-CN.md`：移动合并、Down/Up 配对、holdMs 和动作间隔分离、Lua 生成形式。
+- `docs/ARCHITECTURE-CN.md`：内部 IInputController 时长参数、Stop/Pause 约定。
+- `docs/DECISIONS-CN.md`：ADR-014 至 ADR-017，记录四项冻结决策。
+- `docs/ROADMAP-CN.md`：M0 完成，TV-01 为唯一下一任务。
+- `docs/DEVELOPMENT-LOG-CN.md`：追加 S001 记录。
 
-## 已知注意事项
+## 当前技术事实
 
-1. Windows SendInput 受 UIPI/完整性级别限制，不承诺能操作所有进程或受保护桌面。
-2. 中文/日文物理输入法过程不能仅凭物理键盘事件无损重建；TypeText 单独定义 Unicode 注入能力。
-3. 低级键盘/鼠标 Hook 有回调时限，超时可能被 Windows 静默移除。
-4. 动作列表生成 Lua 后，用户手改 generated block 必须标记不同步，重新生成前预览并确认。
-5. 所有技术依赖的当前版本、TFM、许可证和原生运行时都要在 PoC 中实测。
+- 仓库最新已确认基线：S000 最终提交 `306ed5dc85c36576c52452a499551e4a8f9abc70`；写入前必须再次检查最新 main HEAD。
+- 目前没有 .sln、应用项目、应用代码、可运行安装包或 Release。
+- .NET 10、WinForms、Lua 5.4 是已确认技术方向；NLua/KeraLua 包版本和 lua_sethook 使用路径仍须 TV-01 实测。
+- 当前会话只完成规格冻结，没有运行构建或测试，不得把 PoC 标为通过。
 
-## 下一会话唯一任务
+## 下一任务（唯一）
 
-- 任务 ID：TV-01
-- 任务名称：Lua 5.4 / .NET 10 绑定与中断机制 PoC
-- 目标：验证 NLua/KeraLua 候选能否稳定运行 Lua 5.4、暴露自动化 API、返回行号，并实现 CPU 无限循环取消与可取消 Delay。
-- 范围内：建立独立最小 PoC；检查 NuGet 当前版本、TFM、许可证、Lua 版本和 win-x64 self-contained 发布；验证 lua_sethook/instruction hook；形成结论。
-- 范围外：正式桌面 UI、最终脚本引擎、录制器、鼠标键盘正式实现、编辑器控件选择。
-- 建议输出目录：poc/LuaRuntime/（如 PoC 已达最小必要，按需创建，不要先创建整个正式解决方案）。
-- 必须更新：TECHNICAL-VALIDATION-CN.md、DECISIONS-CN.md、ROADMAP-CN.md、DEVELOPMENT-LOG-CN.md、SESSION-HANDOFF.md。
-- 验收：技术验证清单第 3 节有逐项结果；关键取消目标有重复实测数据；所有包版本和来源写明。
-- 完成后下一任务：TV-02 编辑器组件 PoC（除非 TV-01 暴露架构阻断）。
+- ID：TV-01
+- 名称：Lua 5.4 / .NET 10 绑定与中断机制 PoC
+- 目标：在独立最小 PoC 中验证 Lua 5.4 运行、C# 全局函数注册、错误行号、CPU 无限循环 Stop、可取消 Delay、Pause/Resume、win-x64 self-contained。
+- 先核对 NLua / KeraLua 当前包、依赖树、许可和 native assets；检查高层绑定是否能提供稳定的 instruction hook。
+- 若高层 API 做不到，在证据支持下验证 KeraLua 原生 API 路径；不要直接编写正式桌面 UI。
+- 需要提交 PoC 代码、Windows CI 构建/测试工作流、验证结果和依赖锁定结论。
+- 必须更新 TECHNICAL-VALIDATION-CN.md、DECISIONS-CN.md、ROADMAP-CN.md、DEVELOPMENT-LOG-CN.md、SESSION-HANDOFF.md。
+- 结束时实际检查 GitHub Actions 结果；未通过则记录日志和精确失败原因。
 
-## 给下一会话的执行指令
+## 下一会话接手指令
 
-先读取 AGENTS.md、README.md、本文件、ROADMAP-CN.md 和 TECHNICAL-VALIDATION-CN.md。只执行 TV-01。基于最新 main 工作；完成实际 PoC、构建和测试；如需调整方案，记录证据并更新 ADR；最后更新 handoff / log / roadmap 并提交 main。不要重做产品方向讨论，也不要开始正式应用 UI。
+先读取 AGENTS.md、README.md、docs/SESSION-HANDOFF.md、docs/ROADMAP-CN.md、docs/TECHNICAL-VALIDATION-CN.md 与 docs/LUA-API-CN.md。以 main 最新 HEAD 为准。只执行 TV-01；写入前检查 HEAD；完成独立 PoC、Windows CI 构建/测试和真实验证后，更新 handoff / log / roadmap 并提交 main。不得把未执行测试写成 PASS。
