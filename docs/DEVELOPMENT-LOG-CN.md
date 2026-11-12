@@ -155,3 +155,38 @@ TV-01：Lua 5.4 / .NET 10 绑定与中断机制 PoC。
 
 ### 版本安排
 - 作为 v0.1.0-preview.2 的功能增量；preview.1 既有资产保持不变。
+
+
+## 2026-11-12 — S003 — 全局热键与 v0.1.0-preview.2 发布完成
+
+### 用户需求
+用户明确提出脚本运行时必须有按键精灵熟悉的快捷键，避免无法快速中止。
+
+### 实现
+- F10：应用空闲且未录制时启动当前脚本。
+- F11：脚本运行/暂停时切换暂停与继续。
+- F12：脚本运行/暂停时立即中止并清理本程序持有的按键和鼠标按钮。
+- 使用全局低级键盘钩子；过滤模拟注入按键，避免脚本自身发送 F10/F11/F12 导致误触发。
+- 只在有对应动作时截获按键：空闲时 F12 仍可交给浏览器打开开发者工具；运行期间 F12 被用作中止键。
+- 主界面、README、PRD、用户手册、验收清单、handoff 和 roadmap 已同步说明。
+
+### Git 提交
+- 快捷键实现：`5ce20ee50542bed34dad86aae89c5dd045767803`
+- 状态按需截获修正：`e8e96cb26df1a254d2db45dd2a72b2c7ef11cd9f`
+- 文档更新：`0bcff7373319a47cc4253309238f3603c7eab81d`
+- preview.2 release：`3e63ff38d8111181fa1a402547350c80e6ceb882`
+
+### CI 与发布
+- 最终代码提交 Actions run：`43226322656`，SUCCESS。
+- Release Actions run：`43226666516`，SUCCESS；Build、Test、Publish、Package、Artifact Upload、Read Release Version、Create GitHub Release 全部成功。
+- 自动化测试：7 passed / 0 failed / 0 skipped。
+- Release：<https://github.com/xiaobei206/anjian/releases/tag/v0.1.0-preview.2>
+- ZIP：`Anjian2026-0.1.0-preview.2-win-x64.zip`，51,881,918 bytes。
+- SHA256：`41139ffeefd695bce3e1f00f232fc8d2fc1cb7b34b67f8bfb53d68019c0bd089`。
+- Sidecar 与实际 ZIP SHA256 已通过本地校验；Release asset ZIP digest 与文件 SHA 一致。
+
+### 验收边界与下一步
+- CI 编译、自动化测试、自包含发布及 Release 资产核验：PASS。
+- 用户 Windows 10/11 实机 F10/F11/F12 热键测试：NOT RUN。
+- 2 小时稳定性、混合 DPI、多显示器、复杂拖拽和不同权限级别目标程序兼容：仍 NOT RUN。
+- 下一步仅优先做用户实机验收与反馈修复，不要擅自扩大首版范围。

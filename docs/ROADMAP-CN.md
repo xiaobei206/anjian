@@ -19,7 +19,7 @@
 - [x] Windows SendInput / SetCursorPos 输入及输入状态清理
 - [x] Click / KeyPress 默认 50ms
 - [x] 播放/暂停/停止
-- [x] 全局快捷键 F10 启动、F11 暂停/继续、F12 中止（代码提交，待最终 CI/用户实机验证）
+- [x] 全局快捷键 F10 启动、F11 暂停/继续、F12 中止（Windows CI SUCCESS，待用户实机验收）
 - [x] 重复次数：默认 1，正整数按轮数执行，0=无限循环
 - [x] 每轮间隔：默认 2000ms，只在轮次之间等待，末轮后不等待
 - [x] 播放设置本地持久化
@@ -27,7 +27,7 @@
 - [x] 7 项自动化测试通过（7/7）
 - [x] win-x64 self-contained ZIP 发布成功
 - [x] SHA256 sidecar 与实际发布 ZIP 复核一致
-- [x] GitHub prerelease v0.1.0-preview.1 已发布
+- [x] GitHub prerelease v0.1.0-preview.2 已发布
 - [ ] 用户 Windows 实机手工验收
 - [ ] 2 小时稳定性测试和 DPI/多显示器实测
 

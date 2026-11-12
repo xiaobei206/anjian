@@ -4,11 +4,11 @@
 - 项目：按键精灵 2026（暂定工作名）
 - 仓库：xiaobei206/anjian
 - 主分支：main
-- 已发布版本：**v0.1.0-preview.1**
-- Release：https://github.com/xiaobei206/anjian/releases/tag/v0.1.0-preview.1
-- 发布提交：cf24ac9292ea21dd1063ea9e9d65f18e3637442a
-- 发布 Actions run：43224009158，结论 SUCCESS。
-- 当前任务：准备 v0.1.0-preview.2，全局热键功能已提交，最终 Windows Actions 验证进行中；preview.1 仍是最新正式 Release。随后由用户实测快捷键与原有播放功能。
+- 已发布版本：**v0.1.0-preview.2**
+- Release：https://github.com/xiaobei206/anjian/releases/tag/v0.1.0-preview.2
+- 发布提交：`3e63ff38d8111181fa1a402547350c80e6ceb882`
+- 发布 Actions run：`43226666516`，结论 SUCCESS。
+- 当前任务：由用户在 Windows 10/11 实机验收 v0.1.0-preview.2，重点验证 F10/F11/F12 全局快捷键和原有播放/停止功能。
 
 ## 用户确认的产品决策
 - Windows 10/11 x64。
@@ -31,29 +31,37 @@
 - Windows SendInput / SetCursorPos 鼠标键盘输入、键状态追踪和停止清理。
 - Unicode 文本输入、可取消长文本注入、常见标点键和数字小键盘键映射。
 - 播放/暂停/停止、重复次数和轮间间隔；配置持久化于用户本地配置目录。
-- 全局快捷键已加入：空闲时 F10 启动；运行/暂停时 F11 暂停/继续、F12 中止。低级键盘钩子过滤模拟注入事件；功能键仅在对应动作可用时被截获。代码提交 `e8e96cb26df1a254d2db45dd2a72b2c7ef11cd9f`，待该提交 CI 完成及用户实机验收。
+- 全局快捷键：空闲时 F10 启动；运行/暂停时 F11 暂停/继续、F12 中止。低级键盘钩子过滤模拟注入事件；只有对应动作可执行时才截获功能键。代码提交 `e8e96cb26df1a254d2db45dd2a72b2c7ef11cd9f`，Windows CI 已通过；实机验收待用户完成。
 - self-contained win-x64 ZIP 和 SHA256 发布资产。
 
-## 正式 Release 资产
+## 最新 Release 资产：v0.1.0-preview.2
+- Release 页面：https://github.com/xiaobei206/anjian/releases/tag/v0.1.0-preview.2
+- ZIP：`Anjian2026-0.1.0-preview.2-win-x64.zip`
+- ZIP 下载：https://github.com/xiaobei206/anjian/releases/download/v0.1.0-preview.2/Anjian2026-0.1.0-preview.2-win-x64.zip
+- ZIP 大小：51,881,918 bytes。
+- SHA256 sidecar：`Anjian2026-0.1.0-preview.2-win-x64.zip.sha256`
+- SHA256 下载：https://github.com/xiaobei206/anjian/releases/download/v0.1.0-preview.2/Anjian2026-0.1.0-preview.2-win-x64.zip.sha256
+- ZIP SHA256：`41139ffeefd695bce3e1f00f232fc8d2fc1cb7b34b67f8bfb53d68019c0bd089`
+- 已从 Actions artifact 下载内层 ZIP 和 SHA sidecar；文件大小及 SHA256 三方核对通过（sidecar 与实际 ZIP 计算值一致，GitHub Release asset digest 与 ZIP SHA 一致）。
+- Release asset IDs：ZIP `739580318`；SHA256 `739580310`。
+- Release ID：`442980321`，prerelease=true。
+
+## 历史 Release：v0.1.0-preview.1
 - Release 页面：https://github.com/xiaobei206/anjian/releases/tag/v0.1.0-preview.1
-- ZIP：`Anjian2026-0.1.0-preview.1-win-x64.zip`
-- ZIP 下载：https://github.com/xiaobei206/anjian/releases/download/v0.1.0-preview.1/Anjian2026-0.1.0-preview.1-win-x64.zip
 - ZIP 大小：51,879,710 bytes。
-- SHA256 sidecar：`Anjian2026-0.1.0-preview.1-win-x64.zip.sha256`
-- SHA256 下载：https://github.com/xiaobei206/anjian/releases/download/v0.1.0-preview.1/Anjian2026-0.1.0-preview.1-win-x64.zip.sha256
-- ZIP SHA256：`80bfbf3ddbebafaf6e835bc8fb29148760662418b2c57de79f7ab7dbe88e6164`
-- 已下载 Actions artifact 并解包：其中 ZIP 为 51,879,710 bytes；实际 sha256 与 sidecar 及 GitHub Release asset digest 三方一致。
-- Release asset IDs：ZIP `739527441`；SHA256 `739527433`。
+- ZIP SHA256：`80bfbf3ddbebafaf6e835bc8fb29148760662418b2c57de79f7ab7dbe88e6164`。
 - Release ID：`442961207`，prerelease=true。
 
 ## Windows CI 验证
-- Release workflow run：43224009158，SUCCESS。
-- Release build：0 warnings / 0 errors。
-- 自动化测试：7 passed / 0 failed / 0 skipped。
+- v0.1.0-preview.2 Release workflow run：`43226666516`，SUCCESS；所有 job/step 均成功。
+- 最终快捷键代码提交 `e8e96cb26df1a254d2db45dd2a72b2c7ef11cd9f` 对应 run：`43226322656`，SUCCESS。
+- Release 构建、测试、自包含 win-x64 publish、ZIP/SHA256 package、artifact upload、GitHub Release creation：全部 SUCCESS。
+- 自动化测试：7 passed / 0 failed / 0 skipped（测试项目现有 7 项）。
 - 测试包括：播放次数/轮间隔默认值、100 轮 99 次间隔、0 无限循环、边界值校验；Lua 5.4 版本确认、Lua 调用 C# 全局函数、Lua instruction-count hook 触发。
 - self-contained win-x64 publish：SUCCESS。
 - ZIP/SHA256 package：SUCCESS。
-- Add-Content 写入 GitHub Actions output 变量修复已通过，正式 prerelease 已成功创建。
+- Release ZIP SHA256 已通过实际解包 Actions artifact 并运行 `sha256sum -c` 核验。
+- 正式 prerelease v0.1.0-preview.2 已成功创建。
 
 ## 仍未完成（务必如实）
 - 用户 Windows 实机手工验收：NOT RUN。
@@ -71,8 +79,8 @@
 3. 手写 `MoveTo`、`LeftClick(50)`、`KeyPress`、`Hotkey`、`TypeText`、`Delay` 测试。
 4. 重复次数设置 100，确认完整执行 100 轮；每轮间隔 0/1000/2000ms，确认只在两轮之间发生等待。
 5. 设置 0 无限循环并执行 Stop；测试 CPU 无限循环 Stop、Delay 中 Stop、Pause/Resume 和输入释放。
-5. 实机验证 F10/F11/F12 全局快捷键：应用最小化或焦点在目标应用时分别启动、暂停/继续、停止；验证 F12 停止后键鼠释放，空闲时 F12 仍可交给浏览器/前台程序。若钩子安装失败，收集日志和 Win32 错误码。
-6. 把实际错误日志、具体复现步骤和目标程序环境交给下一会话，按小版本迭代修复。
+6. 实机验证 F10/F11/F12 全局快捷键：应用最小化或焦点在目标应用时分别启动、暂停/继续、停止；验证 F12 停止后键鼠释放，空闲时 F12 仍可交给浏览器/前台程序。若钩子安装失败，收集日志和 Win32 错误码。
+7. 把实际错误日志、具体复现步骤和目标程序环境交给下一会话，按小版本迭代修复。
 
 ## 下一会话接手指令
 先读 AGENTS.md、README.md、本文件、docs/ROADMAP-CN.md、docs/LUA-API-CN.md 和 docs/USER-GUIDE-CN.md。先核对当前 main HEAD 与 Release，不要假设旧版本状态。优先处理用户实机反馈；除非反馈明确要求，不要擅自重写初版 UI 或扩大范围。
