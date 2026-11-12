@@ -146,8 +146,9 @@ public static class LuaEditorService
                        (char.IsAsciiLetterOrDigit(source[index]) ||
                         source[index] is '.' or '_' or '+' or '-'))
                 {
-                    if (source[index] is '+' or '-' &&
-                        source[index - 1] is not 'e' and not 'E' and not 'p' and not 'P')
+                    if ((source[index] == '+' || source[index] == '-') &&
+                        source[index - 1] != 'e' && source[index - 1] != 'E' &&
+                        source[index - 1] != 'p' && source[index - 1] != 'P')
                         break;
                     index++;
                 }
@@ -161,7 +162,8 @@ public static class LuaEditorService
                 index++;
                 if (index < source.Length &&
                     ((current == '.' && source[index] == '.') ||
-                     (current is '=' or '<' or '>' or '~' && source[index] == '=')))
+                     ((current == '=' || current == '<' || current == '>' || current == '~') &&
+                      source[index] == '=')))
                 {
                     index++;
                     if (current == '.' && index < source.Length && source[index] == '.')
