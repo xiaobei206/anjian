@@ -423,8 +423,9 @@ M3 已 DONE。下一会话唯一任务为 M4：Lua 调试器基础。必须实�
 ### Windows CI 反馈与当前状态
 - Actions run 43289601917 首次编译反馈 Core 代码中 LuaFunction 同时来自 KeraLua 与 NLua；以 NLua.LuaFunction 限定后，Core 和 App 项目可继续编译。
 - Actions run 43290120386 的 Restore PASS，Core/App 编译通过，但测试项目 Build 被 xUnit2031 analyzer 阻断：两处 Assert.Single(collection.Where(...)) 必须使用 Assert.Single(collection, predicate)；已在 commit edac117255cefbad94874b0c34329325e7c41678 修复。
-- 修复后 Actions run 43290603954（commit edac117255cefbad94874b0c34329325e7c41678）与 run 43290697650（commit f58e54df72c12329a8a8a0002710b4b80fb71982）曾显示 in progress；随后路线图提交 d73c6474682ad9e321bb14386fdc1663a1e9555d 也触发了新的 Windows workflow。最终通过/失败结果尚需回读 Actions，不得把前述编译部分通过写成整体验收通过。
+- 修复后 Actions run 43290603954（commit edac117255cefbad94874b0c34329325e7c41678）Restore/Build PASS（0 warnings / 0 errors），但 25 项测试为 24 passed / 1 failed。run 43290697650（commit f58e54df72c12329a8a8a0002710b4b80fb71982）重复得到相同测试结果。唯一失败为 StepIntoOverAndOutFollowNestedLuaCallFrames：测试一开始只发送 Continue，未设置后续断点，实际运行只在初始停点暂停一次；问题属于测试用例未在后续执行点建立控制入口，不是 CI 编译故障。
 - 本轮本地执行容器没有 .NET SDK（dotnet command not found），本地 Restore/Build/Test：NOT RUN。真实构建和测试由 Windows GitHub Actions 执行。
+- 已在 commit ca56ef49feb531ab314b7ac446bddf1f99dc8fb5 将嵌套步进测试修正为在 main 脚本第 9 行设置真实断点，之后依次执行 Step Into / Step Over / Step Out，并验证最终停点为外层函数后及主脚本后续行。该测试修正对应 Actions run 43291044845；本轮更新时尚未完成，必须继续核实。
 - Windows 桌面手工验收尚未执行：M1 preview.4 窗口/托盘/Hook/DPI/多屏/长时稳定性、M3 编辑器交互、M4 断点/变量面板均为 NOT RUN。CI 不代表桌面实机验收。
 - 本轮未创建新 Release；v0.1.0-preview.4 的 Release/ZIP/SHA256 不变。
 - 当前 M4 只提供基础 scalar snapshot；断点不跨关闭标签/重启持久化，watch 表达式和表展开未实现。功能矩阵 F05 仍标记“部分实现”，不得描述为完整调试器交付。
