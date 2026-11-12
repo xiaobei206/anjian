@@ -9,8 +9,8 @@
 - Release commit：`08886d9e66c08ba24f6f1b7d9e91bbdaeba8a9e0`
 - 发布 Actions run：`43253611158`，结论 SUCCESS。
 - 最新产品代码/release commit：`08886d9e66c08ba24f6f1b7d9e91bbdaeba8a9e0`。
-- 当前最新 main HEAD：`63bd1785e84faf0a2d4db41c034f27ac695f08aa`（本次产品大纲/架构/交接状态校准提交）。
-- 当前阶段：preview.4 的 CI/发布已完成；下一步优先 Windows 实机验收和稳定性验证，不要默认用户已经完成验收。
+- main 分支可能继续产生文档提交；新 GPT 接手时必须重新查询 main 最新 HEAD，不要把 handoff 中的历史提交 SHA 当成分支当前头部。
+- 当前阶段：preview.4 的 CI/发布已完成；下一步优先 Windows 实机验收、2 小时稳定性、DPI/多显示器及输入 Hook 验证，不要默认用户已经完成验收。
 
 ## preview.4 窗口与托盘决策
 - 悬浮窗和完整主窗口必须是两个独立顶层窗口，可以同时显示；打开主窗口不替换或隐藏悬浮窗。
