@@ -139,18 +139,18 @@
 
 ### M3 完成：完整 Lua IDE 基础（Windows CI 已验收）
 
-- 最终 M3 代码验收基线：\`71555d30815a60f96ef0708fe6c46f4cc0a16253\`。
-- Windows Actions run \`43281738798\`：SUCCESS；Restore PASS；Release Build PASS（0 warnings / 0 errors）；自动化测试 \`20 passed / 0 failed / 0 skipped\`；API handbook \`--check\` PASS；self-contained win-x64 publish、ZIP/SHA256 和 artifact upload 均 PASS。
-- 实现位于 \`Anjian.Core.Editor.LuaEditorService\` 和 WinForms \`LuaEditorControl\` / \`ScriptSearchReplaceForm\` / \`MainForm\`。功能包括语法高亮、行号、API 补全、活动参数/签名帮助、查找替换、多标签保存/重开、语法诊断和错误行导航。
-- API 候选、签名和高亮只读取 \`LuaApiRegistry.Load().Categories\` / \`.Apis\`；不复制函数定义，只列出状态为 \`implemented\` 的 API。独立 API 命令面板未实现。
-- 语法检查调用 NLua \`LoadString\` 编译 chunk，不执行脚本；高亮扫描移至后台线程并以文本版本号丢弃过期结果。
+- 最终 M3 代码验收基线：`71555d30815a60f96ef0708fe6c46f4cc0a16253`。
+- Windows Actions run `43281738798`：SUCCESS；Restore PASS；Release Build PASS（0 warnings / 0 errors）；自动化测试 `20 passed / 0 failed / 0 skipped`；API handbook `--check` PASS；self-contained win-x64 publish、ZIP/SHA256 和 artifact upload 均 PASS。
+- 实现位于 `Anjian.Core.Editor.LuaEditorService` 和 WinForms `LuaEditorControl` / `ScriptSearchReplaceForm` / `MainForm`。功能包括语法高亮、行号、API 补全、活动参数/签名帮助、查找替换、多标签保存/重开、语法诊断和错误行导航。
+- API 候选、签名和高亮只读取 `LuaApiRegistry.Load().Categories` / `.Apis`；不复制函数定义，只列出状态为 `implemented` 的 API。独立 API 命令面板未实现。
+- 语法检查调用 NLua `LoadString` 编译 chunk，不执行脚本；高亮扫描移至后台线程并以文本版本号丢弃过期结果。
 - Windows 自动测试 20 项全部通过；本地 Restore/Build/Test 为 NOT RUN（容器无 .NET SDK）。桌面实机验收与 1MB 文件/DPI/中文日文输入人工验证仍为 NOT RUN。
-- 早期有一项签名提示测试因测试夹具逗号位置错误失败；修正夹具后最终 run \`43281738798\` 通过。前期错误不隐藏，最终状态以该次最新成功运行作为验收依据。
+- 早期有一项签名提示测试因测试夹具逗号位置错误失败；修正夹具后最终 run `43281738798` 通过。前期错误不隐藏，最终状态以该次最新成功运行作为验收依据。
 - M3 未创建 Release，v0.1.0-preview.4 Release ZIP/SHA256 未改变。代码折叠不在该 handoff 强制范围，功能矩阵 F04 仍为部分实现；M4 调试器未实现。
 
 ### 下一会话唯一任务（M4：Lua 调试器基础）
 
-严格按冻结的 \`docs/PRD-CN.md\` / \`docs/FEATURE-MATRIX-CN.md\` 和 \`docs/ROADMAP-CN.md\` 实施 M4，不得用日志展示或仅显示行号冒充调试能力：
+严格按冻结的 `docs/PRD-CN.md` / `docs/FEATURE-MATRIX-CN.md` 和 `docs/ROADMAP-CN.md` 实施 M4，不得用日志展示或仅显示行号冒充调试能力：
 1. 先检查 NLua/KeraLua 可用的真实调试 hook/stack/local APIs 与现有 worker 子进程边界，确定可控的调试协议。
 2. 实现真实断点（文件/行号）、单步进入/越过/跳出、继续运行、运行到光标；暂停后确实停在目标 Lua 执行点。
 3. 暴露当前栈帧、调用栈、局部变量/可读全局变量观察；不得将 Lua state 从 worker 线程并发交给 UI。
@@ -164,4 +164,4 @@ M3 Windows 桌面手工验收仍为 NOT RUN；代码折叠和独立 API 命令�
 
 ## 下一会话接手指令
 
-先核对 \`main\` 最新 HEAD，再读取本文件、\`AGENTS.md\`、\`README.md\`、\`docs/ROADMAP-CN.md\`。M3 已由 Windows Actions run \`43281738798\` 验收通过；下一会话唯一开发任务为 M4 Lua 调试器基础，严格按本节 ID/范围/验收条件执行，不重复询问仓库已有答案。直接在 main 小步提交，不创建长期分支或 PR。v0.1.0-preview.4 发布资产不变；M1 和 M3 Windows 桌面手工验收都必须保留为 NOT RUN，CI 不可代替实机验收。
+先核对 `main` 最新 HEAD，再读取本文件、`AGENTS.md`、`README.md`、`docs/ROADMAP-CN.md`。M3 已由 Windows Actions run `43281738798` 验收通过；下一会话唯一开发任务为 M4 Lua 调试器基础，严格按本节 ID/范围/验收条件执行，不重复询问仓库已有答案。直接在 main 小步提交，不创建长期分支或 PR。v0.1.0-preview.4 发布资产不变；M1 和 M3 Windows 桌面手工验收都必须保留为 NOT RUN，CI 不可代替实机验收。
