@@ -3,6 +3,7 @@ using System.IO.Pipes;
 using System.Text;
 using System.Text.Json;
 using Anjian.Core;
+using Anjian.Core.Editor;
 
 namespace Anjian.App.Services;
 
@@ -12,23 +13,40 @@ internal sealed class PlaybackRunner : IDisposable
     private readonly ExecutionGate _gate = new();
     private CancellationTokenSource? _runCts;
     private Process? _worker;
+    private LuaDebugLaunchOptions? _debugLaunchOptions;
+    private TaskCompletionSource<LuaDebugCommand>? _debugCommandSource;
 
     public event Action<string>? Log;
     public event Action<int, int>? IterationChanged;
+    public event Action<LuaDebugSnapshot>? DebugPaused;
+    public event Action? DebugSessionCompleted;
     public bool IsRunning => _runCts is not null;
     public bool IsPaused => _gate.IsPaused;
+    public bool IsDebugging => _runCts is not null && _debugLaunchOptions is not null;
 
     public void Pause() => _gate.Pause();
     public void Resume() => _gate.Resume();
 
-    public async Task RunAsync(string scriptPath, PlaybackOptions options)
+    public void SubmitDebugCommand(LuaDebugCommand command)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        Volatile.Read(ref _debugCommandSource)?.TrySetResult(command);
+    }
+
+    public async Task RunAsync(
+        string scriptPath,
+        PlaybackOptions options,
+        LuaDebugLaunchOptions? debugOptions = null)
     {
         options.Validate();
         if (_runCts is not null)
             throw new InvalidOperationException("已有脚本正在运行。");
+        if (debugOptions is not null && (options.RepeatCount != 1 || options.IntervalMilliseconds != 0))
+            throw new ArgumentException("调试运行固定执行单轮，不支持循环次数和轮间隔。", nameof(options));
 
         using var cts = new CancellationTokenSource();
         _runCts = cts;
+        _debugLaunchOptions = debugOptions;
         _gate.Resume();
         var token = cts.Token;
         var completed = 0;
@@ -42,7 +60,7 @@ internal sealed class PlaybackRunner : IDisposable
                 Log?.Invoke(options.IsInfinite
                     ? $"开始第 {next} 轮（无限循环）"
                     : $"开始第 {next}/{options.RepeatCount} 轮");
-                await RunOneAsync(scriptPath, token).ConfigureAwait(false);
+                await RunOneAsync(scriptPath, debugOptions, token).ConfigureAwait(false);
                 completed++;
                 if (!options.HasNextIteration(completed))
                     break;
@@ -63,19 +81,26 @@ internal sealed class PlaybackRunner : IDisposable
         {
             KillWorker();
             _input.ReleaseAll();
+            Volatile.Read(ref _debugCommandSource)?.TrySetCanceled();
+            _debugLaunchOptions = null;
             _runCts = null;
             _gate.Resume();
+            DebugSessionCompleted?.Invoke();
         }
     }
 
     public void Stop()
     {
         _runCts?.Cancel();
+        Volatile.Read(ref _debugCommandSource)?.TrySetCanceled();
         KillWorker();
         _input.ReleaseAll();
     }
 
-    private async Task RunOneAsync(string scriptPath, CancellationToken token)
+    private async Task RunOneAsync(
+        string scriptPath,
+        LuaDebugLaunchOptions? debugOptions,
+        CancellationToken token)
     {
         var pipeName = "Anjian2026_" + Guid.NewGuid().ToString("N");
         await using var server = new NamedPipeServerStream(pipeName, PipeDirection.InOut, 1,
@@ -100,8 +125,8 @@ internal sealed class PlaybackRunner : IDisposable
                 var message = JsonSerializer.Deserialize<IpcMessage>(line) ?? throw new InvalidDataException("收到空的执行请求。");
                 try
                 {
-                    await DispatchAsync(message, token).ConfigureAwait(false);
-                    await writer.WriteLineAsync("{\"ok\":true}").ConfigureAwait(false);
+                    var payload = await DispatchAsync(message, debugOptions, token).ConfigureAwait(false);
+                    await writer.WriteLineAsync(JsonSerializer.Serialize(new { ok = true, payload })).ConfigureAwait(false);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
@@ -124,8 +149,23 @@ internal sealed class PlaybackRunner : IDisposable
         }
     }
 
-    private async Task DispatchAsync(IpcMessage message, CancellationToken token)
+    private async Task<string?> DispatchAsync(
+        IpcMessage message,
+        LuaDebugLaunchOptions? debugOptions,
+        CancellationToken token)
     {
+        if (message.Type == "worker-ready")
+            return debugOptions is null ? null : JsonSerializer.Serialize(debugOptions);
+
+        if (message.Type == "debug-break")
+        {
+            if (debugOptions is null || string.IsNullOrWhiteSpace(message.Text))
+                throw new InvalidDataException("收到非调试会话的断点请求。");
+            var snapshot = JsonSerializer.Deserialize<LuaDebugSnapshot>(message.Text)
+                ?? throw new InvalidDataException("无法解析 Lua 调试快照。");
+            return JsonSerializer.Serialize(await WaitForDebuggerCommandAsync(snapshot, token).ConfigureAwait(false));
+        }
+
         // Pause takes effect at every command boundary. Explicit Up commands remain allowed
         // so a paused script cannot strand a held key or mouse button.
         if (message.Type is not ("mouse-up" or "key-up"))
@@ -174,6 +214,27 @@ internal sealed class PlaybackRunner : IDisposable
                 break;
             default:
                 throw new InvalidDataException($"未知执行命令：{message.Type}");
+        }
+
+        return null;
+    }
+
+    private async Task<LuaDebugCommand> WaitForDebuggerCommandAsync(
+        LuaDebugSnapshot snapshot,
+        CancellationToken token)
+    {
+        var source = new TaskCompletionSource<LuaDebugCommand>(TaskCreationOptions.RunContinuationsAsynchronously);
+        if (Interlocked.CompareExchange(ref _debugCommandSource, source, null) is not null)
+            throw new InvalidOperationException("调试器已经在等待控制命令。");
+
+        try
+        {
+            DebugPaused?.Invoke(snapshot);
+            return await source.Task.WaitAsync(token).ConfigureAwait(false);
+        }
+        finally
+        {
+            Interlocked.CompareExchange(ref _debugCommandSource, null, source);
         }
     }
 
