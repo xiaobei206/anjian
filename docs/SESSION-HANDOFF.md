@@ -10,7 +10,7 @@
 - 发布 Actions run：`43253611158`，结论 SUCCESS。
 - 最新产品代码/release commit：`08886d9e66c08ba24f6f1b7d9e91bbdaeba8a9e0`。
 - main 分支可能继续产生文档提交；新 GPT 接手时必须重新查询 main 最新 HEAD，不要把 handoff 中的历史提交 SHA 当成分支当前头部。
-- 当前阶段：M0 完成；M1 Windows 实机验收仍 IN_PROGRESS/NOT RUN；M2 单一 API 注册表与函数手册工程已完成且 Windows CI PASS；下一开发阶段为 M3 完整 Lua IDE 基础。
+- 当前阶段：M0/M2/M3 已完成；M1 Windows 实机验收仍 IN_PROGRESS/NOT RUN；M3 Lua IDE 基础已通过 Windows CI，桌面手工验收待执行；下一开发阶段为 M4 Lua 调试器。
 
 ## 完整产品目标已冻结（2026-11-13）
 - 产品范围基线：[docs/PRD-CN.md](PRD-CN.md)。
@@ -45,7 +45,7 @@
 ## 当前已交付功能
 - WinForms 主窗口和脚本列表。
 - 脚本本地存储、新建、打开、保存、重命名、复制、删除和右键菜单。
-- 基础 Lua 文本编辑器，Ctrl+S 保存。
+- M3 Lua 编辑器（仅在当前 main 未发布开发版）：语法高亮、行号、注册表驱动 API 补全/签名提示、查找替换、多标签、语法只编译诊断与错误行导航；标签切换/关闭自动保存。v0.1.0-preview.4 发布包仍只有基础文本编辑器。
 - 全局鼠标/键盘录制，鼠标移动合并，录制过滤注入事件及本程序窗口事件，避免键盘自动重复污染；录制结束时补齐尚未释放的 Down/Up。
 - 录制数据生成 Lua 代码，点击按下时长与动作间隔分开保存。
 - NLua 1.7.9 / Lua 5.4 worker 子进程；named pipe IPC；指令钩子 Pause 检查点；Stop 可终止 CPU 无限循环 worker。
@@ -91,7 +91,7 @@
 - 2 小时稳定性测试：NOT RUN。
 - Windows 10/11 干净环境、DPI、多显示器负坐标、复杂拖拽及具体目标程序权限兼容：NOT RUN。
 - 录制采用低级 Hook，需在用户电脑确认 Hook 采集工作正常、不会漏录或重复。
-- 编辑器仍为基础文本框，没有语法高亮、补全、参数提示、断点。
+- 代码折叠、独立 API 命令面板未实现；断点/单步/变量窗/调用栈属于下一阶段 M4。M3 Windows 桌面手工验收仍为 NOT RUN。
 - 没有可视化动作列表/动作参数编辑 UI，录制结束直接生成 Lua。
 - 不支持图像识别/OCR、窗口相对坐标、后台窗口注入、插件或云同步。
 
@@ -137,17 +137,31 @@
 - 编辑器自动补全、参数提示、命令面板 UI 尚未实现；M2 已提供唯一数据源，M3 必须直接消费该注册表，不能复制维护第二份 API 清单。
 - M1 Windows 10/11 窗口/托盘/Hook 实机验收、DPI/多显示器、复杂拖拽和 2 小时稳定性仍为 NOT RUN。CI 成功不等于桌面实机验收成功。
 
-### 下一会话唯一任务（M3：完整 Lua IDE 基础）
-严格按 `docs/ROADMAP-CN.md` 的 M3 范围实施，不重复讨论已冻结的 PRD：
-1. 将当前基础 Lua 文本框升级为可用编辑器，具备语法高亮、行号、查找/替换和多标签编辑。
-2. 提供可工作的 API 补全与参数/签名提示；数据必须来自 `LuaApiRegistry.Load().Categories` / `.Apis`，不允许在 UI 层复制函数名、参数或说明。
-3. 提供脚本诊断和错误行导航；编辑器保存、关闭、重开、多标签切换不能丢失内容。
-4. 命令面板若在本阶段接入，也必须由同一注册表驱动，搜索、展示签名/说明和插入代码需形成真实可用流程。
-5. 增加编辑器与注册表消费的一致性/交互自动测试，并运行 Windows CI；将 Windows 桌面 UI 的手工验收单独标记，不能由 CI 代替。
-6. 调试器的断点/单步/变量窗属于 M4，不要在本任务中冒充完成。
+### M3 完成：完整 Lua IDE 基础（Windows CI 已验收）
 
-M1 实机验收仍保留为未完成事项，但不阻塞 M3 的独立开发。
+- 最终 M3 代码验收基线：\`71555d30815a60f96ef0708fe6c46f4cc0a16253\`。
+- Windows Actions run \`43281738798\`：SUCCESS；Restore PASS；Release Build PASS（0 warnings / 0 errors）；自动化测试 \`20 passed / 0 failed / 0 skipped\`；API handbook \`--check\` PASS；self-contained win-x64 publish、ZIP/SHA256 和 artifact upload 均 PASS。
+- 实现位于 \`Anjian.Core.Editor.LuaEditorService\` 和 WinForms \`LuaEditorControl\` / \`ScriptSearchReplaceForm\` / \`MainForm\`。功能包括语法高亮、行号、API 补全、活动参数/签名帮助、查找替换、多标签保存/重开、语法诊断和错误行导航。
+- API 候选、签名和高亮只读取 \`LuaApiRegistry.Load().Categories\` / \`.Apis\`；不复制函数定义，只列出状态为 \`implemented\` 的 API。独立 API 命令面板未实现。
+- 语法检查调用 NLua \`LoadString\` 编译 chunk，不执行脚本；高亮扫描移至后台线程并以文本版本号丢弃过期结果。
+- Windows 自动测试 20 项全部通过；本地 Restore/Build/Test 为 NOT RUN（容器无 .NET SDK）。桌面实机验收与 1MB 文件/DPI/中文日文输入人工验证仍为 NOT RUN。
+- 早期有一项签名提示测试因测试夹具逗号位置错误失败；修正夹具后最终 run \`43281738798\` 通过。前期错误不隐藏，最终状态以该次最新成功运行作为验收依据。
+- M3 未创建 Release，v0.1.0-preview.4 Release ZIP/SHA256 未改变。代码折叠不在该 handoff 强制范围，功能矩阵 F04 仍为部分实现；M4 调试器未实现。
+
+### 下一会话唯一任务（M4：Lua 调试器基础）
+
+严格按冻结的 \`docs/PRD-CN.md\` / \`docs/FEATURE-MATRIX-CN.md\` 和 \`docs/ROADMAP-CN.md\` 实施 M4，不得用日志展示或仅显示行号冒充调试能力：
+1. 先检查 NLua/KeraLua 可用的真实调试 hook/stack/local APIs 与现有 worker 子进程边界，确定可控的调试协议。
+2. 实现真实断点（文件/行号）、单步进入/越过/跳出、继续运行、运行到光标；暂停后确实停在目标 Lua 执行点。
+3. 暴露当前栈帧、调用栈、局部变量/可读全局变量观察；不得将 Lua state 从 worker 线程并发交给 UI。
+4. UI 提供断点标记、当前执行行、调试控制和变量/调用栈视图；普通播放/停止行为继续工作。
+5. 为断点命中、单步次序、嵌套调用栈、变量快照、继续/停止和调试结束清理建立自动化测试，并运行 Windows CI。
+6. 任何无法可靠读取或显示的值都要明确标记类型/不可展开/截断原因；不执行任意表达式作为“观察变量”的捷径。
+7. M1 preview.4 实机验收及 M3 Windows 编辑器手工验收继续保留为单独 NOT RUN 项，不因 M4 开发而宣称完成。
+
+M3 Windows 桌面手工验收仍为 NOT RUN；代码折叠和独立 API 命令面板仍待后续完成。M1 实机验收继续保留，但不阻塞 M4 独立开发。
+
 
 ## 下一会话接手指令
 
-先核对 `main` 最新 HEAD，再读取本文件、`AGENTS.md`、`README.md` 和 `docs/ROADMAP-CN.md`。M2 已由 Windows Actions run `43273917056` 验收通过；下一会话唯一开发任务为 M3 完整 Lua IDE 基础。严格以 PRD/功能矩阵冻结的完整产品目标为准，直接在 main 小步提交，不创建长期分支或 PR。保留 M1 实机验收未完成的真实状态。
+先核对 \`main\` 最新 HEAD，再读取本文件、\`AGENTS.md\`、\`README.md\`、\`docs/ROADMAP-CN.md\`。M3 已由 Windows Actions run \`43281738798\` 验收通过；下一会话唯一开发任务为 M4 Lua 调试器基础，严格按本节 ID/范围/验收条件执行，不重复询问仓库已有答案。直接在 main 小步提交，不创建长期分支或 PR。v0.1.0-preview.4 发布资产不变；M1 和 M3 Windows 桌面手工验收都必须保留为 NOT RUN，CI 不可代替实机验收。
