@@ -1,6 +1,9 @@
 using Anjian.App.Models;
 using Anjian.App.Services;
+using Anjian.App.Controls;
 using Anjian.Core;
+using Anjian.Core.Api;
+using Anjian.Core.Editor;
 
 namespace Anjian.App;
 
@@ -11,7 +14,12 @@ internal sealed class MainForm : Form
     private readonly GlobalRecorder _recorder = new();
     private readonly PlaybackRunner _playback = new();
     private readonly ListBox _scripts = new();
-    private readonly RichTextBox _editor = new();
+    private readonly LuaApiRegistry _apiRegistry = LuaApiRegistry.Load();
+    private readonly TabControl _editorTabs = new() { Dock = DockStyle.Fill };
+    private readonly RichTextBox _emptyEditor = new();
+    private readonly Dictionary<string, ScriptTab> _openTabs = new(StringComparer.OrdinalIgnoreCase);
+    private ScriptTab? _activeTab;
+    private RichTextBox _editor => _activeTab?.Editor.TextBox ?? _emptyEditor;
     private readonly RichTextBox _log = new();
     private readonly NumericUpDown _repeatCount = new();
     private readonly NumericUpDown _repeatInterval = new();
@@ -39,6 +47,16 @@ internal sealed class MainForm : Form
     private NotifyIcon? _trayIcon;
     private Icon? _applicationIcon;
     private bool _allowExit;
+    private bool _refreshingScripts;
+    private bool _suppressTabSelection;
+
+    private sealed class ScriptTab(ScriptEntry entry, TabPage page, LuaEditorControl editor)
+    {
+        public ScriptEntry Entry { get; set; } = entry;
+        public TabPage Page { get; } = page;
+        public LuaEditorControl Editor { get; } = editor;
+        public bool Dirty { get; set; }
+    }
 
     public MainForm()
     {
@@ -63,7 +81,7 @@ internal sealed class MainForm : Form
         _playback.IterationChanged += (current, total) => Ui(() =>
             _progress.Text = total == 0 ? $"正在执行第 {current} 轮（无限）" : $"正在执行第 {current}/{total} 轮");
         _scripts.SelectedIndexChanged += (_, _) => SelectScript();
-        _editor.TextChanged += (_, _) => { if (!_loading) { _dirty = true; UpdateTitle(); } };
+        _editorTabs.SelectedIndexChanged += (_, _) => HandleEditorTabSelectionChanged();
         _repeatCount.ValueChanged += (_, _) =>
         {
             _floating?.SetRepeatCount((int)_repeatCount.Value);
@@ -132,6 +150,9 @@ internal sealed class MainForm : Form
         _stopButton.Enabled = false;
         _stopButton.Click += async (_, _) => await StopPlaybackAsync();
         toolbar.Controls.Add(_stopButton);
+        toolbar.Controls.Add(MakeButton("查找/替换", (_, _) => ShowSearchReplace()));
+        toolbar.Controls.Add(MakeButton("检查语法", async (_, _) => await CheckCurrentSyntaxAsync()));
+        toolbar.Controls.Add(MakeButton("关闭标签", (_, _) => CloseCurrentTab()));
 
         toolbar.Controls.Add(new Label { Text = "重复次数", AutoSize = true, Margin = new Padding(12, 8, 2, 0) });
         _repeatCount.Minimum = 0;
@@ -230,14 +251,10 @@ internal sealed class MainForm : Form
         editorHeader.Controls.Add(fileName);
         right.Controls.Add(editorHeader, 0, 0);
 
-        _editor.Dock = DockStyle.Fill;
-        _editor.Font = new Font("Consolas", 10.5F);
-        _editor.WordWrap = false;
-        _editor.AcceptsTab = true;
-        _editor.DetectUrls = false;
-        _editor.HideSelection = false;
-        _editor.BackColor = Color.FromArgb(250, 250, 250);
-        right.Controls.Add(_editor, 0, 1);
+        _editorTabs.Dock = DockStyle.Fill;
+        _editorTabs.Padding = new Point(12, 4);
+        _editorTabs.ShowToolTips = true;
+        right.Controls.Add(_editorTabs, 0, 1);
 
         var logPanel = new Panel { Dock = DockStyle.Fill };
         var logHeader = new Panel { Dock = DockStyle.Top, Height = 26 };
@@ -431,61 +448,269 @@ internal sealed class MainForm : Form
     private void RefreshScripts(string? selectPath = null)
     {
         var items = _repository.GetScripts();
-        _scripts.BeginUpdate();
-        _scripts.Items.Clear();
-        foreach (var item in items) _scripts.Items.Add(item);
-        _scripts.EndUpdate();
-
-        if (selectPath is not null)
+        var wantedPath = selectPath ?? _current?.FullPath;
+        _refreshingScripts = true;
+        try
         {
-            for (var i = 0; i < _scripts.Items.Count; i++)
+            _scripts.BeginUpdate();
+            _scripts.Items.Clear();
+            foreach (var item in items) _scripts.Items.Add(item);
+            _scripts.SelectedIndex = -1;
+
+            if (wantedPath is not null)
             {
-                if (_scripts.Items[i] is ScriptEntry entry &&
-                    string.Equals(entry.FullPath, selectPath, StringComparison.OrdinalIgnoreCase))
+                for (var i = 0; i < _scripts.Items.Count; i++)
                 {
-                    _scripts.SelectedIndex = i;
-                    break;
+                    if (_scripts.Items[i] is ScriptEntry entry &&
+                        string.Equals(entry.FullPath, wantedPath, StringComparison.OrdinalIgnoreCase))
+                    {
+                        _scripts.SelectedIndex = i;
+                        break;
+                    }
                 }
             }
+
+            if (_scripts.SelectedIndex < 0 && _scripts.Items.Count > 0)
+                _scripts.SelectedIndex = 0;
+        }
+        finally
+        {
+            _scripts.EndUpdate();
+            _refreshingScripts = false;
         }
 
-        if (_scripts.SelectedIndex < 0 && _scripts.Items.Count > 0)
-            _scripts.SelectedIndex = 0;
-
-        if (_scripts.Items.Count == 0)
+        if (_scripts.SelectedItem is ScriptEntry selected)
         {
+            if (_activeTab is null || !string.Equals(_activeTab.Entry.FullPath, selected.FullPath, StringComparison.OrdinalIgnoreCase))
+                SelectScript();
+        }
+        else if (_activeTab is null)
+        {
+            _emptyEditor.Clear();
             _current = null;
-            _loading = true;
-            _editor.Clear();
-            _loading = false;
+            _dirty = false;
             UpdateTitle();
         }
     }
 
     private void SelectScript()
     {
-        if (_scripts.SelectedItem is not ScriptEntry selected || selected == _current)
+        if (_refreshingScripts || _scripts.SelectedItem is not ScriptEntry selected)
             return;
+
         if (_recordSessionActive)
         {
-            var currentIndex = _current is null ? -1 : _scripts.Items.IndexOf(_current);
-            if (currentIndex >= 0) _scripts.SelectedIndex = currentIndex;
+            SetScriptListSelection(_current);
             AppendLog("录制期间不能切换脚本，请先结束录制。");
             return;
         }
-        if (!SaveCurrent())
+
+        if (_activeTab is not null &&
+            string.Equals(_activeTab.Entry.FullPath, selected.FullPath, StringComparison.OrdinalIgnoreCase))
             return;
+
+        OpenScriptTab(selected);
+    }
+
+    private void OpenScriptTab(ScriptEntry entry)
+    {
+        if (_activeTab is not null && !SaveCurrent())
+        {
+            SetScriptListSelection(_current);
+            return;
+        }
+
+        if (_openTabs.TryGetValue(entry.FullPath, out var existing))
+        {
+            _editorTabs.SelectedTab = existing.Page;
+            ActivateTab(existing);
+            return;
+        }
 
         try
         {
-            _loading = true;
-            _current = selected;
-            _editor.Text = _repository.Read(selected);
+            var editor = new LuaEditorControl(_apiRegistry) { Dock = DockStyle.Fill };
+            editor.TextBox.Text = _repository.Read(entry);
+            var page = new TabPage(entry.Name) { Tag = null, ToolTipText = entry.FullPath };
+            var tab = new ScriptTab(entry, page, editor);
+            page.Tag = tab;
+            page.Controls.Add(editor);
+            editor.ContentChanged += (_, _) =>
+            {
+                tab.Dirty = true;
+                tab.Page.Text = tab.Entry.Name + " *";
+                if (ReferenceEquals(_activeTab, tab))
+                {
+                    _dirty = true;
+                    UpdateTitle();
+                }
+            };
+
+            _openTabs.Add(entry.FullPath, tab);
+            _editorTabs.TabPages.Add(page);
+            _editorTabs.SelectedTab = page;
+            ActivateTab(tab);
+        }
+        catch (Exception ex)
+        {
+            AppendLog("打开脚本失败：" + ex.Message);
+            MessageBox.Show(this, ex.Message, "打开脚本失败", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    private void HandleEditorTabSelectionChanged()
+    {
+        if (_suppressTabSelection)
+            return;
+
+        if (_editorTabs.SelectedTab?.Tag is ScriptTab selected)
+        {
+            ActivateTab(selected);
+            return;
+        }
+
+        if (_activeTab is not null && SaveCurrent())
+        {
+            _activeTab = null;
+            _current = null;
             _dirty = false;
             UpdateTitle();
         }
-        catch (Exception ex) { AppendLog("打开脚本失败：" + ex.Message); }
-        finally { _loading = false; }
+    }
+
+    private void ActivateTab(ScriptTab tab)
+    {
+        if (!ReferenceEquals(_activeTab, tab) && !SaveCurrent())
+        {
+            _suppressTabSelection = true;
+            _editorTabs.SelectedTab = _activeTab?.Page;
+            _suppressTabSelection = false;
+            return;
+        }
+
+        _activeTab = tab;
+        _current = tab.Entry;
+        _dirty = tab.Dirty;
+        SetScriptListSelection(tab.Entry);
+        UpdateTitle();
+    }
+
+    private void SetScriptListSelection(ScriptEntry? entry)
+    {
+        _refreshingScripts = true;
+        try
+        {
+            var index = -1;
+            if (entry is not null)
+            {
+                for (var i = 0; i < _scripts.Items.Count; i++)
+                {
+                    if (_scripts.Items[i] is ScriptEntry candidate &&
+                        string.Equals(candidate.FullPath, entry.FullPath, StringComparison.OrdinalIgnoreCase))
+                    {
+                        index = i;
+                        break;
+                    }
+                }
+            }
+
+            _scripts.SelectedIndex = index;
+        }
+        finally
+        {
+            _refreshingScripts = false;
+        }
+    }
+
+    private void CloseCurrentTab()
+    {
+        if (_activeTab is null || !SaveCurrent())
+            return;
+
+        var closing = _activeTab;
+        _suppressTabSelection = true;
+        _openTabs.Remove(closing.Entry.FullPath);
+        _editorTabs.TabPages.Remove(closing.Page);
+        _activeTab = null;
+        _current = null;
+        _dirty = false;
+        _suppressTabSelection = false;
+        closing.Page.Dispose();
+
+        if (_editorTabs.SelectedTab?.Tag is ScriptTab next)
+            ActivateTab(next);
+        else
+        {
+            SetScriptListSelection(null);
+            UpdateTitle();
+        }
+    }
+
+    private void ShowSearchReplace()
+    {
+        if (_activeTab is null)
+        {
+            MessageBox.Show(this, "请先打开一个脚本。", "查找与替换", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        using var dialog = new ScriptSearchReplaceForm(_editor);
+        dialog.ShowDialog(this);
+    }
+
+    private async Task CheckCurrentSyntaxAsync()
+    {
+        if (_recordSessionActive || _current is null || !SaveCurrent())
+            return;
+
+        var path = _current.FullPath;
+        var source = _editor.Text;
+        _status.Text = "正在检查语法…";
+        try
+        {
+            var diagnostics = await Task.Run(() =>
+                LuaEditorService.AnalyzeSyntax(source, Path.GetFileName(path)));
+
+            if (!string.Equals(_current?.FullPath, path, StringComparison.OrdinalIgnoreCase))
+                return;
+
+            if (diagnostics.Count == 0)
+            {
+                AppendLog($"语法检查通过：{Path.GetFileName(path)}（仅编译检查，未执行脚本）。");
+                MessageBox.Show(this, "Lua 语法检查通过。脚本没有被执行。", "语法检查", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            foreach (var diagnostic in diagnostics)
+                AppendLog($"语法错误：{Path.GetFileName(path)} 第 {diagnostic.Line} 行，第 {diagnostic.Column} 列：{diagnostic.Message}");
+
+            var first = diagnostics[0];
+            NavigateToLine(first.Line, first.Column);
+            MessageBox.Show(this,
+                $"{Path.GetFileName(path)}：第 {first.Line} 行，第 {first.Column} 列\n{first.Message}",
+                "语法检查失败", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+        catch (Exception ex)
+        {
+            AppendLog("语法检查失败：" + ex.Message);
+            MessageBox.Show(this, ex.Message, "语法检查失败", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+        finally
+        {
+            _status.Text = _playback.IsRunning ? "正在运行" : "未运行";
+        }
+    }
+
+    private void NavigateToLine(int line, int column)
+    {
+        var index = _editor.GetFirstCharIndexFromLine(Math.Max(0, line - 1));
+        if (index < 0)
+            index = Math.Max(0, _editor.TextLength - 1);
+
+        var position = Math.Clamp(index + Math.Max(0, column - 1), 0, _editor.TextLength);
+        _editor.Select(position, position < _editor.TextLength ? 1 : 0);
+        _editor.ScrollToCaret();
+        _editor.Focus();
     }
 
     private void CreateScript()
@@ -507,11 +732,16 @@ internal sealed class MainForm : Form
     private bool SaveCurrent()
     {
         if (_recordSessionActive) return true;
-        if (_current is null || !_dirty) return true;
+        if (_current is null || (!_dirty && _activeTab?.Dirty != true)) return true;
         try
         {
             _repository.Save(_current, _editor.Text);
             _dirty = false;
+            if (_activeTab is not null)
+            {
+                _activeTab.Dirty = false;
+                _activeTab.Page.Text = _activeTab.Entry.Name;
+            }
             UpdateTitle();
             return true;
         }
@@ -530,7 +760,15 @@ internal sealed class MainForm : Form
         if (prompt.ShowDialog(this) != DialogResult.OK) return;
         try
         {
+            var oldPath = _current.FullPath;
             var renamed = _repository.Rename(_current, prompt.Value);
+            if (_activeTab is not null)
+            {
+                _openTabs.Remove(oldPath);
+                _activeTab.Entry = renamed;
+                _openTabs[renamed.FullPath] = _activeTab;
+                _activeTab.Page.Text = renamed.Name + (_activeTab.Dirty ? " *" : string.Empty);
+            }
             _current = renamed;
             RefreshScripts(renamed.FullPath);
             UpdateTitle();
@@ -568,9 +806,21 @@ internal sealed class MainForm : Form
 
         try
         {
+            var deletedPath = _current.FullPath;
             _repository.Delete(_current);
-            _current = null;
-            _dirty = false;
+            if (_activeTab is not null &&
+                string.Equals(_activeTab.Entry.FullPath, deletedPath, StringComparison.OrdinalIgnoreCase))
+            {
+                var closing = _activeTab;
+                _suppressTabSelection = true;
+                _openTabs.Remove(deletedPath);
+                _editorTabs.TabPages.Remove(closing.Page);
+                _activeTab = null;
+                _current = null;
+                _dirty = false;
+                _suppressTabSelection = false;
+                closing.Page.Dispose();
+            }
             RefreshScripts();
         }
         catch (Exception ex)
@@ -809,6 +1059,8 @@ internal sealed class MainForm : Form
     private void UpdateTitle()
     {
         Text = $"按键精灵 2026 · {(_current?.Name ?? "未选择脚本")}{(_dirty ? " *" : "")}";
+        if (_activeTab is not null)
+            _activeTab.Page.Text = _activeTab.Entry.Name + (_activeTab.Dirty ? " *" : string.Empty);
         UpdateFloatingState();
     }
 
