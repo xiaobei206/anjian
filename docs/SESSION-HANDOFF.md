@@ -9,7 +9,7 @@
 - Release commit：`08886d9e66c08ba24f6f1b7d9e91bbdaeba8a9e0`
 - 发布 Actions run：`43253611158`，结论 SUCCESS。
 - 最新产品代码/release commit：`08886d9e66c08ba24f6f1b7d9e91bbdaeba8a9e0`。
-- 当前最新 main HEAD（文档校准提交前）：`b477c387ca87b0f72acf804b54f0b64f4cf84aad`。
+- 当前最新 main HEAD：`63bd1785e84faf0a2d4db41c034f27ac695f08aa`（本次产品大纲/架构/交接状态校准提交）。
 - 当前阶段：preview.4 的 CI/发布已完成；下一步优先 Windows 实机验收和稳定性验证，不要默认用户已经完成验收。
 
 ## preview.4 窗口与托盘决策
