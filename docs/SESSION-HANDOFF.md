@@ -161,8 +161,9 @@ M4 的基础代码已经接入 main，当前请继续围绕 M4 收尾，不要�
 - 已有 Core 自动测试覆盖断点、嵌套函数步进、Run To Cursor、变量快照、不可展开值和 Hook Dispose。
 
 #### 必须先完成的 CI 收尾
-1. 最新一次已确认的 Windows Actions 43290120386：Restore PASS，Core 和 App 编译通过；测试项目 Build 被 xUnit2031 阻断。已修复为 Assert.Single(collection, predicate)，修复提交 edac117255cefbad94874b0c34329325e7c41678。
-2. 回读 Actions run 43290603954 和 43290697650，并检查之后最新 main commit 对应的 run。确保 Restore / Release Build / 全部自动测试 / API handbook --check / self-contained win-x64 publish / ZIP+SHA256 / artifact upload 全部通过；若失败，读取 job log 并继续修复，不要跳去 M5。
+1. Actions run 43290120386：Restore PASS，Core/App Build 曾因 LuaFunction 命名冲突失败；修复后 run 43290603954 的 Restore/Build PASS（0 warnings / 0 errors），但 25 项测试中 24 PASS / 1 FAIL。xUnit2031 两处 analyzer 已由 commit edac117255cefbad94874b0c34329325e7c41678 修复。
+2. run 43290697650（commit f58e54df72c12329a8a8a0002710b4b80fb71982）同样 Restore/Build PASS，24 passed / 1 failed。唯一失败为嵌套步进测试没有在首个 Continue 之后设置断点，因而未产生后续单步控制停点。
+3. 已在 commit ca56ef49feb531ab314b7ac446bddf1f99dc8fb5 修正该测试：在 main 脚本第 9 行设置真实断点，再按 Step Into / Step Over / Step Out 验证真实停点顺序。读取 Actions run 43291044845 及其后最新 main 对应 run；确保 Restore / Release Build / 全部自动测试 / API handbook --check / self-contained win-x64 publish / ZIP+SHA256 / artifact upload 全部通过；若失败，读取日志继续修复，不要跳去 M5。
 3. 当前文档路线上 M4 标为 IN PROGRESS（CI 验证中），不能写 DONE，直到一条覆盖最终 main HEAD 的完整 Windows workflow SUCCESS。
 4. 本地容器没有 .NET SDK，本地 Restore/Build/Test = NOT RUN。Windows desktop manual = NOT RUN。CI 通过也不代表 M4/M3/M1 桌面实机验收通过。
 5. 不创建 Release、不改版本号；v0.1.0-preview.4 的已有资产和 SHA256 保持不变。
