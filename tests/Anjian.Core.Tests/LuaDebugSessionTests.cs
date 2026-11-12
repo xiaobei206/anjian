@@ -96,7 +96,7 @@ public sealed class LuaDebugSessionTests
         lua.DoString(source, "@" + path);
         debugger.ThrowIfFaulted();
 
-        var snapshot = Assert.Single(snapshots.Where(item => item.Line == 5));
+        var snapshot = Assert.Single(snapshots, item => item.Line == 5);
         var locals = snapshot.Frames[0].Locals.ToDictionary(item => item.Name, StringComparer.Ordinal);
         Assert.Equal("hello debugger", locals["message"].Value);
         Assert.Equal("42", locals["count"].Value);
@@ -104,7 +104,7 @@ public sealed class LuaDebugSessionTests
         Assert.False(locals["settings"].CanExpand);
         Assert.Contains("不展开", locals["settings"].Limitation ?? "");
 
-        var global = Assert.Single(snapshot.Globals.Where(item => item.Name == "DebugGlobalValue"));
+        var global = Assert.Single(snapshot.Globals, item => item.Name == "DebugGlobalValue");
         Assert.Equal("99", global.Value);
     }
 
