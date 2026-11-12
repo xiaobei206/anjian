@@ -175,7 +175,10 @@ preview.4 当前采用低级鼠标/键盘 Hook，已纳入 Windows CI 编译与�
 
 - 目标框架 net10.0-windows / WinForms / win-x64。
 - Lua 绑定当前采用 NLua 1.7.9，已验证运行时为 Lua 5.4、C# 全局函数注册调用和 instruction-count hook；Windows CI 测试通过。
-- 当前编辑器是 WinForms RichTextBox 基础文本框，没有语法高亮/补全；Scintilla 等编辑器尚未采用。
+- 当前 main 编辑器采用自定义 WinForms `LuaEditorControl`（RichTextBox + 行号 gutter），实现词法颜色、行号、注册表驱动补全/签名提示、查找替换、多标签与语法诊断；没有引入 Scintilla 等第三方编辑器依赖。
+- 编辑语言服务位于 `Anjian.Core.Editor.LuaEditorService`；关键字/token 识别与 API 补全消费 `LuaApiRegistry.Load()` 的唯一注册表，不能在 UI 维护第二份 API 定义。
+- 语法诊断使用 NLua `LoadString` 编译 chunk，不执行脚本语句；代码着色在后台线程计算，并通过文本版本号丢弃过期结果。WinForms 控件只在 UI 线程应用颜色。
+- M3 Windows CI 已通过，但中文/日文输入、1MB 文件、DPI、多标签交互等 Windows 桌面手工验收仍为 NOT RUN；代码折叠和独立命令面板尚未实现。
 - 后续引入编辑器/Dock/图像库时仍需先做 PoC 并记录许可证、原生依赖和发布兼容性。
 - 不在业务层直接调用第三方 Lua/编辑器类型。
 - 发布时优先 self-contained win-x64 文件夹 ZIP；单文件发布作为单独验证项。
