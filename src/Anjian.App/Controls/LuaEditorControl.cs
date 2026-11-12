@@ -316,4 +316,16 @@ internal sealed class LuaEditorControl : UserControl
                 brush.Color, TextFormatFlags.Right | TextFormatFlags.NoPadding);
         }
     }
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _highlightTimer.Stop();
+            _highlightTimer.Dispose();
+            _signatureTip.Dispose();
+        }
+
+        base.Dispose(disposing);
+    }
+
 }
