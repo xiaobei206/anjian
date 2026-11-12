@@ -34,6 +34,7 @@ public sealed class LuaDebugSessionTests
         var snapshots = new List<LuaDebugSnapshot>();
         var commands = new Queue<LuaDebugCommand>([
             LuaDebugCommand.Continue,
+            LuaDebugCommand.Continue,
             LuaDebugCommand.StepInto,
             LuaDebugCommand.StepOver,
             LuaDebugCommand.StepOut,
@@ -55,11 +56,11 @@ public sealed class LuaDebugSessionTests
         lua.DoString(source, "@" + path);
         debugger.ThrowIfFaulted();
 
-        Assert.Equal(new[] { 1, 5, 2, 3, 7 }, snapshots.Select(snapshot => snapshot.Line));
-        Assert.True(snapshots[2].Frames.Count >= 2, "Step-into should stop inside the nested Lua function.");
-        Assert.Contains(snapshots[2].Frames, frame => frame.Name == "twice");
-        Assert.Equal(1, snapshots[3].Frames.Count);
+        Assert.Equal(new[] { 1, 5, 6, 2, 3, 7 }, snapshots.Select(snapshot => snapshot.Line));
+        Assert.True(snapshots[3].Frames.Count >= 2, "Step-into should stop inside the nested Lua function.");
+        Assert.Contains(snapshots[3].Frames, frame => frame.Name == "twice");
         Assert.Equal(1, snapshots[4].Frames.Count);
+        Assert.Equal(1, snapshots[5].Frames.Count);
     }
 
     [Fact]
