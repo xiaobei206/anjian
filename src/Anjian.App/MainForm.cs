@@ -159,7 +159,7 @@ internal sealed class MainForm : Form
         toolbar.Controls.Add(_clickOnlyCheck);
         _alwaysOnTopCheck.Margin = new Padding(4, 7, 4, 0);
         toolbar.Controls.Add(_alwaysOnTopCheck);
-        toolbar.Controls.Add(MakeButton("返回悬浮窗", (_, _) => HideMainWindow()));
+        toolbar.Controls.Add(MakeButton("返回悬浮窗", (_, _) => HideMainWindow(showFloatingWindow: true)));
         _fullModePanel.Controls.Add(toolbar);
 
         var split = new SplitContainer
@@ -360,13 +360,13 @@ internal sealed class MainForm : Form
         Activate();
     }
 
-    private void HideMainWindow()
+    private void HideMainWindow(bool showFloatingWindow)
     {
-        SaveCurrent();
+        if (!SaveCurrent()) return;
         SaveSettings();
         ShowInTaskbar = false;
         Hide();
-        ShowFloatingWindow();
+        if (showFloatingWindow) ShowFloatingWindow();
     }
 
     private void ShowFloatingWindow()
@@ -878,7 +878,7 @@ internal sealed class MainForm : Form
         if (!_allowExit && e.CloseReason == CloseReason.UserClosing)
         {
             e.Cancel = true;
-            HideMainWindow();
+            HideMainWindow(showFloatingWindow: false);
             return;
         }
 
