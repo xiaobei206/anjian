@@ -11,7 +11,7 @@
 - v0.1.0-preview.4 发布包对应代码 commit：`08886d9e66c08ba24f6f1b7d9e91bbdaeba8a9e0`。
 - M3 当前 main 开发代码验收基线：`71fd493cad0fbed1451a4ffa46192752a18bd0a6`（Windows Actions run `43282795272` PASS）；接手时仍须重新核对 main HEAD。
 - main 分支可能继续产生文档提交；新 GPT 接手时必须重新查询 main 最新 HEAD，不要把 handoff 中的历史提交 SHA 当成分支当前头部。
-- 当前阶段：M0/M2/M3 已完成；M1 Windows 实机验收仍 IN_PROGRESS/NOT RUN；M3 Lua IDE 基础已通过 Windows CI，桌面手工验收待执行；下一开发阶段为 M4 Lua 调试器。
+- 当前阶段：M0/M2/M3/M4/M5 代码与 Windows CI 验收均已完成；M5 run 43295924472 为 SUCCESS（37/37 tests、Release Build 0 warnings/0 errors、API check、win-x64 publish、ZIP/SHA256、artifact upload 全 PASS）。M1 Hook 与 M3/M4/M5 Windows 桌面手工验收仍需独立执行（NOT RUN）。
 
 ## 完整产品目标已冻结（2026-11-13）
 - 产品范围基线：[docs/PRD-CN.md](PRD-CN.md)。
@@ -20,7 +20,7 @@
 - API 当前实现契约：[docs/LUA-API-CN.md](LUA-API-CN.md)。
 - 阶段路线图：[docs/ROADMAP-CN.md](ROADMAP-CN.md)。
 - 完整 IDE、窗口/坐标、图色/OCR、参数 UI、小精灵、插件及函数手册均为正式目标，不得再从大纲中删除或只标为可选远期项目。
-- 下一项开发任务是 M3：实现完整 Lua IDE 基础（语法高亮、行号、补全、参数提示、诊断、查找/替换、多标签和错误行导航）；补全与命令面板数据必须直接读取 M2 的唯一 API 注册表。
+- 当前 main 已完成 M3 IDE、M4 基础调试器，并正在收尾 M5 结构化录制/动作列表；下一阶段按 ROADMAP 转入 M6 坐标系统与窗口自动化。公开 API 增改仍必须遵守 M2 单一注册表。
 
 
 ## preview.4 窗口与托盘决策
@@ -174,7 +174,7 @@ M4 基础调试器已在 main 实现并通过 Windows CI。具体实现提交与
 - 暂无命名 Watch 表达式、table/object 展开和复杂对象属性求值。
 - M4-01 至 M4-10 的桌面测试仍需在用户 Windows 10/11 环境执行。
 
-### 下一会话唯一任务（M5：可视化录制/动作列表）
+### M5 唯一任务定义（本会话已执行，范围留档）
 
 严格按 docs/PRD-CN.md 第 2.3 节、docs/RECORDER-DESIGN-CN.md、docs/FEATURE-MATRIX-CN.md 的 F09/F10 和 docs/ROADMAP-CN.md 实施 M5。不得把当前简单的 Lua 文本生成或原始事件列表冒充结构化可视化动作列表。
 
@@ -207,9 +207,20 @@ M4 基础调试器已在 main 实现并通过 Windows CI。具体实现提交与
 - 手工修改 generated block 可检测脱离同步，重生成有差异预览和显式确认。
 - 块外手写 Lua、原始事件和动作元数据不被覆盖或丢失。
 - F09/F10、Recorder 设计文档、用户指南、路线图、development log 与 handoff 同步更新；main 小步提交，不建长期分支或 PR。
-- M1、M3、M4 Windows 桌面验收仍为 NOT RUN，不因 M5 CI 成功而标记实机通过。
+- M1、M3、M4、M5 Windows 桌面验收仍为 NOT RUN，不因 M5 CI 成功而标记实机通过。
 
+
+
+## M5 本次交付结果（2026-11-13）
+
+- 功能主体提交：eedc1f89329e2ebfbf9ccadb54b529c954fe248d；sidecar 名称修正：2093aa24c4cf49b89c902c164171ae6e8835daec；CI 编译错误修复：ec06cf1d3a0e847267b9de251d5a6ff26c710c4f（当前 main HEAD）。
+- Windows CI run 43295924472：SUCCESS。Restore PASS；Release Build 0 warnings / 0 errors；Core Tests 37 passed / 0 failed / 0 skipped；API 文档一致性检查 22 个当前公开函数 PASS；self-contained win-x64 publish PASS；ZIP/SHA256 与 artifact upload PASS。Workflow：[run 43295924472](https://github.com/xiaobei206/anjian/actions/runs/43295924472)。Artifact ID 13979855824，51,827,155 bytes；内部 ZIP SHA256 `ddc08cfd78503d9e5e5c7995ff1202e3bc36abfcf1de6fa3ae9cc35a5baf531f`。CI runner 为 Windows Server 2025，不等于用户 Windows 桌面实机验收。
+- CI artifact：Artifact ID 13979855824，51,827,155 bytes；内部 ZIP 为 Anjian2026-0.1.0-preview.4-win-x64.zip，SHA256 ddc08cfd78503d9e5e5c7995ff1202e3bc36abfcf1de6fa3ae9cc35a5baf531f（已从 artifact 中读取 .sha256 并重新计算校验一致）。该文件是 main CI 临时产物，不是正式 Release；官方 preview.4 Release ZIP/SHA 未更改。
+- 首轮 run 43295605802 与 sidecar 修正后的 run 43295786937 均 Restore PASS、Build FAIL（0 warning / 3 errors）；CS1012 字符字面量错误两处、CS1674 DirectoryInfo 生命周期错误一处，已在 ec06cf1 修复。两次失败和根因均在 DEVELOPMENT-LOG-CN.md 留档。
+- 本地执行容器没有 .NET SDK（dotnet --info 返回 command not found），本地 Restore/Build/Test：NOT RUN；实际构建和 37 项自动化测试由 Windows GitHub Actions 执行。
+- Windows 桌面手工验收 M5-01 至 M5-10、M1 Hook、M3 编辑器、M4 调试器均保持 NOT RUN；CI 不等于桌面实机验收。
+- 本次不创建新 Release；v0.1.0-preview.4 官方 Release/ZIP/SHA 不变。
 
 ## 下一会话接手指令
 
-先核对 main 最新 HEAD，再读取 AGENTS.md、README.md、本文件、docs/ROADMAP-CN.md 和 docs/RECORDER-DESIGN-CN.md。M4 基础调试器已完成 Windows CI 验收：Actions run 43291175992 SUCCESS（25/25 tests，Release Build 0 warnings / 0 errors，API check、win-x64 publish、ZIP/SHA256、artifact upload 全部 PASS）；本地构建/测试 NOT RUN，Windows M1/M3/M4 桌面手工验收仍 NOT RUN。下一会话唯一开发任务为 M5 可视化录制/动作列表，严格按本文件 M5 范围/自动化验收执行，不重复询问仓库已有答案。直接在 main 小步提交，不创建长期分支或 PR，不创建新 Release/不改 preview.4 资产。
+先核对 main 最新 HEAD，再读取 AGENTS.md、README.md、本文件、docs/ROADMAP-CN.md 和 docs/RECORDER-DESIGN-CN.md。M4 基础调试器 Windows CI run 43291175992 SUCCESS（25/25 tests，0 warning / 0 errors，API check、win-x64 publish、ZIP/SHA256、artifact upload PASS）；M5 最终代码提交 ec06cf1d3a0e847267b9de251d5a6ff26c710c4f 对应 Windows CI run 43295924472 SUCCESS（37/37 tests，0 warning / 0 errors，API check、win-x64 publish、ZIP/SHA256、artifact upload PASS）。本地 build/test NOT RUN；M1 Hook 实机可靠性与 M3/M4/M5 Windows 桌面验收仍 NOT RUN。下一会话唯一开发任务为 M6：坐标系统与窗口自动化；开始前读取 PRD 第 2.5/2.6 节、FEATURE-MATRIX F11/F12/F13、ROADMAP M6 和现有 MoveTo/输入 API。M6 要新增 screen/window/client/anchor/ratio 显式坐标模型及双向转换，并实现安全的窗口查找/枚举/属性/激活/移动/尺寸/对齐/等待；必须保持 MoveTo(x,y) 现有 screen 绝对物理像素语义，不得改变旧脚本含义；窗口销毁/句柄复用时必须检测失效，超时/取消有明确结果，不绕过 UIPI/UAC/安全桌面。M6 不得扩展为后台输入、控件自动化、图像/OCR。按 F12/F13 的验收条件实现、测试、更新文件并提交 main；不建长期分支/PR，不创建新 Release。目标是新增 screen/window/client/anchor/ratio 显式坐标模型与双向换算，以及安全窗口查找/枚举/属性/激活/移动/大小/对齐/等待；保持 MoveTo(x,y) 现有 screen 绝对物理像素语义，不能静默改变旧脚本；窗口关闭后引用失效须能检测，超时/取消明确，不绕过 UIPI/UAC/安全桌面。M6 不得借机开发后台输入、控件自动化、图像/OCR。按当前 feature matrix 的 F12/F13 验收条件小步实施。直接在 main 小步提交，不创建长期分支或 PR，不创建新 Release/不改 preview.4 资产。

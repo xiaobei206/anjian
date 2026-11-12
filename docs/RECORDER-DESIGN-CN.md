@@ -142,3 +142,16 @@
 - 高速移动和大量事件队列。
 - 双击阈值与系统设置变化。
 - 代码编辑后 dirty 状态、预览覆盖和恢复。
+
+
+## 13. M5 实现状态与边界（main 开发版）
+
+- sidecar 文件名固定为脚本名.actions.json，例如 main.lua 对应 main.actions.json；与 Lua 脚本放在同一目录。写入通过临时文件、flush-to-disk、旧文件 .bak 备份和覆盖移动完成。
+- schemaVersion 1 为当前持久化格式。遇到未知 schema/坐标空间时拒绝读取和编辑，保留原文件，不进行自动降级覆盖。
+- RecorderDocument 保存 ScriptId、RecordingId、timestamp frequency、coordinate space、clickOnly、队列丢失数、全部原始 events、结构化 actions、generated block ID/hash 和同步状态。原始事件保存 Hook Source 与 Flags；动作保存 actionId、来源、时间戳范围和 RawEventIds。
+- 当前配对策略故意保守：只有时间排序后相邻、同名且时长不超过 Click/KeyPress 上限的 Down/Up 才折叠；Move 或其他事件插入时不跨事件配对，重叠按键也保留 Down/Up。该策略优先保证可回放顺序，不臆测复杂拖动/组合键。
+- M5 的动作列表已采用 DataGridView VirtualMode，提供插入、删除、复制、上下移动、启停、字段/延时、分组、注释、批量延时，展示 actionId、来源和原始事件 ID。录制时仍由旧 Hook 合并鼠标移动；本轮没有重写 Hook。
+- Lua 生成区块的外层标记含 generated block ID/schema，每个动作另有稳定 actionId 注释，可从列表定位到编辑器。动作表到 Lua 是单向生成；任意 Lua 文本不反解析成动作。
+- 代码块之外的用户代码保持原样。手改区块时状态为 Detached，删除区块时状态为 Missing；覆盖/补回前展示当前区块与新生成区块并明确确认。取消操作不会更改脚本文本。区块 hash 将 CRLF/CR 统一为 LF 后再计算。
+- 单步试运行由既有 PlaybackRunner 执行临时 Lua 片段；执行前确认真实输入风险，时长有界，Worker 退出仍走已有 ReleaseAllOwnedInputs 清理。它不是模拟预览。
+- Windows CI 只验证构建与自动化测试；Hook 安装/漏录/重复、权限、DPI、多显示器、实际动作表手工编辑和键鼠试运行仍需 Windows 10/11 桌面验收。

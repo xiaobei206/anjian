@@ -432,4 +432,28 @@ M3 已 DONE。下一会话唯一任务为 M4：Lua 调试器基础。必须实�
 - 当前 M4 只提供基础 scalar snapshot；断点不跨关闭标签/重启持久化，watch 表达式和表展开未实现。功能矩阵 F05 仍标记“部分实现”，不得描述为完整调试器交付。
 
 ### 下一步
-M4 基础调试器已完成 Windows CI 验收。下一会话唯一任务切换为 M5：可视化录制/动作列表。M1、M3、M4 的 Windows 桌面实机验收仍分别保留为 NOT RUN。
+M4 基础调试器与 M5 可视化录制/动作列表均已完成 Windows CI 验收。下一会话唯一任务切换为 M6：坐标系统与窗口自动化（详见 SESSION-HANDOFF）。M1、M3、M4、M5 的 Windows 桌面实机验收仍分别保留为 NOT RUN。
+
+ 
+## 2026-11-13 — M5 — 可视化录制/动作列表（Windows CI 全部 PASS，桌面验收 NOT RUN）
+
+### 实现内容
+- 在 Anjian.Core/Recorder 新增 RecorderDocument、RecorderRawEvent、RecorderAction、RecorderDocumentBuilder、RecorderDocumentStore 和 RecorderLuaGenerator；原始事件与结构化动作分层，保留 timestamp/source/flags/坐标/RawEventIds/动作 ID、holdMs、delayMs、clickOnly 和 droppedEventCount。
+- 转换只折叠时间排序后相邻、同名且有效的 Down/Up；在拖动移动或重叠按键中保留原始 Down/Up 顺序，不能配对的事件不静默丢弃。鼠标 Hook 的既有合并、暂停/续录、click-only、注入过滤保持不变。
+- 主窗口增加“动作列表”入口；WinForms 动作表采用 DataGridView VirtualMode，支持插入/删除/复制/排序、启用状态、参数/延时、分组/注释和批量延时；显示动作 ID、事件来源和原始事件引用。
+- Lua generated block 有 ID/schema 标记与每动作 actionId 注释；保留区块外用户代码；手工修改和删除区块分别标记 Detached/Missing，预览+确认后才替换/补回；支持从动作表定位到生成代码。哈希统一换行符，避免 CRLF/LF 误报。
+- sidecar 为 脚本名.actions.json（main.lua -> main.actions.json），支持 schema 检查、临时文件+flush、备份、改名/复制/删除联动。不兼容 schema 不覆盖。
+- 步骤试运行复用现有 PlaybackRunner/Worker、停止清理路径；单步风险确认、时长上限 60 秒、文本长度上限 1000 字符；超长动作间隔有 7 天上限并以有作用域循环生成，控制 Lua 区块体积。
+- 新增 RecorderDocumentTests.cs 覆盖 builder、同步、持久化、Lua 编译执行、路径、安全边界；不新增、不改变公开 Lua API，因此函数手册与注册表无需更新。
+
+### 关键提交（均直接提交 main）
+- M5 功能主体：eedc1f89329e2ebfbf9ccadb54b529c954fe248d。
+- sidecar 名称修正：2093aa24c4cf49b89c902c164171ae6e8835daec。
+- CI 首轮编译反馈修正（代码导航字符字面量、测试临时目录生命周期）：ec06cf1d3a0e847267b9de251d5a6ff26c710c4f。
+
+### Windows CI 与实机验收
+- 首轮 Windows CI（commit eedc1f8, run 43295605802）：Restore PASS；Release Build FAIL，0 warning / 3 errors；错误为 MainForm 字符字面量 CS1012 两项、测试将 DirectoryInfo 作为 IDisposable 的 CS1674 一项。此失败已在 ec06cf1 中修正，不能隐藏这次失败记录。
+- sidecar 文件名修正后的 run 43295786937 仍因前述两处 CS1012 与一处 CS1674 失败；修复后的最终提交 run 43295924472 SUCCESS。Restore PASS；Release Build 0 warnings/0 errors；37 passed / 0 failed / 0 skipped；API handbook --check 22 个公开函数 PASS；win-x64 publish、ZIP/SHA256 与 artifact upload PASS。Artifact ID 13979855824（51,827,155 bytes）。内部 ZIP SHA256：ddc08cfd78503d9e5e5c7995ff1202e3bc36abfcf1de6fa3ae9cc35a5baf531f。CI runner 为 Windows Server 2025，不是用户桌面实机。
+- 本地执行容器没有 .NET SDK（dotnet --info 返回 command not found），本地 Restore/Build/Test：NOT RUN；Windows GitHub Actions 是实际构建/测试环境。
+- M1 Hook 实机可靠性，以及 M3/M4/M5 WinForms 桌面手工验收均 NOT RUN。Windows CI 不代表实机验收通过。
+

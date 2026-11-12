@@ -15,7 +15,7 @@
 | M2 单一 API 注册表与文档生成 | DONE（Windows CI PASS，2026-11-13） | 建立机器可读 API 注册描述；以同一来源生成手册和后续 IDE 提示 |
 | M3 完整 Lua IDE 基础 | DONE（Windows CI PASS，2026-11-13；桌面手工验收待执行） | 高亮、行号、补全、参数提示、诊断、查找/替换、多标签、错误行导航 |
 | M4 调试器 | DONE（基础能力 Windows CI PASS；桌面实机验收 NOT RUN） | 文件/行号断点、单步、运行到光标、变量快照、调用栈 |
-| M5 可视化录制/动作列表 | TODO | 动作编辑、分组、排序、延时编辑、生成代码区块和同步状态 |
+| M5 可视化录制/动作列表 | DONE（Windows CI PASS；桌面手工验收 NOT RUN） | 结构化原始事件/动作、虚拟化动作编辑器、参数/延时/分组/注释/启用状态、Lua 区块同步保护、sidecar 和单步试运行 |
 | M6 坐标系统与窗口自动化 | TODO | screen/window/client/anchor/ratio、坐标转换、窗口查找/布局/对齐/等待 |
 | M7 控件与前后台能力适配 | TODO | UI Automation/标准控件能力探测、后台输入适配、失败回退和边界说明 |
 | M8 截图、图色与模板资源 | TODO | 截图区域、找色、多点找色、找图、阈值/多结果和资源管理 |
@@ -81,7 +81,7 @@ M2 验收：当前实现中的 22 个公开函数均可在注册表和手册中�
 - 断点、单步、变量窗和调用栈属于 M4，未实现。
 
 ### 下一步
-M3 已 DONE。下一会话唯一开发任务为 M4：Lua 调试器基础（真实断点/单步/运行到光标、变量观察和调用栈）；不能用日志展示冒充执行点控制。M1 preview.4 Windows 桌面实机验收继续保留为单独 NOT RUN 项，不阻塞 M4。
+M3/M4/M5 自动化代码与 Windows CI 均已完成；M1/M3/M4/M5 的 Windows 桌面实机验收仍各自独立保留为 NOT RUN。
 
 ## M4 — Lua 调试器基础（DONE：Windows CI 已通过；桌面手工验收 NOT RUN）
 
@@ -117,6 +117,30 @@ M3 已 DONE。下一会话唯一开发任务为 M4：Lua 调试器基础（真�
 - 自动：Windows Restore/Build、所有 Core 自动测试、API 手册一致性检查、self-contained win-x64 publish、ZIP/SHA256 package、artifact upload 全部通过。
 - 手工：参照 docs/ACCEPTANCE-TEST-CN.md 的 M4-01 至 M4-10 执行并记录环境、操作、结果和日志。
 - 断点/单步/运行到光标必须确实控制 Lua 执行点；状态和变量视图不得访问 UI 线程外的 Lua state。
+
+## M5 — 可视化录制/动作列表（实现与 Windows CI 已完成；桌面手工验收 NOT RUN）
+
+### 本轮实现范围
+- [x] 在 Anjian.Core 增加 RecorderDocument / RecorderRawEvent / RecorderAction / 同步状态模型；保留原始 Hook 事件、单调时间戳、来源、标志位、负坐标、click-only 和队列丢失计数。
+- [x] Raw Event -> Action 转换使用 recording 内稳定 ID；仅相邻、同名且时长在范围内的 Down/Up 才折叠成 MouseClick / KeyPress；拖动中插入 Move、重叠按键和不能配对的事件保留 Down/Up 原顺序。
+- [x] 按住时长 holdMs 与相邻动作的 delayMs 分开计算；MouseWheel、鼠标 Down/Up、KeyDown/KeyUp 均保留语义；动作保存来源与原始 event ID 引用。
+- [x] WinForms 动作表使用 DataGridView VirtualMode；支持插入、删除、复制、上移/下移、启用/禁用、动作类型/参数/延时、分组/注释和批量延时编辑；显示 actionId、来源和原始事件引用。
+- [x] generated Lua block 有稳定 ID/schema 标记，每个动作另有可导航的 action ID 注释；采用单向生成，不做任意 Lua 反向解析。
+- [x] generated block 外用户代码保留；编辑区块后识别 Detached；区块被删除后识别 Missing；更新时显示旧/新代码预览并要求确认，取消不改脚本。哈希统一 LF/CRLF，避免 Windows 换行变化产生误报。
+- [x] 以“脚本名.actions.json”保存 sidecar（例如 main.lua 对应 main.actions.json）；使用临时文件、磁盘 flush、.bak 备份和 schemaVersion 检查。不兼容 schema 不覆盖；脚本重命名/复制/删除会同步管理 sidecar。
+- [x] 单步试运行复用现有 PlaybackRunner/Worker 和输入清理路径；执行前有真实输入风险确认，单次合计时间不超过 60 秒，文本最多 1000 字符。
+- [x] 巨大动作延时以有作用域 Lua 循环生成，且文档限制单个动作间隔不超过 7 天，避免异常持久化数据放大代码体积。
+
+### 自动化验收覆盖
+- [x] Down/Up 配对、Hold 与 Delay 分离、Move 插入打断配对、重叠按键、负坐标、滚轮、稳定 ID、来源/Flags、溢出计数。
+- [x] 动作 JSON 保存/加载、指定 sidecar 文件名、未知 schema 原文件保护、超长 delay 拒绝。
+- [x] generated block 外代码保留、手改/删除区块确认、取消不改脚本、动作 ID 映射、NLua 语法执行和 CRLF/LF 哈希一致。
+- [ ] Windows UI 手工验收：全部 M5 桌面场景仍 NOT RUN，不能由 CI 代替。Windows CI run 43295924472 已通过 37 项自动化测试，但不得据此改变本行状态。
+
+### 完成边界
+M5 不代表 Hook 在 Windows 桌面已完成可靠性验收，不代表多坐标空间、窗口绑定或后台输入已实现（属于后续 M6/M7）。M5 也不实现任意 Lua 回读动作表；generated block 由动作模型单向生成。
+
+Windows CI 最终结果：run 43295924472 SUCCESS；37/37 tests、Release Build 0 warnings/0 errors、API handbook check、self-contained win-x64 publish、ZIP/SHA256 和 artifact upload 全部 PASS。Artifact ID 13979855824；内部 ZIP SHA256 `ddc08cfd78503d9e5e5c7995ff1202e3bc36abfcf1de6fa3ae9cc35a5baf531f`。所有 M5 桌面场景仍为 NOT RUN。
 
 ## M3–M7 — IDE、调试、录制、坐标与窗口
 

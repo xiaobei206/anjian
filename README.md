@@ -9,7 +9,7 @@ v0.1.0-preview.4 已正式发布。Windows CI 的 Restore、Build、7 项测试�
 下载入口：[v0.1.0-preview.4 Release](https://github.com/xiaobei206/anjian/releases/tag/v0.1.0-preview.4)，[Windows x64 ZIP](https://github.com/xiaobei206/anjian/releases/download/v0.1.0-preview.4/Anjian2026-0.1.0-preview.4-win-x64.zip)，[SHA256 sidecar](https://github.com/xiaobei206/anjian/releases/download/v0.1.0-preview.4/Anjian2026-0.1.0-preview.4-win-x64.zip.sha256)。
 ZIP SHA256：`6b59ab27f825aa48b2ec5343cec826ad8b0ded759e9989af02d51f8b949f09aa`。
 
-**main 开发状态（未发布）：** M3 Lua IDE 基础已完成并通过 Windows CI（20 项测试）；包含语法高亮、行号、API 补全/签名提示、语法诊断、查找替换和多标签。上述功能尚未进入 v0.1.0-preview.4 Release ZIP，桌面手工验收仍待执行。详见 [M3 路线图](docs/ROADMAP-CN.md) 与 [验收清单](docs/ACCEPTANCE-TEST-CN.md)。
+**main 开发状态（未发布）：** M3 Lua IDE、M4 基础调试器以及 M5 结构化录制/可视化动作列表代码已接入。M5 包含动作编辑、分组/注释、排序、参数与延时编辑、Lua generated block 同步保护、.actions.json 持久化和单步试运行。M5 代码提交 ec06cf1d3a0e847267b9de251d5a6ff26c710c4f 的 Windows CI run 43295924472：SUCCESS；Restore PASS；Release Build 0 warnings / 0 errors；Core Tests 37 passed / 0 failed / 0 skipped；API handbook check 22 个公开函数 PASS；self-contained win-x64 publish、ZIP/SHA256、artifact upload PASS。Artifact ID 13979855824，51,827,155 bytes；内部 ZIP SHA256 `ddc08cfd78503d9e5e5c7995ff1202e3bc36abfcf1de6fa3ae9cc35a5baf531f`。CI runner 是 Windows Server 2025，不代表用户桌面实机验收。上述 M3/M4/M5 功能均未进入 v0.1.0-preview.4 Release ZIP，Windows 桌面实机验收仍需单独执行。详见 [路线图](docs/ROADMAP-CN.md)、[录制器设计](docs/RECORDER-DESIGN-CN.md) 与 [验收清单](docs/ACCEPTANCE-TEST-CN.md)。
 使用说明：[首版使用说明](docs/USER-GUIDE-CN.md)。
 
 ## 项目完整大纲与接手资料

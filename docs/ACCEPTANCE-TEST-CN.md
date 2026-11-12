@@ -182,3 +182,25 @@ CI 自动测试应覆盖 Lua hook 与 worker 数据协议；桌面交互需要�
 | M4-10 | 路径与 DPI | 使用包含中文目录的脚本，在 100/125/150/200% DPI 检查断点 gutter、当前行标记和调用栈 | 源码路径匹配、行号位置、按钮和视图无裁切/重叠 | NOT RUN（桌面） |
 
 M4 Core 自动测试文件：tests/Anjian.Core.Tests/LuaDebugSessionTests.cs，覆盖真实断点行、嵌套调用 step-into/over/out 顺序、run-to-cursor、局部/全局快照、表不可展开和 hook dispose。CI 结果与 Windows 桌面手工结果分别记录在 DEVELOPMENT-LOG-CN.md / SESSION-HANDOFF.md。
+
+ 
+## 11. M5 可视化录制/动作列表验收（main 开发版，未随 preview.4 发布）
+
+CI 自动化测试只验证数据模型、转换、生成、持久化和代码保护；run 43295924472 为 Windows CI SUCCESS（37/37，0 failed/0 skipped），但以下 UI、Hook 和真实输入场景仍必须在 Windows 10/11 桌面执行并记录。当前全部桌面项均为 NOT RUN。
+
+| ID | 场景 | 操作 | 通过标准 | 当前状态 |
+|---|---|---|---|---|
+| M5-01 | 原始事件持久化 | 录制鼠标、键盘和滚轮，结束并检查脚本同目录文件 | 生成脚本名.actions.json；保存 source/flags/eventId/timestamp/坐标空间/clickOnly/recordingId，文件可重开 | NOT RUN（桌面） |
+| M5-02 | 点击/按键配对 | 录制普通点击、长按、键按下释放、拖动时插入 Move、重叠按键和滚轮 | 相邻匹配 Down/Up 才折叠；holdMs 与 delayMs 分开；拖动/重叠/无法配对事件顺序不丢，负坐标正确 | NOT RUN（桌面） |
+| M5-03 | 点击模式与队列告警 | 分别启用/禁用只录点击，进行高速移动和长时间录制 | click-only 不产生移动轨迹；关闭后保留合并移动；队列溢出有明确丢失数，不伪称完整录制 | NOT RUN（桌面） |
+| M5-04 | 动作列表编辑 | 插入、删除、复制、上下移动动作，切换类型/坐标/按键/时长/延时/启停、编辑分组注释并批量修改延时 | 修改即时反映在动作模型；只读 ID/source/raw event refs 正确；大量动作滚动与编辑无明显卡顿 | NOT RUN（桌面） |
+| M5-05 | 代码生成与定位 | 生成 Lua 区块，选中动作执行“定位代码” | 每个动作有稳定 ID 标记；生成语句与动作参数一致；定位选中正确行；生成 Lua 可由运行时执行 | NOT RUN（桌面） |
+| M5-06 | 块外代码保护 | 在 generated block 前后分别加入普通 Lua 代码，再修改动作并生成 | 区块外内容逐字保留；只替换指定 ID 的生成区块；不会覆盖用户自定义代码 | NOT RUN（桌面） |
+| M5-07 | 脱离/缺失同步保护 | 手工改动生成区块或整个删除，打开动作列表并尝试同步；分别取消和确认预览 | Detached/Missing 状态正确；预览完整展示替换内容；取消不修改 Lua；确认后同步且更新 hash | NOT RUN（桌面） |
+| M5-08 | Sidecar 生命周期 | 保存/重开、复制、重命名、删除脚本；手工把 schemaVersion 改为未知值 | main.lua 对应 main.actions.json；改名/复制/删除联动正确；未知 schema 不覆盖原数据；备份可识别 | NOT RUN（桌面） |
+| M5-09 | 单步试运行与停止 | 试运行点击/按下/滚轮/文本输入，测试取消或 F12，随后再次运行普通脚本 | 风险确认清晰；限时/文本长度有效；输入停止/worker 退出后释放所有本程序持有输入，后续普通播放可用 | NOT RUN（桌面） |
+| M5-10 | DPI/多屏/权限 | 在 100/125/150/200% 与主副屏（含负坐标）下录制、编辑、定位和试运行；普通权限/高权限目标分别尝试 | 坐标与代码一致且无 UI 裁切；权限受限给出真实错误，不绕过 UIPI/UAC 或安全边界 | NOT RUN（桌面） |
+
+### M5 自动化测试范围
+
+tests/Anjian.Core.Tests/RecorderDocumentTests.cs 覆盖：原始事件排序与稳定 ID、保守 Down/Up 配对、hold/delay 分离、Move 造成的配对中断、重叠按键、滚轮/负坐标/source/flags、溢出计数、sidecar 文件名与 round-trip、未知 schema 原文件保护、超长延时拒绝、Lua 区块生成/执行、CRLF/LF 哈希、块外代码保留、手工改动/删除区块需要预览确认、取消不改脚本和 actionId 代码映射。自动化测试结果见 DEVELOPMENT-LOG-CN.md 与 SESSION-HANDOFF.md。
