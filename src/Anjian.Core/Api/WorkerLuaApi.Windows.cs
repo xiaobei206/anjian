@@ -270,6 +270,7 @@ public sealed partial class WorkerLuaApi
         var response = pipe.Request(type, text: JsonSerializer.Serialize(payload, WindowApiJson.Options));
         if (response is null)
             throw new IOException($"窗口自动化 API {type} 没有返回数据。");
-        return response;
+        return JsonSerializer.Deserialize<string>(response)
+            ?? throw new InvalidDataException($"窗口自动化 API {type} 返回了空字符串或无效数据。");
     }
 }

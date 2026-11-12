@@ -84,11 +84,11 @@ internal sealed class WindowsControlAutomationProvider(
             var (element, depth) = queue.Dequeue();
             try
             {
+                if (binding.Elements.Count >= MaxStoredElements)
+                    throw new InvalidOperationException("本次运行的控件引用数量已达到 4096；请解绑窗口后重新绑定。");
                 var info = CreateInfo(element);
                 binding.Elements[info.ControlId] = element;
                 results.Add(info);
-                if (binding.Elements.Count > MaxStoredElements)
-                    throw new InvalidOperationException("本次运行的控件引用数量已达到 4096；请解绑窗口后重新绑定。");
                 if (depth >= 16)
                     continue;
 
@@ -100,9 +100,17 @@ internal sealed class WindowsControlAutomationProvider(
                     child = walker.GetNextSibling(child);
                 }
             }
-            catch (Exception ex) when (IsAutomationFailure(ex))
+            catch (ElementNotAvailableException)
             {
                 // Controls may disappear while a provider tree is being traversed.
+            }
+            catch (InvalidOperationException ex) when (ex.InnerException is ElementNotAvailableException)
+            {
+                // CreateInfo translates a destroyed element into a descriptive invalid-operation error.
+            }
+            catch (COMException)
+            {
+                // Providers can fail one node while the remainder of the tree is still useful.
             }
         }
         return results;
@@ -117,6 +125,7 @@ internal sealed class WindowsControlAutomationProvider(
     public string GetValue(string bindingId, string controlId)
     {
         var (_, element) = ResolveControl(bindingId, controlId);
+        EnsureNotPassword(element);
         return GetPattern<ValuePattern>(element, ValuePattern.Pattern, "Value").Current.Value;
     }
 
@@ -135,6 +144,7 @@ internal sealed class WindowsControlAutomationProvider(
     public string GetText(string bindingId, string controlId)
     {
         var (_, element) = ResolveControl(bindingId, controlId);
+        EnsureNotPassword(element);
         if (TryGetPattern(element, TextPattern.Pattern, out TextPattern? textPattern))
             return textPattern!.DocumentRange.GetText(32768);
         if (TryGetPattern(element, ValuePattern.Pattern, out ValuePattern? valuePattern))
@@ -180,24 +190,44 @@ internal sealed class WindowsControlAutomationProvider(
         var backend = request.Backend.Trim().ToLowerInvariant();
         if (backend is not ("auto" or "foreground"))
             throw Unsupported("WindowInput backend", "M7 未提供通用后台鼠标/键盘/文本输入；请使用 UIA 控件 API，或显式选择 auto/foreground。");
-        if (!windows.IsForeground(binding.WindowId))
-            throw new InvalidOperationException("目标窗口当前不是前台窗口。WindowInput 不会自动激活或抢占焦点；请先显式调用 WindowActivate 并确认返回 true。");
 
-        switch (request.Action.Trim().ToLowerInvariant())
+        var action = request.Action.Trim().ToLowerInvariant();
+        var info = windows.GetInfo(binding.WindowId);
+        if (!info.Visible || info.Minimized || !windows.IsForeground(binding.WindowId))
+            throw new InvalidOperationException("目标窗口当前不可见、已最小化或不是前台窗口。WindowInput 不会自动激活或抢占焦点；请先显式调用 WindowActivate 并确认返回 true。");
+
+        switch (action)
         {
             case "move":
-                input.MoveTo(request.X, request.Y);
-                break;
             case "click":
+            {
+                var client = info.ClientRect;
+                if (request.X < client.Left || request.X >= client.Right
+                    || request.Y < client.Top || request.Y >= client.Bottom)
+                    throw new ArgumentOutOfRangeException(nameof(request), "WindowInput 的 move/click 坐标必须位于绑定窗口客户区内（屏幕物理像素）。");
+
+                if (!windows.IsForeground(binding.WindowId))
+                    throw new InvalidOperationException("目标窗口在输入注入前失去前台状态；已拒绝本次输入。");
+
                 input.MoveTo(request.X, request.Y);
-                await input.ClickAsync(NormalizeMouseButton(request.Name), request.HoldMilliseconds, token).ConfigureAwait(false);
+                if (action == "click")
+                    await input.ClickAsync(NormalizeMouseButton(request.Name), request.HoldMilliseconds, token).ConfigureAwait(false);
                 break;
+            }
             case "key-press":
-                await input.KeyPressAsync(request.Name, request.HoldMilliseconds, token).ConfigureAwait(false);
+                if (!info.Focused)
+                    throw new InvalidOperationException("目标窗口当前没有键盘焦点；WindowInput 不会自动把焦点转移到目标控件。");
+                if (!windows.IsForeground(binding.WindowId))
+                    throw new InvalidOperationException("目标窗口在按键注入前失去前台状态；已拒绝本次输入。");
+                await input.KeyPressAsync(Required(request.Name, "按键名称"), request.HoldMilliseconds, token).ConfigureAwait(false);
                 break;
             case "text":
                 if (request.Value.Length > 100000)
                     throw new ArgumentOutOfRangeException(nameof(request), "单次 WindowInput 文本最多 100000 个字符。");
+                if (!info.Focused)
+                    throw new InvalidOperationException("目标窗口当前没有键盘焦点；WindowInput 不会自动把焦点转移到目标控件。");
+                if (!windows.IsForeground(binding.WindowId))
+                    throw new InvalidOperationException("目标窗口在文本注入前失去前台状态；已拒绝本次输入。");
                 input.TypeText(request.Value, token);
                 break;
             default:
@@ -328,6 +358,12 @@ internal sealed class WindowsControlAutomationProvider(
         TryGetPattern<T>(element, pattern, out var value)
             ? value!
             : throw Unsupported(name, $"目标控件未暴露 UI Automation {name} pattern。");
+
+    private static void EnsureNotPassword(AutomationElement element)
+    {
+        if (element.Current.IsPassword)
+            throw new InvalidOperationException("目标控件是密码字段；为避免泄露凭据，禁止读取其 Value/Text 内容。");
+    }
 
     private static string SafeName(AutomationElement element)
     {

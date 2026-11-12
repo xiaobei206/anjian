@@ -11,7 +11,10 @@ internal static class Program
             return WorkerProgram.Run(args);
 
         ApplicationConfiguration.Initialize();
-        Application.Run(new MainForm());
+        if (args.Length > 0 && args[0].Equals("--automation-probe", StringComparison.OrdinalIgnoreCase))
+            Application.Run(new AutomationProbeForm());
+        else
+            Application.Run(new MainForm());
         return 0;
     }
 }

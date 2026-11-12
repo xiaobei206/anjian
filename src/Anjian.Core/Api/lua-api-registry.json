@@ -3060,7 +3060,7 @@
       "name": "WindowInput",
       "category": "automation",
       "title": "按能力执行窗口输入",
-      "description": "按目标绑定和明确后端执行可见前台输入。auto/foreground 均要求目标窗口已经在前台；不会自动激活或静默切换后端。后台鼠标/键盘/文本注入当前明确不支持。",
+      "description": "按目标绑定和明确后端执行可见前台输入。auto/foreground 均要求目标窗口可见、未最小化且当前在前台；键盘/文本还要求窗口内已有键盘焦点，move/click 坐标必须在客户区内。不会自动激活或静默切换后端。后台鼠标/键盘/文本注入当前明确不支持。",
       "signature": "WindowInput(bindingId, backend, action, name?, x?, y?, value?, holdMs?)",
       "parameters": [
         {
@@ -3095,14 +3095,14 @@
           "name": "name",
           "type": "string",
           "required": false,
-          "description": "click 的 left/right/middle，或 key-press 的键名。",
+          "description": "click/key-press 必填；click 为 left/right/middle，key-press 为现有规范键名。",
           "defaultValue": ""
         },
         {
           "name": "x",
           "type": "integer",
           "required": false,
-          "description": "move/click 的屏幕绝对物理像素 X 坐标。",
+          "description": "move/click 必填；绑定窗口客户区内的屏幕绝对物理像素 X 坐标。",
           "defaultValue": 0,
           "minimum": -2147483648,
           "maximum": 2147483647,
@@ -3112,7 +3112,7 @@
           "name": "y",
           "type": "integer",
           "required": false,
-          "description": "move/click 的屏幕绝对物理像素 Y 坐标。",
+          "description": "move/click 必填；绑定窗口客户区内的屏幕绝对物理像素 Y 坐标。",
           "defaultValue": 0,
           "minimum": -2147483648,
           "maximum": 2147483647,
@@ -3122,7 +3122,7 @@
           "name": "value",
           "type": "string",
           "required": false,
-          "description": "text 动作的 Unicode 文本，最多 100000 个字符。",
+          "description": "text 必填；Unicode 文本，最多 100000 个字符。",
           "defaultValue": ""
         },
         {
@@ -3145,17 +3145,17 @@
       ],
       "behavior": {
         "pauseBehavior": "在 Lua 命令边界遵循暂停状态；UI Automation 同步调用期间无法被中途抢占。",
-        "cancellationBehavior": "Stop 会终止 worker；UI Automation provider 的同步 COM 调用无法保证被硬中断，停止会在调用返回后的下一个边界生效。",
+        "cancellationBehavior": "click/key-press 复用统一输入跟踪和释放清理；text 在 Unicode 字符边界响应停止。停止/异常仍执行 ReleaseAllOwnedInputs。",
         "sideEffects": [],
-        "coordinateSpace": "none",
-        "permissionNotes": "仅使用公开 Windows UI Automation API；受 UIPI、UAC、安全桌面、用户会话和目标 provider 能力约束，不提升权限或绕过访问控制。"
+        "coordinateSpace": "move/click 使用绑定窗口客户区内的虚拟桌面绝对物理像素；key-press/text 无坐标。",
+        "permissionNotes": "SendInput 前台输入；目标窗口必须可见、未最小化并保持前台。键盘/文本还要求目标窗口内有键盘焦点。move/click 的坐标必须位于绑定窗口客户区。遵守 UIPI、UAC 和交互桌面限制；不注入后台窗口，不自动抢占焦点。"
       },
       "example": "WindowInput(binding, \"auto\", \"click\", \"left\", 400, 300, \"\", 50)",
       "implementationStatus": "implemented",
       "verificationStatus": "automated-contract-test;desktop-unverified",
       "introducedIn": "0.3.0-dev.1",
       "runtime": {
-        "definition": "function(bindingId, backend, action, name, x, y, value, holdMs) return __AnjianBridge_WindowInput(bindingId, backend, action, name or \"\", x or 0, y or 0, value or \"\", holdMs == nil and 50 or holdMs) end",
+        "definition": "function(bindingId, backend, action, name, x, y, value, holdMs)\n  action = string.lower(action or \"\")\n  if (action == \"move\" or action == \"click\") and (x == nil or y == nil) then error(\"WindowInput move/click 必须提供 x 和 y。\", 2) end\n  if (action == \"click\" or action == \"key-press\") and (name == nil or name == \"\") then error(\"WindowInput click/key-press 必须提供 name。\", 2) end\n  if action == \"text\" and value == nil then error(\"WindowInput text 必须提供 value。\", 2) end\n  return __AnjianBridge_WindowInput(bindingId, backend, action, name or \"\", x or 0, y or 0, value or \"\", holdMs == nil and 50 or holdMs)\nend",
         "bindings": [
           {
             "name": "__WindowInput",
