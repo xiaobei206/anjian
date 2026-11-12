@@ -22,6 +22,7 @@ internal sealed class MainForm : Form
     private readonly Button _playButton = new();
     private readonly Button _pauseButton = new();
     private readonly Button _stopButton = new();
+    private GlobalHotkeyManager? _hotkeyManager;
     private ScriptEntry? _current;
     private bool _loading;
     private bool _recording;
@@ -55,6 +56,7 @@ internal sealed class MainForm : Form
         RefreshScripts();
         AppendLog("就绪。脚本保存在：" + _repository.RootDirectory);
         AppendLog("播放设置：次数 1=执行一次，0=无限；间隔只在每轮之间等待。");
+        AppendLog("全局快捷键：F10 启动，F11 暂停/继续，F12 立即中止。");
     }
 
     private void BuildUi()
@@ -109,6 +111,13 @@ internal sealed class MainForm : Form
         _repeatInterval.Width = 88;
         _repeatInterval.Margin = new Padding(0, 1, 2, 0);
         toolbar.Controls.Add(_repeatInterval);
+        toolbar.Controls.Add(new Label
+        {
+            Text = "全局热键：F10 播放 / F11 暂停继续 / F12 中止",
+            AutoSize = true,
+            ForeColor = Color.FromArgb(70, 90, 110),
+            Margin = new Padding(12, 8, 8, 0)
+        });
         Controls.Add(toolbar);
 
         var split = new SplitContainer
@@ -567,6 +576,49 @@ internal sealed class MainForm : Form
             else action();
         }
         catch (InvalidOperationException) { }
+    }
+
+    protected override void OnHandleCreated(EventArgs e)
+    {
+        base.OnHandleCreated(e);
+        _hotkeyManager?.Dispose();
+        _hotkeyManager = new GlobalHotkeyManager(Handle);
+        if (_hotkeyManager.IsInstalled)
+            AppendLog("全局快捷键已启用：F10 启动，F11 暂停/继续，F12 中止。");
+        else
+            AppendLog($"全局快捷键钩子安装失败（Win32 {_hotkeyManager.LastError}）；请使用窗口内的播放/暂停/停止按钮。");
+    }
+
+    protected override void OnHandleDestroyed(EventArgs e)
+    {
+        _hotkeyManager?.Dispose();
+        _hotkeyManager = null;
+        base.OnHandleDestroyed(e);
+    }
+
+    protected override void WndProc(ref Message m)
+    {
+        if (m.Msg == GlobalHotkeyManager.WindowMessage)
+        {
+            switch (m.WParam.ToInt32())
+            {
+                case GlobalHotkeyManager.StartAction:
+                    if (!_recording && !_playback.IsRunning)
+                        _ = StartPlaybackAsync();
+                    break;
+                case GlobalHotkeyManager.PauseResumeAction:
+                    if (!_recording && _playback.IsRunning)
+                        TogglePause();
+                    break;
+                case GlobalHotkeyManager.StopAction:
+                    if (_playback.IsRunning)
+                        _ = StopPlaybackAsync();
+                    break;
+            }
+            return;
+        }
+
+        base.WndProc(ref m);
     }
 
     protected override void OnFormClosing(FormClosingEventArgs e)
