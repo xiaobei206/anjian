@@ -338,7 +338,7 @@ public sealed class LuaDebugSession : IDisposable
             return new LuaDebugVariable(name, "number", formattable.ToString(null, CultureInfo.InvariantCulture), false);
 
         var type = value is LuaTable ? "table"
-            : value is LuaFunction ? "function"
+            : value is NLua.LuaFunction ? "function"
             : value is LuaThread ? "thread"
             : "userdata";
         return new LuaDebugVariable(
