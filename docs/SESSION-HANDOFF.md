@@ -9,7 +9,8 @@
 - Release commit：`3938b1550f32cb98511b67cfb5642e6eaf78f8fe`
 - 发布 Actions run：`43232898372`，结论 SUCCESS。
 - 最新任务：preview.4 独立悬浮窗、托盘生命周期和应用图标已进入代码；Windows CI 与实机验收待完成。
-- 最近一次已核对 main HEAD：e5edd11e5bdb7023a2ca14ea47c1cff711c4407f（后续将合并文档/图标批次）。
+- 最新代码提交：`7c10cd9f3f396afbca1aceccd990c7128c90280c`。
+- Windows CI run：`43253075450`，SUCCESS；Restore/Build/Test/Publish/Package/Artifact upload 全部成功。
 
 ## 本轮新增需求与实现目标
 - 默认勾选“只记录点击坐标”：鼠标移动不生成 MoveTo 轨迹；点击使用真实按下坐标，生成 MoveTo -> 可选 Delay -> Click。
@@ -86,13 +87,13 @@
 - 默认启动隐藏主窗口，仅显示悬浮窗和托盘图标；主窗口 ShowInTaskbar=false。打开完整界面时显示主窗口，不隐藏悬浮窗。
 - 主窗口右上角 × 与“返回悬浮窗”都隐藏主窗口并移除任务栏按钮，不退出进程；托盘菜单负责恢复窗口或退出。
 - 悬浮窗可直接设置循环次数与轮间隔，并与主窗口共用设置及持久化。
-- 自定义图标资源候选已生成，待确认 EXE 编译嵌入和托盘使用同一图标。
+- 自定义多尺寸 ICO 已提交为 `src/Anjian.App/Resources/Anjian2026.ico`；csproj 设置 `ApplicationIcon`，主窗体、悬浮窗和 NotifyIcon 使用相同 EXE 图标资源。Windows CI 已成功编译，实机小尺寸可辨性仍待用户确认。
 - 当前代码尚未经过 Windows CI 编译、自动化测试和 Windows 实机验收，不能标记为通过。
 
 ## 下一步唯一任务
-1. 完成 preview.4 的 EXE 图标资源嵌入（`ApplicationIcon`）并确认主窗口、悬浮窗、托盘都使用同一图标。
-2. 让 Windows Actions 执行 Restore / Build / Test / win-x64 self-contained publish；修复所有 warning-as-error。
-3. 核实版本号、ZIP 与 SHA256 对应同一个 preview.4；仅在 CI 全部通过后创建 prerelease。
+1. 确认 preview.4 Release workflow 成功创建 tag 和 prerelease。
+2. 核实版本号、ZIP 与 SHA256 对应同一个 preview.4，并更新本交接文件。
+3. 交由用户进行 Windows 实机验收；未经手工验证的界面/托盘行为不得标记 PASS。
 4. Windows 实机检查：默认启动只显示悬浮窗和托盘；主窗口打开时悬浮窗仍在；主窗口关闭后任务栏按钮消失，托盘仍可重新打开主窗口。
 5. 测试托盘右键菜单、双击托盘、隐藏/显示悬浮窗、明确退出；检查进程与 Hook、NotifyIcon 是否正确释放。
 6. 检查悬浮窗次数/间隔与主窗口双向同步、0 无限、设置持久化；验证录制和播放时状态同步。

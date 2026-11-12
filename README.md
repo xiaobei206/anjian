@@ -4,7 +4,7 @@ Windows 10/11 x64 桌面自动化工具，首版使用 WinForms + .NET 10 + Lua 
 
 ## 当前进度
 
-最新已发布版本仍为 v0.1.0-preview.3。v0.1.0-preview.4 正在开发：悬浮窗拆分为独立顶层窗口，增加系统托盘生命周期管理，并为 EXE、窗口和托盘统一使用自定义图标。Windows CI 和实机验收完成前，不把 preview.4 标记为已发布。
+v0.1.0-preview.4 候选代码已通过 Windows CI（Build、7 项测试、自包含发布、ZIP/SHA256 均成功），正在执行正式 Release 发布流程。新版本修复了窗口互相替换的问题，并加入独立悬浮窗、系统托盘、自定义 EXE/托盘图标。Windows 实机手工验收仍待完成。
 
 下载入口：[v0.1.0-preview.3 正式预览版](https://github.com/xiaobei206/anjian/releases/tag/v0.1.0-preview.3)，或直接下载 [Windows x64 ZIP](https://github.com/xiaobei206/anjian/releases/download/v0.1.0-preview.3/Anjian2026-0.1.0-preview.3-win-x64.zip) 和 [SHA256](https://github.com/xiaobei206/anjian/releases/download/v0.1.0-preview.3/Anjian2026-0.1.0-preview.3-win-x64.zip.sha256)。
 使用说明：[首版使用说明](docs/USER-GUIDE-CN.md)。
