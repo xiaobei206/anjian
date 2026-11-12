@@ -4,12 +4,14 @@ using System.Text;
 using System.Text.Json;
 using Anjian.Core;
 using Anjian.Core.Editor;
+using Anjian.Core.Windows;
 
 namespace Anjian.App.Services;
 
 internal sealed class PlaybackRunner : IDisposable
 {
     private readonly WindowsInputController _input = new();
+    private readonly WindowsWindowManager _windows = new();
     private readonly ExecutionGate _gate = new();
     private CancellationTokenSource? _runCts;
     private Process? _worker;
@@ -146,6 +148,7 @@ internal sealed class PlaybackRunner : IDisposable
             worker.Dispose();
             _worker = null;
             _input.ReleaseAll();
+            _windows.ClearReferences();
         }
     }
 
@@ -212,12 +215,93 @@ internal sealed class PlaybackRunner : IDisposable
             case "error":
                 Log?.Invoke(message.Text ?? "脚本发生未知错误。");
                 break;
+            case "window-find":
+            {
+                var selector = ReadWindowPayload<WindowSelector>(message.Text);
+                return JsonSerializer.Serialize(_windows.Find(selector), WindowApiJson.Options);
+            }
+            case "window-enumerate":
+            {
+                var selector = ReadWindowPayload<WindowSelector>(message.Text);
+                return JsonSerializer.Serialize(_windows.Enumerate(selector), WindowApiJson.Options);
+            }
+            case "window-enumerate-children":
+            {
+                var request = ReadWindowPayload<WindowReferenceRequest>(message.Text);
+                return JsonSerializer.Serialize(_windows.EnumerateChildren(request.Id), WindowApiJson.Options);
+            }
+            case "window-get-info":
+            {
+                var request = ReadWindowPayload<WindowReferenceRequest>(message.Text);
+                return JsonSerializer.Serialize(_windows.GetInfo(request.Id), WindowApiJson.Options);
+            }
+            case "window-operation":
+            {
+                var request = ReadWindowPayload<WindowActionRequest>(message.Text);
+                var result = request.Operation switch
+                {
+                    "activate" => _windows.Activate(request.Id),
+                    "show" => _windows.Show(request.Id),
+                    "hide" => _windows.Hide(request.Id),
+                    "minimize" => _windows.Minimize(request.Id),
+                    "maximize" => _windows.Maximize(request.Id),
+                    "restore" => _windows.Restore(request.Id),
+                    "topmost" => _windows.SetTopmost(request.Id, request.Enabled),
+                    "move" => _windows.Move(request.Id, request.X, request.Y),
+                    "resize" => _windows.Resize(request.Id, request.Width, request.Height),
+                    "align" => _windows.Align(request.Id, ParseWindowAnchor(request.Anchor), request.OffsetX, request.OffsetY),
+                    _ => throw new InvalidDataException("未知窗口操作：" + request.Operation)
+                };
+                return JsonSerializer.Serialize(result);
+            }
+            case "window-wait":
+            {
+                var request = ReadWindowPayload<WindowWaitRequest>(message.Text);
+                var result = await _windows.WaitForWindowAsync(request.Selector, request.TimeoutMilliseconds, token)
+                    .ConfigureAwait(false);
+                return JsonSerializer.Serialize(result, WindowApiJson.Options);
+            }
+            case "window-wait-closed":
+            {
+                var request = ReadWindowPayload<WindowWaitClosedRequest>(message.Text);
+                var result = await _windows.WaitForClosedAsync(request.Id, request.TimeoutMilliseconds, token)
+                    .ConfigureAwait(false);
+                return JsonSerializer.Serialize(result);
+            }
+            case "coordinate-to-screen":
+            case "coordinate-from-screen":
+            {
+                var request = ReadWindowPayload<WindowCoordinateRequest>(message.Text);
+                var result = _windows.ConvertCoordinate(request, toScreen: message.Type == "coordinate-to-screen");
+                return JsonSerializer.Serialize(result, WindowApiJson.Options);
+            }
             default:
                 throw new InvalidDataException($"未知执行命令：{message.Type}");
         }
 
         return null;
     }
+
+    private static T ReadWindowPayload<T>(string? json) =>
+        string.IsNullOrWhiteSpace(json)
+            ? throw new InvalidDataException("窗口 API 缺少请求数据。")
+            : JsonSerializer.Deserialize<T>(json, WindowApiJson.Options)
+                ?? throw new InvalidDataException("窗口 API 请求数据无效。");
+
+    private static WindowAnchor ParseWindowAnchor(string value) =>
+        (value ?? string.Empty).Trim().ToLowerInvariant().Replace("_", "-") switch
+        {
+            "top-left" => WindowAnchor.TopLeft,
+            "top-center" or "top-middle" => WindowAnchor.TopCenter,
+            "top-right" => WindowAnchor.TopRight,
+            "center-left" or "middle-left" => WindowAnchor.CenterLeft,
+            "center" or "middle" => WindowAnchor.Center,
+            "center-right" or "middle-right" => WindowAnchor.CenterRight,
+            "bottom-left" => WindowAnchor.BottomLeft,
+            "bottom-center" or "bottom-middle" => WindowAnchor.BottomCenter,
+            "bottom-right" => WindowAnchor.BottomRight,
+            _ => throw new ArgumentException("不支持的窗口锚点。", nameof(value))
+        };
 
     private async Task<LuaDebugCommand> WaitForDebuggerCommandAsync(
         LuaDebugSnapshot snapshot,
@@ -248,5 +332,9 @@ internal sealed class PlaybackRunner : IDisposable
         catch { }
     }
 
-    public void Dispose() => Stop();
+    public void Dispose()
+    {
+        Stop();
+        _windows.Dispose();
+    }
 }

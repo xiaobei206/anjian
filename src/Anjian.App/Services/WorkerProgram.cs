@@ -32,7 +32,7 @@ internal static class WorkerProgram
             try
             {
                 using var lua = new NLua.Lua(openLibs: true);
-                var api = new WorkerLuaApi(client);
+                var api = new WorkerLuaApi(client, lua);
                 LuaApiRuntime.Register(lua, api);
                 var fullPath = Path.GetFullPath(scriptPath);
                 if (debugOptions is null)
