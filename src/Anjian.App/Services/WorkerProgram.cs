@@ -45,7 +45,7 @@ internal static class WorkerProgram
         }
     }
 
-    private static void Register(Lua lua, WorkerLuaApi api)
+    private static void Register(NLua.Lua lua, WorkerLuaApi api)
     {
         void Reg(string luaName, string methodName) =>
             lua.RegisterFunction(luaName, api, typeof(WorkerLuaApi).GetMethod(methodName)!);
