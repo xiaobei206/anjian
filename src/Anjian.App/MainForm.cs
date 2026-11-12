@@ -489,7 +489,7 @@ internal sealed class MainForm : Form
             return;
         if (_recordSessionActive)
         {
-            var currentIndex = _scripts.Items.IndexOf(_current);
+            var currentIndex = _current is null ? -1 : _scripts.Items.IndexOf(_current);
             if (currentIndex >= 0) _scripts.SelectedIndex = currentIndex;
             AppendLog("录制期间不能切换脚本，请先结束录制。");
             return;
