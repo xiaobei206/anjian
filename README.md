@@ -1,62 +1,62 @@
-# 按键精灵 2026（暂定项目名）
+# 按键精灵 2026
 
-Windows 桌面自动化软件。独立实现经典按键精灵式工作流，采用 Lua 5.4、自定义自动化命令、键鼠录制和代码编辑。
+Windows 10/11 x64 桌面自动化工具，首版使用 WinForms + .NET 10 + Lua 5.4。
 
-> 当前阶段：M0 文档与首版交互规格已冻结；尚无正式应用代码或可运行版本。最新状态以 docs/SESSION-HANDOFF.md 为准。
+## 当前进度
 
-## 新会话从这里开始
+正在开发第一个可用预览版。首版不是完整 IDE，先提供脚本录制、Lua 编辑、播放控制与重复运行设置。
 
-1. [AGENTS.md](AGENTS.md)：所有 GPT / 开发会话必须遵守的协作规则。
-2. [最短接手提示词](docs/SESSION-START-PROMPT-CN.md)：复制到新 GPT 对话即可接手。
-3. [当前交接状态](docs/SESSION-HANDOFF.md)：当前唯一有效状态和下一会话唯一任务。
-4. [会话协议](docs/SESSION-PROTOCOL-CN.md)：如何分配任务、使用上下文和完成交接。
-5. [开发路线图](docs/ROADMAP-CN.md)：所有里程碑和任务 ID。
+## 首版目标
 
-## 产品与技术规范
+- 本地 Lua 脚本列表：新建、打开、保存、重命名、删除。
+- 全局鼠标/键盘录制，生成可编辑 Lua 脚本；录制会过滤本程序自身界面和注入输入。
+- 鼠标移动合并/降噪；点击和按键的按下时长会被保留。
+- 鼠标移动、点击、按下/释放、滚轮；键盘单键、按下/释放、组合键和 Unicode 文本输入。
+- 播放、暂停、停止；脚本在独立子进程执行，停止通过终止执行进程处理 Lua 无限循环，并清理仍按下的输入。
+- 重复次数：默认 1；输入 100 表示执行 100 轮；0 表示无限循环。
+- 每轮间隔：默认 2000ms，可设 0 至 600000ms。只在两轮之间等待，最后一轮后不等待。
+- 设置保存在本机用户配置目录。
 
-- [产品需求 PRD](docs/PRD-CN.md)
-- [技术架构与模块边界](docs/ARCHITECTURE-CN.md)
-- [Lua 5.4 命令 API](docs/LUA-API-CN.md)
-- [录制器与双模式设计](docs/RECORDER-DESIGN-CN.md)
-- [首版验收清单](docs/ACCEPTANCE-TEST-CN.md)
-- [依赖选型与 PoC 验证](docs/TECHNICAL-VALIDATION-CN.md)
-- [架构决策记录](docs/DECISIONS-CN.md)
-- [累计开发日志](docs/DEVELOPMENT-LOG-CN.md)
+## 快速使用
 
-## 核心约束
+1. 从 GitHub Releases 下载 Anjian2026 对应版本的 win-x64 ZIP，解压后运行 Anjian.App.exe。
+2. 点击“新建脚本”或“开始录制”。录制开始后切换到目标程序操作，完成后切回本软件点击“结束录制”。
+3. 双击脚本列表中的脚本打开编辑；Ctrl+S 保存。
+4. 设置重复次数和每轮间隔后点击“播放”。暂停可恢复；停止会终止当前脚本并释放本程序持有的键鼠输入。
 
-- 首版只做 Windows 10/11 x64 桌面自动化；不做 Android、云同步和旧版 Q 脚本兼容。
-- “按键精灵 2026”为项目工作名；这是独立实现，不使用原产品闭源代码或未经授权的素材。
-- 技术路线：C# / .NET 10 LTS、WinForms、Lua 5.4、自定义全局 Lua 函数 API。
-- 用户脚本使用标准 Lua 语法，例如 `MoveTo(122, 100)`、`LeftClick(50)`、`Delay(300)`；省略点击时长时默认 50 ms。
-- 首版录制合并鼠标移动；坐标采用虚拟桌面绝对物理像素，支持副屏负坐标，不做窗口相对坐标。
-- 动作列表可以生成 Lua 代码；不承诺任意 Lua 代码无损反向转换为动作列表。
-- 先做技术 PoC，再建立正式解决方案和功能代码。
-- 每个 GPT 会话只执行 handoff 中指定任务；结束前更新 handoff、开发日志、路线图并提交 Git。
-- main 是唯一长期集成分支；保持小步、可回滚提交。
+脚本和设置目录：
+- 脚本：%LOCALAPPDATA%\Anjian2026\Scripts
+- 设置：%LOCALAPPDATA%\Anjian2026\settings.json
 
-## 当前仓库结构
+## Lua API 示例
 
-    AGENTS.md
-    README.md
-    docs/
-      PRD-CN.md
-      ARCHITECTURE-CN.md
-      LUA-API-CN.md
-      RECORDER-DESIGN-CN.md
-      ACCEPTANCE-TEST-CN.md
-      TECHNICAL-VALIDATION-CN.md
-      ROADMAP-CN.md
-      DECISIONS-CN.md
-      SESSION-PROTOCOL-CN.md
-      SESSION-HANDOFF.md
-      SESSION-START-PROMPT-CN.md
-      DEVELOPMENT-LOG-CN.md
-    src/README.md
-    tests/README.md
+MoveTo(122, 100)
+LeftClick()        -- 默认按下 50ms 后释放
+LeftClick(100)     -- 按下 100ms 后释放
+RightClick(50)
+KeyPress("ENTER")  -- 默认按下 50ms
+Hotkey("CTRL", "SHIFT", "S")
+TypeText("按键精灵 2026")
+Delay(500)
+Log("本轮完成")
 
-src/ 和 tests/ 目前只有结构说明，没有正式项目文件、应用代码或可运行构建。
+长按使用 LeftDown() / Delay(500) / LeftUp()。Delay() 可暂停和停止；点击和按键动作收到停止请求时会在清理路径中释放。
 
-## 下一步
+## 当前限制
 
-按 docs/SESSION-HANDOFF.md 执行 TV-01：Lua 5.4 / .NET 10 绑定与中断机制 PoC。
+- 这是早期预览版，编辑器暂为基础文本编辑框，尚无语法高亮/补全。
+- 录制使用低级 Windows 输入钩子；如果系统策略、权限或安全软件拦截，录制可能不可用。
+- 前台输入受 Windows UIPI 和目标程序权限级别限制；本软件不会尝试绕过受保护桌面或更高权限边界。
+- 鼠标移动经过合并/采样，不保证逐像素还原高速轨迹。
+- 复杂拖拽和多设备键盘录制需要实机验证。
+- 不要在未经验证的生产环境或敏感操作中直接设置无限循环；运行时确认目标窗口正确。
+
+## 开发
+
+PowerShell commands:
+dotnet restore Anjian2026.sln
+dotnet build Anjian2026.sln -c Release --no-restore
+dotnet test tests/Anjian.Core.Tests/Anjian.Core.Tests.csproj -c Release
+dotnet publish src/Anjian.App/Anjian.App.csproj -c Release -r win-x64 --self-contained true
+
+版本号见 VERSION。Windows 构建与测试由 .github/workflows/windows-build.yml 执行。
