@@ -1,8 +1,10 @@
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO.Pipes;
 using System.Text;
 using System.Text.Json;
 using System.Security.Cryptography;
+using System.Runtime.InteropServices;
 using Anjian.Core;
 using Anjian.Core.Editor;
 using Anjian.Core.Imaging;
@@ -252,6 +254,12 @@ internal sealed class PlaybackRunner : IDisposable
                 throw new TimeoutException(
                     $"Worker 在 {RunInstanceLimits.WorkerStartupTimeoutMilliseconds} ms 内未建立 IPC 连接。");
             }
+
+            if (!GetNamedPipeClientProcessId(server.SafePipeHandle, out var clientProcessId))
+                throw new Win32Exception(Marshal.GetLastWin32Error(), "无法验证 Worker named pipe 客户端进程。");
+            if (clientProcessId != (uint)worker.Id)
+                throw new UnauthorizedAccessException(
+                    $"IPC 客户端 PID {clientProcessId} 与此实例启动的 Worker PID {worker.Id} 不匹配。");
 
             reader = new StreamReader(server, new UTF8Encoding(false), false, 4096, leaveOpen: true);
             writer = new StreamWriter(server, new UTF8Encoding(false), 4096, leaveOpen: true)
@@ -862,4 +870,10 @@ internal sealed class PlaybackRunner : IDisposable
         if (_ownsInputArbiter)
             _inputArbiter.Dispose();
     }
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetNamedPipeClientProcessId(
+        Microsoft.Win32.SafeHandles.SafePipeHandle pipe,
+        out uint clientProcessId);
+
 }
