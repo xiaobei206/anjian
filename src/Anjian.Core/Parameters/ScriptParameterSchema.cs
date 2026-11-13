@@ -98,7 +98,7 @@ public static class ScriptParameterValidator
             if (p.DefaultValue is { } defaultValue && defaultValue.ValueKind != JsonValueKind.Undefined)
             {
                 var result = ValidateValue(p, defaultValue, baseDirectory: null);
-                issues.AddRange(result.Select(message => new ParameterValidationIssue(p.Id, label, "默认值无效：" + message)));
+                issues.AddRange(result.Select(message => new ParameterValidationIssue(p.Id ?? string.Empty, label, "默认值无效：" + message)));
             }
         }
         return issues;
