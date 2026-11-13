@@ -133,6 +133,26 @@ public sealed class ScriptParameterTests
         }
     }
 
+    [Fact]
+    public void FutureConfigurationVersionIsNeverReplacedByOlderBackup()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "anjian-params-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        var path = Path.Combine(directory, "config.json");
+        try
+        {
+            ParameterConfigurationStore.SaveAtomic(path, new ParameterConfiguration { Values = new() { ["count"] = Json("2") } });
+            File.WriteAllText(path, "{\"schemaVersion\":9,\"values\":{}}");
+            Assert.Throws<NotSupportedException>(() => ParameterConfigurationStore.LoadOrRecover(path));
+            Assert.Contains("\"schemaVersion\":9", File.ReadAllText(path));
+            Assert.Equal(2, JsonDocument.Parse(File.ReadAllText(path + ".bak")).RootElement.GetProperty("values").GetProperty("count").GetInt32());
+        }
+        finally
+        {
+            try { Directory.Delete(directory, recursive: true); } catch (IOException) { }
+        }
+    }
+
     private static JsonElement Json(string json)
     {
         using var document = JsonDocument.Parse(json);

@@ -64,9 +64,9 @@ public static class ParameterConfigurationStore
                 stream.Flush(flushToDisk: true);
             }
 
-            if (File.Exists(path))
+            if (File.Exists(path) && IsValidConfigurationFile(path))
             {
-                // Preserve the prior file before replacement. The caller validates it before saving.
+                // Do not replace a known-good backup with a corrupt or future-version file.
                 var backupTemporary = path + ".bak.tmp";
                 File.Copy(path, backupTemporary, overwrite: true);
                 File.Move(backupTemporary, path + ".bak", overwrite: true);
@@ -79,6 +79,12 @@ public static class ParameterConfigurationStore
         }
     }
 
+    private static bool IsValidConfigurationFile(string path)
+    {
+        try { _ = LoadOne(path); return true; }
+        catch (Exception ex) when (ex is IOException or JsonException or InvalidDataException) { return false; }
+    }
+
     private static ParameterConfiguration LoadOne(string path)
     {
         var info = new FileInfo(path);
@@ -87,8 +93,10 @@ public static class ParameterConfigurationStore
         using var stream = File.OpenRead(path);
         var result = JsonSerializer.Deserialize<ParameterConfiguration>(stream)
             ?? throw new InvalidDataException("参数配置为空。");
+        if (result.SchemaVersion > 1)
+            throw new NotSupportedException($"参数配置版本 {result.SchemaVersion} 高于当前支持版本 1；为保护原文件，拒绝回退或覆盖。");
         if (result.SchemaVersion != 1)
-            throw new InvalidDataException($"不支持参数配置版本 {result.SchemaVersion}。");
+            throw new InvalidDataException($"参数配置版本 {result.SchemaVersion} 无效。");
         result.Values ??= new Dictionary<string, JsonElement>(StringComparer.Ordinal);
         return result;
     }
