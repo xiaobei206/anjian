@@ -52,7 +52,7 @@ M1–M13 的 Windows 桌面实机验收统一延期至 M14 全部功能开发完
 | F28 | 文件/目录/剪贴板 | 受控文件操作、剪贴板、对话框与常用数据 API | PARTIAL：受控文件/目录 13 项与剪贴板/对话框 5 项 API 已实现；均使用本次 Grant 双层校验；Windows Actions run 43408020908 的 147/147 tests、Build、API handbook、自包含发布与 Sprite/Worker smoke 全 PASS；真实桌面交互待 M14 | M12 | 文件权限/链接/上限/取消契约测试；剪贴板读写、三类对话框、默认拒绝、伪造 IPC 与主线程/停止路径验证 |
 | F29 | 进程/应用控制 | 启动、等待、查询、明确权限的结束操作 | PARTIAL：StartProcess/WaitProcess/GetProcessInfo 已实现；Windows Actions run 43414530292 的 152/152 tests、0 warnings/errors、API handbook、win-x64 发布、Sprite/Worker smoke、ZIP/SHA 与 artifact 上传全 PASS；不提供任意进程终止/Shell，桌面验收 M14 | M12 | 精确路径默认拒绝；参数边界；超时/Stop/Pause；查询退出码；句柄不可跨会话或查询任意 PID |
 | F30 | 网络/JSON | 显式 HTTP(S)、超时、状态码、JSON、上传/下载 | PARTIAL：HttpRequest 已实现；Windows Actions run 43427860126 的 161/161 Core tests、0 warnings/0 errors、API handbook 与自包含包 smoke 全 PASS；精确主机/方法逐次授权、HTTPS 默认、HTTP 单独批准、逐跳重定向授权、超时/Stop、1 MiB 请求体与 4 MiB 响应体上限；大文件流式上传/下载尚未实现 | M12 | 默认不自动联网；未批准主机/方法/HTTP/重定向拒绝；超时/Stop/响应上限可靠；无网络时其余功能正常 |
-| F31 | 定时与多实例 | 定时运行、独立实例、任务状态、超时和失败策略 | 未实现 | M13 | 互相隔离，能分别停止、查看日志和处理输入状态 |
+| F31 | 定时与多实例 | 定时运行、独立实例、任务状态、超时和失败策略 | 部分实现（M13-01）：Core 稳定 instanceId/状态转换与 4 active + 16 queue 限额契约及测试已进入 main；现有 PlaybackRunner 仍单实例，协调器/Worker 并发/InputArbiter/定时尚未实现 | M13 | 实例状态、参数、日志、Lua state、权限 Grant 与句柄隔离；全局输入串行并能逐实例 Stop/清理；定时/失败策略可验证 |
 | F32 | 扩展兼容性 | 稳定 API 版本、弃用策略、迁移说明、插件 API 约束 | 插件 manifest min/max API 兼容已实现；贡献 schema v1；运行期 extension view 不改静态内置 registry（1.2 / 103）与静态手册；Windows Actions Run 43441156420 PASS | M12 | API 不兼容、未知/未来 schema、保留名/重复名拒绝；内置公开 API 语义不静默改变 |
 | F33 | 离线文档 | 用户手册、函数手册、打包/插件开发说明和离线 HTML | 部分实现：现有 Markdown 文档分散 | M2/M14 | 发布包内文档与发行版本匹配，可断网查阅 |
 | F34 | 发布/测试 | Windows 10/11、长时稳定性、DPI/多屏、依赖许可和 SHA256 | CI 流程已接入；实机验收未完成 | M1/M14 | 测试报告、版本、ZIP、SHA256 和 release 一致 |
@@ -78,3 +78,8 @@ M1–M13 的 Windows 桌面实机验收统一延期至 M14 全部功能开发完
 - 如需删减完整产品目标，必须明确向用户说明影响并获得用户确认；不得通过把项目号改成 P2 或重排路线图来悄悄删除功能。
 - 增加新 API 时必须更新注册表、函数手册、编辑器提示、测试和开发日志。
 - 当前阶段只允许按依赖排序，不允许把尚未实现写成已经交付。
+
+
+## M13-01 状态注记（2026-11-13）
+
+F31 由“未实现”调整为“部分实现”，只代表 Core 契约与状态机测试进入 main。没有多实例运行时、并发 Worker、UI 管理器或 InputArbiter；这些仍必须按 M13-02/M13-04 落地。当前 Windows Actions 结果与 Windows 10/11 手工验收分别记录，后者保持 NOT RUN（M14）。

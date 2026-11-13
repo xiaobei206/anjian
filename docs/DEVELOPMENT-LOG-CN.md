@@ -852,3 +852,18 @@ M4 基础调试器与 M5 可视化录制/动作列表均已完成 Windows CI 验
 - 新增 Core tests：registry/IDE completion、实际 NLua 调用、参数数量/类型、异常传播、宿主全局隔离、内置/插件名称冲突、启用原子性、未来/未知 schema 与模块 hash 篡改。未修改 VERSION/AssemblyVersion/FileVersion，不创建 tag/Release；preview.4 发布资产不变。
 - Windows Actions 先后发现 nullable 检查、xUnit2031 与 NLua 实际抛出 LuaScriptException（不是 LuaException）的断言问题，均依据日志修复。最终 run [43441156420](https://github.com/xiaobei206/anjian/actions/runs/43441156420) 对代码 HEAD 6cb86e9111fa6ea792122ec07667c0e9ee0f3b94 SUCCESS：Restore、Release Build 0 warnings/0 errors、177/177 Core tests、API handbook 103 项、自包含 win-x64 发布、包内 Sprite/Plugin Worker smoke、ZIP/SHA256、artifact upload 全 PASS。临时 artifact ID 14044284665，87,281,040 bytes，SHA-256 29b125cbb56b21f8e52075713474c72591c8df9a38f5e8cd5383d8c3e26c5a0d（至 2026-12-13；非 Release）。当前容器无 .NET SDK，local Restore/Build/Test NOT RUN；真实 Windows 10/11 插件管理/命令面板/DPI/多屏验收 NOT RUN（M14）。
 
+
+
+## 2026-11-13 — M13-01 多实例运行实例模型与隔离契约
+
+- 开始时核对 main HEAD `14298c74b746929cd998149d4bb1d3a4ad0b3df7`，重新读取 AGENTS、README、handoff、ROADMAP、PRD、FEATURE-MATRIX、ARCHITECTURE、DECISIONS、ACCEPTANCE 与当前 PlaybackRunner/Worker/Grant/输入控制器边界。当前实现确认只有一个 PlaybackRunner：Worker、ExecutionGate、CTS、Grant、ProcessSession、Window/Image 缓存和输入 held-state 均为该 runner 的字段；MainForm 当前拒绝第二个同时启动。
+- 规格决策写入 ADR-033 / Architecture §19：区分逻辑 instanceId、启动请求幂等 startRequestId 与每轮 Worker workerAttemptId；同脚本不同 Start 可以多实例，同一 Start 请求重试必须幂等。逻辑实例跨 RepeatCount 不变。
+- 冻结状态转换 Core 类型 `Anjian.Core.Runtime.RunInstanceLifecycle`：12 个状态、独立 Outcome/TerminationMode/CleanupStatus、显式允许边集合、首个 Stop/timeout 原因不可覆盖、清理结果不覆盖脚本结果。新增 10 个 xUnit 测试，穷举状态对并验证成功、暂停、取消、超时、强制终止、清理失败与非法转换。
+- 容量策略：最多 4 个活动 Worker 槽位、最多 16 个 FIFO 排队项；队满明确拒绝。Worker 启动 watchdog 30 秒；停止宽限 2 秒后再强制终止。运行超时从第一次 Running 起算，不计权限审阅/排队时间，Paused 仍计入墙钟时间；具体用户可配置值留 M13-03。
+- 隔离契约：Lua/Worker/IPC session、Pause/CTS/计时、ProcessSession 随机句柄、HTTP/Window/Image/Plugin/debug resources、日志与输入释放归属都逐实例私有。Grant 每实例重读/逐次审阅，不跨同路径实例复用；host 保留权威 Grant 并逐 IPC 验证。
+- 输入安全：SendInput/SetCursorPos 是进程间共享桌面资源，M13-02 必须使用主进程唯一 FIFO InputArbiter；完整点击/按键/文本操作原子化，显式 Down 持锁直到 Up，暂停保持租约，Stop 清理仅释放本实例记录的键鼠；清理失败进入全局输入故障锁定，禁止其他实例继续发送输入。
+- 代码提交：`7112e1dbabc01911d63108d842e799d3334cecc1`（Core 生命周期和 10 个测试）；启动 timeout 分支补充 `4d1ac7d631293e48e06c21b448bacd5ca4d2fc5f`；同步状态转换测试 `a03fd8c35f61e283da40d47caaf033ac4c27a465`。本轮不改 Lua API registry/函数手册，不改 VERSION，不创建 Release/tag。
+- Windows Actions：首个功能提交对应 run [43448241211](https://github.com/xiaobei206/anjian/actions/runs/43448241211) SUCCESS：Restore、Release Build、187/187 Core tests、API handbook、self-contained win-x64 publish、Sprite/Worker smoke、ZIP/SHA256 与 artifact upload 全通过。包含 30 秒 Starting timeout 分支的后续提交以 run [43448660886](https://github.com/xiaobei206/anjian/actions/runs/43448660886) 最终结果作为本轮最新代码验收依据（待核对状态后填写结论）。
+- 当前容器无 .NET SDK，local Restore/Build/Test NOT RUN。M13-01 没有执行 UI/多实例运行器集成测试；Windows 10/11 多实例、输入竞争/清理、权限审批、DPI/多屏和应用退出实测仍 NOT RUN（M14），不得将 Core 状态测试或 CI 通过写成桌面 PASS。
+- 下一步只进入 M13-02：实现独立运行协调器/Worker session/IPC 身份与全局 InputArbiter；不要顺手实现定时/周期触发（M13-03）。
+

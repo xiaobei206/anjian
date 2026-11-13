@@ -446,3 +446,35 @@ preview.4 当前采用低级鼠标/键盘 Hook，已纳入 Windows CI 编译与�
 - SHA-256 只检测与 manifest 不一致的修改，不是发布者签名或可信来源证明；能够同时改写 manifest 和文件的人仍可构造自洽包。独立 Worker 是执行隔离边界，不是完整 OS 沙箱。只导入可信插件，不加载 DLL/EXE，不承诺隔离任意恶意同用户代码。
 
 - Windows Actions run [43433992383](https://github.com/xiaobei206/anjian/actions/runs/43433992383) 对代码 HEAD 582db78d9bddbed820727dd1bf01b19847beb5f6 全 PASS：Restore；Release Build 0 warnings / 0 errors；Core tests 171 passed / 0 failed / 0 skipped；API handbook check；self-contained win-x64 publish；published plugin Worker 与 Sprite Worker smoke；ZIP/SHA256 和 artifact upload 全 PASS。Artifact ID 14042985442，87,263,152 bytes，archive SHA-256 ebe8ca9bc7c4f82723e86628da5755bd783d655a9c1a170c7112336919e95af1，有效至 2026-12-13；这是 Actions 临时 artifact，不是 GitHub Release。
+
+
+## 19. M13 多实例运行实例与资源隔离契约（M13-01）
+
+M13-01 先冻结契约；新增 Core 类型只负责身份、状态转换和并发界限，不代表主程序已经可以同时运行多个脚本。当前 main 仍以单个 `PlaybackRunner` 和单活动运行作为现状；多实例协调器属于 M13-02。
+
+### 19.1 身份与一次启动的边界
+
+- `RunInstanceId` 为小写 32 位 GUID-N；一次明确 Start 只分配一次。重复派发同一个 `startRequestId` 必须幂等，同脚本的另一明确 Start 则是新实例，不做按路径去重。
+- 逻辑实例贯穿全部 RepeatCount。每一轮可以启动新的 Worker，但必须有独立 `workerAttemptId`、命名管道和 nonce；IPC 服务端把该 pipe/session 固定映射到一个 instanceId/attempt，不按消息正文自报身份选择资源。
+- 实例快照封存规范化脚本路径/内容版本、参数、播放选项、权限、插件计划和创建时刻。运行后编辑器的后续更改不影响已封存快照。
+
+### 19.2 私有资源和生命周期
+
+- 每实例拥有 Worker/Lua state、IPC 会话、ExecutionGate、CancellationTokenSource、运行计时、随机 process handles、HTTP session、Window 引用、Image cache、Plugin contribution snapshot、debug wait source、日志/异常上下文和输入释放登记。不能让 runner 复用另一实例的可变字段。
+- Core 状态类型：`RunInstanceState` + 独立的 `RunInstanceOutcome`、`RunInstanceTerminationMode`、`RunInstanceCleanupStatus`。状态转换表由 `RunInstanceLifecycle.AllowedTransitions` 导出，并由测试枚举所有状态对核对；首个终止原因不可覆盖，进入 Cleaned 前必须完成清理并写入成功/失败结果。
+- 容量：同时最多 4 个 Worker 槽位实例，另有最多 16 个 FIFO 排队项。正在启动、运行、暂停、终止和清理仍占用槽位；只有 Cleaned 后才释放。队列满立即明确拒绝。启动 Worker 连接 watchdog 30 秒，停止后给 Worker 2 秒正常退出宽限，再强制杀死进程树。
+- 实例运行超时从首个 Running 开始；验证、权限提示和排队不计时；Running 与 Paused 都计入墙钟时间，循环间隔也计入。具体用户可配置的上限/默认值由 M13-03 冻结。
+- 首个状态提交决定 Stop 与 timeout 的胜者；用户 Stop 锁定 Cancelled，timeout 锁定 TimedOut，其他后续异常只能附加诊断，不能改写结果。清理异常另由 CleanupStatus 反映。
+
+### 19.3 输入、权限和 IPC 隔离
+
+- SendInput/SetCursorPos 是整个桌面共享的全局副作用。所有实例必须通过主进程唯一 FIFO InputArbiter 串行；单个 Click/KeyPress/TypeText 等原子事件不可交错，显式 Down 持有租约直到 Up。暂停时继续持有输入租约；Stop/timeout 必须发出属于自己的 Up 并清空 owned-held 集合后才释放。清理失败时全局输入仲裁进入故障锁定，修复前禁止新输入租约。
+- Worker 可以拥有各自 Lua state 和缓存，却不能通过独立 controller 绕过全局输入仲裁。纯 UIA 操作可并行，但窗口引用和 provider 缓存仍实例私有。
+- 每实例重新解析权限请求并执行一次用户审阅。Grant 不按脚本路径共享、不持久化；Worker 启动载荷只由其 pipe 的宿主会话发送，host 保留权威 Grant 并逐 IPC 双重验证。ProcessSession 的随机句柄字典属于单实例，不能跨实例查询/等待。
+- 每条日志/状态事件必须带 instanceId；Worker attempt 及循环序号可用于诊断 Worker 崩溃、重复执行和清理失败。不得记录敏感参数或请求/响应正文。
+
+### 19.4 当前可机读契约与下一步
+
+- Core：`Anjian.Core.Runtime.RunInstanceLifecycle`、`RunInstanceId`、`RunInstanceSnapshot`、`RunInstanceLimits`。限额常量：4 active、16 queued、30,000 ms Worker startup watchdog、2,000 ms cancellation grace。
+- 自动化测试核对 GUID-N 规范、所有允许/禁止状态边、排队/成功/暂停/停止/超时/强制终止/清理失败的状态结果，以及首个终止原因不可覆盖。
+- M13-02 才落地 coordinator、Worker payload/IPC identity、全局 InputArbiter 与 owner-only cleanup；M13-03 负责用户超时/定时；M13-04 负责多实例 UI、日志筛选与 Windows 包 smoke。M14 负责真实桌面验收。

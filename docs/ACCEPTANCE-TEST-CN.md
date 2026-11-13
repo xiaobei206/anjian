@@ -526,3 +526,22 @@ M12-09 只实现有上限的显式 HTTP 缓冲请求；不代表大文件流式�
 - Actions artifact ID `14044284665`，87,281,040 bytes，archive SHA-256 `29b125cbb56b21f8e52075713474c72591c8df9a38f5e8cd5383d8c3e26c5a0d`，有效至 2026-12-13；是临时 Actions artifact，不是 GitHub Release。
 - 上述 run 验证代码和测试基线；后续文档提交会另行触发 Actions。local Restore/Build/Test NOT RUN（当前容器无 .NET SDK）。未修改版本号/创建 tag/Release；M14 Windows 10/11 桌面验收仍 NOT RUN。
 
+
+
+## 24. M13-01 多实例运行实例模型与隔离契约（规格/Core 测试已进入 main）
+
+| ID | 场景 | 自动化覆盖/结果 | Windows 桌面状态 |
+|---|---|---|---|
+| M13-01-01 | instanceId 稳定格式与唯一创建 | RunInstanceLifecycleTests 验证小写 GUID-N、拒绝非规范输入、两次创建不同 ID | NOT RUN（M14） |
+| M13-01-02 | 状态转换图完整性 | 自动枚举每个状态对，与 AllowedTransitions 精确比较，非法边拒绝 | NOT RUN（M14） |
+| M13-01-03 | 结果与清理语义 | 自动覆盖成功、暂停/恢复、用户取消、timeout、强制终止、清理失败；首个终止原因不可覆盖；清理失败与脚本结果分离 | NOT RUN（M14） |
+| M13-01-04 | 并发/队列常量与启动/停止边界 | 自动断言 4 active、16 queued、30 秒 Worker startup watchdog、2 秒取消宽限常量 | NOT RUN（M14） |
+| M13-01-05 | 多实例资源与权限隔离设计 | ADR-033 / Architecture §19 定义 owner-only Worker/IPC/Grant/process handles 与全局输入仲裁；本任务没有并发 runtime 实现或集成测试 | NOT RUN（M14） |
+| M13-01-06 | 同脚本多实例、重复 Start、单实例 Stop 与全局 SendInput 争用 | 作为 M13-02 coordinator/InputArbiter 集成测试，不得以 Core 状态机测试代替 | NOT RUN（M14） |
+| M13-01-07 | Worker 崩溃、主程序退出、输入清理失败 | 作为 M13-02 集成测试及 M14 Windows 桌面验收 | NOT RUN（M14） |
+
+### M13-01 自动化与边界记录
+
+- Core 新增 10 个状态机/ID/不变量测试；完整 Core suite 在提交 7112e1d 对应 Windows Actions run [43448241211](https://github.com/xiaobei206/anjian/actions/runs/43448241211) 为 187/187 PASS，Build 0 warnings / 0 errors、API handbook、self-contained win-x64 publish、Sprite/Worker smoke、ZIP/SHA256 和 artifact upload 全 PASS。
+- 包含 Starting -> TimeoutRequested 的 30 秒 Worker startup watchdog 边界的后续 HEAD `a03fd8c`，对应 Windows Actions run [43448660886](https://github.com/xiaobei206/anjian/actions/runs/43448660886)，以终端状态为最新代码结论；本记录随后会核验并更新。
+- 当前容器无 .NET SDK，local Restore/Build/Test NOT RUN。没有 M13-02 coordinator、worker concurrency、IPC owner-binding 或 InputArbiter；真实 Windows 10/11 并发、权限 UI、输入释放、DPI/多屏和应用退出仍 NOT RUN（M14）。

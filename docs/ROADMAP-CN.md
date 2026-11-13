@@ -22,8 +22,8 @@
 | M9 OCR 与文本识别 | DONE（实现与 Windows CI PASS；桌面验收延期至 M14 后，NOT RUN） | PaddleOcrNet 2.4.0 CPU 适配器、显式 ch/en/japan 模型管理、严格离线推理、行级结果/置信度/边界框、OCR/FindText/WaitText、暂停/停止与资源释放 |
 | M10 参数、配置与脚本自定义 UI | DONE（实现与 Windows 自动化验收完成；WinForms/桌面实测延期 M14） | 参数 sidecar schema v1、10 种类型、统一 validator、配置持久化/恢复、播放/调试前表单、参数设计器、JSON 导入导出、typed Worker IPC、递归只读 Lua Args、脚本目录相对路径解析 |
 | M11 小精灵打包器 | DONE（Windows CI run 229 PASS；WinForms/DPI/真实输入桌面验收延期 M14，NOT RUN） | 独立便携目录 + EXE 启动 ZIP、依赖/资源收集、M10 参数 UI、运行控制、manifest/SHA256、构建日志与离线函数参考 Markdown |
-| M12 内置扩展 API 与插件系统 | IN_PROGRESS（M12-01 权限基座和播放/调试审阅/Worker 注入已通过 Windows CI；系统 API 和插件待实现） | 默认拒绝权限契约、逐次运行审阅、Worker grant 注入；文件/剪贴板/对话框/进程/HTTP/JSON 的主机双重授权和插件 manifest/加载仍待实现 |
-| M13 多实例与定时任务 | TODO（下一阶段先做 M13-01 契约设计） | 独立运行实例、任务状态、定时、超时、失败策略与隔离 |
+| M12 内置扩展 API 与插件系统 | DONE（M12-01..M12-12 实现与 Windows CI 自动化完成；WinForms/权限/DPI/多屏桌面验收延期 M14） | 文件/剪贴板/对话框/进程/HTTP(S)/JSON 双层授权；本地插件 manifest/hash/三方 Grant 交集、入口 sidecar 与受限 Lua contribution；内置 API registry 1.2 / 103 |
+| M13 多实例与定时任务 | IN_PROGRESS（M13-01 契约/状态转换模型 DONE；M13-02 下一步实现协调器与输入仲裁） | 稳定 instanceId、状态机、4 active + 16 queue、Worker/权限/输入隔离契约已冻结；运行时多实例与定时尚未实现 |
 | M14 1.0 稳定化与发布 | TODO | 自动与手工验收、依赖许可、离线帮助、性能/长时测试和正式稳定版发布 |
 
 ## 统一 Windows 桌面实机验收策略（用户决定，2026-11-13）
@@ -400,3 +400,12 @@ M13-01 不是新 release；不得以设计文件代替实现测试证据，也�
 - 复用既有逐次 WinForms 审阅；明确拒绝/取消不会启动 Worker。没有 sidecar 的入口合法但 Grant 为空；声明不代表批准。Host 对每条 IPC 仍独立检查 Grant，未修改公开 Lua API registry（1.2 / 103）。
 - 最新 Windows Actions run [43436997492](https://github.com/xiaobei206/anjian/actions/runs/43436997492) 对 HEAD `ff5dc1510f4f68fe23e4abf54e2c291f6df6229b` 全 PASS：Restore、Release Build 0 warnings / 0 errors、173/173 Core tests、API handbook check、自包含 win-x64 publish、发布包 Sprite 与 Plugin Worker smoke、ZIP/SHA256 及 artifact upload。Artifact ID `14044230189`，87,267,435 bytes，archive SHA-256 `8c4312eb072012db084917bd025d5640e105d623a4d7df819632bf7cf1e58fc0`；这是临时 Actions artifact，不是 GitHub Release。
 - 本地容器无 .NET SDK，local Restore/Build/Test 为 NOT RUN。Windows 10/11 WinForms 审阅 UI、批准/拒绝路径、DPI/多屏实机验收 NOT RUN，统一留 M14；不能用 CI smoke 代替。
+
+
+## M13-01 — 多实例身份、生命周期与资源隔离契约（DONE；运行时实现待 M13-02）
+
+- Core 新增 `RunInstanceId` / `RunInstanceLifecycle` / `RunInstanceSnapshot` / `RunInstanceLimits`，状态边和终态不变量有测试；当前 MainForm/PlaybackRunner 仍为单实例运行，不能把契约模型标作多实例功能已交付。
+- 决策见 ADR-033、Architecture §19：instanceId + startRequestId + workerAttemptId 分层；同脚本多次独立 Start 允许并发，同一请求重试幂等；4 个 Worker active slot + 16 FIFO queue；Worker startup watchdog 30 秒、Stop graceful period 2 秒；首个 Stop/timeout 结果不可覆盖，Cleaned 后释放槽位。
+- Lua Worker、pipe/session、Grant、参数、计时、Pause/CTS、ProcessSession handles、HTTP/Window/Image/Plugin/debug context 和输入 held-state 都是实例私有。Grant 每实例重新审阅；host 每 IPC 以 owner instance 权威 Grant 复核。
+- SendInput/SetCursorPos 是全局桌面资源。M13-02 必须用主进程 FIFO InputArbiter 串行；Down 到 Up 的租约归原 owner，暂停保留；Stop/timeout/crash 先释放本实例 owned-held，再交接。清理失败时锁定后续输入。
+- 自动化状态模型测试完成；初始 Windows Actions run [43448241211](https://github.com/xiaobei206/anjian/actions/runs/43448241211) 在代码提交 7112e1d 上 187/187 tests PASS；带 30 秒 startup timeout 分支的最终 HEAD 对应 run 43448660886，需以最终状态确认。M13-02 的并发 Worker/InputArbiter 集成、Windows package multi-worker smoke 尚未实现。
