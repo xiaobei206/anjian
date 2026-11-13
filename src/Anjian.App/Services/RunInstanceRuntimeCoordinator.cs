@@ -43,12 +43,45 @@ internal sealed class RunInstanceRuntimeCoordinator : IDisposable
     private bool _disposed;
 
     public event Action<PlaybackRunner>? RunnerCreated;
-    public event Action<RunInstanceId, string>? Log;
+    private Control? _uiOwner;
+
+    public event Action<string>? Log;
+    public event Action<RunInstanceId, string>? InstanceLog;
     public event Action<RunInstanceSnapshot>? StateChanged;
-    public event Action<RunInstanceId, int, int>? IterationChanged;
-    public event Action<RunInstanceId, LuaDebugSnapshot>? DebugPaused;
-    public event Action<RunInstanceId>? DebugSessionCompleted;
-    public event Action<RunInstanceId, ImageVisualDebugEvent>? VisualDebugUpdated;
+    public event Action<int, int>? IterationChanged;
+    public event Action<LuaDebugSnapshot>? DebugPaused;
+    public event Action? DebugSessionCompleted;
+    public event Action<ImageVisualDebugEvent>? VisualDebugUpdated;
+    public bool IsRunning => SelectedIsRunning;
+    public bool IsPaused => SelectedIsPaused;
+    public bool IsDebugging => SelectedIsDebugging;
+
+    public void SetUiOwner(Control owner)
+    {
+        _uiOwner = owner ?? throw new ArgumentNullException(nameof(owner));
+    }
+
+    public Task RunAsync(
+        string scriptPath,
+        PlaybackOptions options,
+        LuaDebugLaunchOptions? debugOptions = null,
+        IReadOnlyDictionary<string, JsonElement>? parameters = null,
+        SpriteWorkerRuntimeOptions? spriteRuntimeOptions = null,
+        ScriptPermissionGrant? permissions = null,
+        PluginWorkerRuntimeOptions? pluginRuntimeOptions = null) =>
+        StartAsync(
+            Guid.NewGuid().ToString("N"),
+            scriptPath,
+            options,
+            debugOptions,
+            parameters,
+            permissions,
+            spriteRuntimeOptions,
+            pluginRuntimeOptions);
+
+    public void Pause() => PauseSelected();
+    public void Resume() => ResumeSelected();
+    public void Stop() => StopSelected();
 
     public int ActiveCount => _model.ActiveCount;
     public int QueuedCount => _model.QueuedCount;
@@ -83,7 +116,7 @@ internal sealed class RunInstanceRuntimeCoordinator : IDisposable
     }
 
     public bool SelectedIsRunning => SelectedSnapshot()?.State is
-        RunInstanceState.Starting or RunInstanceState.Running or RunInstanceState.Paused or
+        RunInstanceState.Queued or RunInstanceState.Starting or RunInstanceState.Running or RunInstanceState.Paused or
         RunInstanceState.StopRequested or RunInstanceState.TimeoutRequested or
         RunInstanceState.Cancelling or RunInstanceState.ForceTerminating or RunInstanceState.CleaningUp;
 
@@ -148,13 +181,15 @@ internal sealed class RunInstanceRuntimeCoordinator : IDisposable
             _entries.Add(entry.InstanceId, entry);
             _selected = entry.InstanceId;
             WireRunner(entry);
+            if (_uiOwner is not null)
+                runner.SetUiOwner(_uiOwner);
             RunnerCreated?.Invoke(runner);
             StateChanged?.Invoke(admission.Snapshot);
 
             if (admission.ShouldStartImmediately)
                 _ = StartEntryAsync(entry);
             else
-                Log?.Invoke(entry.InstanceId, $"已进入 FIFO 等待队列（前方 {QueuedCount - 1} 个）。");
+                PublishLog(entry.InstanceId, $"已进入 FIFO 等待队列（前方 {QueuedCount - 1} 个）。");
 
             return completion.Task;
         }
@@ -266,18 +301,34 @@ internal sealed class RunInstanceRuntimeCoordinator : IDisposable
     {
         var recovered = _inputArbiter.TryRecoverAfterManualAcknowledgement();
         if (recovered)
-            Log?.Invoke(SelectedInstanceId ?? RunInstanceId.Create(), "用户已确认键鼠状态恢复，全局输入仲裁解除故障锁定。");
+            Log?.Invoke("用户已确认键鼠状态恢复，全局输入仲裁解除故障锁定。");
         return recovered;
     }
 
     private void WireRunner(Entry entry)
     {
         var runner = entry.Runner;
-        runner.Log += message => Log?.Invoke(entry.InstanceId, message);
-        runner.IterationChanged += (current, total) => IterationChanged?.Invoke(entry.InstanceId, current, total);
-        runner.DebugPaused += snapshot => DebugPaused?.Invoke(entry.InstanceId, snapshot);
-        runner.DebugSessionCompleted += () => DebugSessionCompleted?.Invoke(entry.InstanceId);
-        runner.VisualDebugUpdated += value => VisualDebugUpdated?.Invoke(entry.InstanceId, value);
+        runner.Log += message => PublishLog(entry.InstanceId, message);
+        runner.IterationChanged += (current, total) =>
+        {
+            if (SelectedInstanceId == entry.InstanceId)
+                IterationChanged?.Invoke(current, total);
+        };
+        runner.DebugPaused += snapshot =>
+        {
+            if (SelectedInstanceId == entry.InstanceId)
+                DebugPaused?.Invoke(snapshot);
+        };
+        runner.DebugSessionCompleted += () =>
+        {
+            if (SelectedInstanceId == entry.InstanceId)
+                DebugSessionCompleted?.Invoke();
+        };
+        runner.VisualDebugUpdated += value =>
+        {
+            if (SelectedInstanceId == entry.InstanceId)
+                VisualDebugUpdated?.Invoke(value);
+        };
         runner.WorkerReady += () =>
         {
             if (_model.TryMarkRunning(entry.InstanceId, out var snapshot))
@@ -292,7 +343,7 @@ internal sealed class RunInstanceRuntimeCoordinator : IDisposable
             }
             catch (Exception ex)
             {
-                Log?.Invoke(entry.InstanceId, "更新强制终止状态失败：" + ex.Message);
+                PublishLog(entry.InstanceId, "更新强制终止状态失败：" + ex.Message);
             }
         };
     }
@@ -321,12 +372,12 @@ internal sealed class RunInstanceRuntimeCoordinator : IDisposable
         catch (Exception ex)
         {
             failure = ex;
-            Log?.Invoke(entry.InstanceId, "实例运行失败：" + ex);
+            PublishLog(entry.InstanceId, "实例运行失败：" + ex);
         }
         finally
         {
             try { entry.Runner.Dispose(); }
-            catch (Exception ex) { Log?.Invoke(entry.InstanceId, "实例释放资源失败：" + ex.Message); }
+            catch (Exception ex) { PublishLog(entry.InstanceId, "实例释放资源失败：" + ex.Message); }
 
             RunInstanceOutcome outcome;
             try
@@ -348,14 +399,14 @@ internal sealed class RunInstanceRuntimeCoordinator : IDisposable
                         _entries.TryGetValue(completed.Promoted.InstanceId, out promoted);
                     if (promoted is not null)
                     {
-                        Log?.Invoke(promoted.InstanceId, "FIFO 队列轮到本实例，开始 Worker 启动。");
+                        PublishLog(promoted.InstanceId, "FIFO 队列轮到本实例，开始 Worker 启动。");
                         _ = StartEntryAsync(promoted);
                     }
                 }
             }
             catch (Exception ex)
             {
-                Log?.Invoke(entry.InstanceId, "实例状态收尾失败：" + ex);
+                PublishLog(entry.InstanceId, "实例状态收尾失败：" + ex);
                 entry.Completion.TrySetException(ex);
             }
         }
@@ -405,9 +456,16 @@ internal sealed class RunInstanceRuntimeCoordinator : IDisposable
 
         var latest = _model.GetInstances()
             .Where(x => !RunInstanceLifecycle.IsTerminal(x.Snapshot))
-            .OrderByDescending(x => x.CreatedAtUtc)
+            .OrderByDescending(x => _entries.TryGetValue(x.InstanceId, out var candidate) && candidate.Started)
+            .ThenByDescending(x => x.CreatedAtUtc)
             .FirstOrDefault();
         _selected = latest?.InstanceId ?? _selected;
+    }
+
+    private void PublishLog(RunInstanceId instanceId, string message)
+    {
+        InstanceLog?.Invoke(instanceId, message);
+        Log?.Invoke($"[{instanceId.Value[..8]}] {message}");
     }
 
     private static IReadOnlyDictionary<string, JsonElement> CloneParameters(
