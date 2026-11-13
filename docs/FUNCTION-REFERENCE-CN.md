@@ -1979,7 +1979,7 @@ for _, name in ipairs(ListDirectories("data")) do Log(name) end
 CreateDirectory("data/cache")
 ```
 
-#### `CopyFile(sourcePath, destinationPath, overwrite)` — 复制文件
+#### `CopyFile(sourcePath, destinationPath, overwrite?)` — 复制文件
 
 - **稳定 ID：** `anjian.files.copy-file`
 - **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
@@ -2001,7 +2001,7 @@ CreateDirectory("data/cache")
 CopyFile("data/source.bin", "backup/source.bin", true)
 ```
 
-#### `MoveFile(sourcePath, destinationPath, overwrite)` — 移动文件
+#### `MoveFile(sourcePath, destinationPath, overwrite?)` — 移动文件
 
 - **稳定 ID：** `anjian.files.move-file`
 - **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
@@ -2023,7 +2023,7 @@ CopyFile("data/source.bin", "backup/source.bin", true)
 MoveFile("data/old.txt", "archive/old.txt")
 ```
 
-#### `RenameFile(path, newName, overwrite)` — 重命名文件
+#### `RenameFile(path, newName, overwrite?)` — 重命名文件
 
 - **稳定 ID：** `anjian.files.rename-file`
 - **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。

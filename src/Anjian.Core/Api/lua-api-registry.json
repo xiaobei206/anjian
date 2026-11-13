@@ -5732,7 +5732,7 @@
       "category": "files",
       "title": "复制文件",
       "description": "将批准读取根目录中的普通文件复制到批准写入根目录；只支持普通文件，最大 64 MiB。先写入目标目录内的随机临时文件，flush 并 SHA-256 校验后再原子提交。",
-      "signature": "CopyFile(sourcePath, destinationPath, overwrite)",
+      "signature": "CopyFile(sourcePath, destinationPath, overwrite?)",
       "parameters": [
         {
           "name": "sourcePath",
@@ -5791,7 +5791,7 @@
       "category": "files",
       "title": "移动文件",
       "description": "移动一个普通文件；源文件必须同时位于批准读取根和写入根，目标必须位于批准写入根。同卷使用句柄级重命名；跨卷限 64 MiB，先复制、flush、SHA-256 校验并提交目标，再删除源文件。",
-      "signature": "MoveFile(sourcePath, destinationPath, overwrite)",
+      "signature": "MoveFile(sourcePath, destinationPath, overwrite?)",
       "parameters": [
         {
           "name": "sourcePath",
@@ -5850,7 +5850,7 @@
       "category": "files",
       "title": "重命名文件",
       "description": "在同一已批准父目录内重命名一个普通文件；源路径必须同时获读取和写入授权，目标名必须是单个文件名，不能指定其他目录。",
-      "signature": "RenameFile(path, newName, overwrite)",
+      "signature": "RenameFile(path, newName, overwrite?)",
       "parameters": [
         {
           "name": "path",

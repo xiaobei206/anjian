@@ -314,8 +314,7 @@ public sealed class ScriptFileSystem
         if (sourceInfo.VolumeSerialNumber == destinationVolume)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            RenameByHandle(sourceHandle, destinationDirectory,
-                Path.GetFileName(destinationFullPath), overwrite);
+            RenameByHandle(sourceHandle, destinationFullPath, overwrite);
             using var moved = OpenFileHandle(destinationFullPath, FileReadAttributes,
                 FileShareRead | FileShareWrite, OpenExisting);
             return true;
@@ -379,7 +378,7 @@ public sealed class ScriptFileSystem
         EnsureDestinationAvailable(destinationFullPath, overwrite);
 
         cancellationToken.ThrowIfCancellationRequested();
-        RenameByHandle(sourceHandle, destinationDirectory, newName, overwrite);
+        RenameByHandle(sourceHandle, destinationFullPath, overwrite);
         using var renamed = OpenFileHandle(destinationFullPath, FileReadAttributes,
             FileShareRead | FileShareWrite, OpenExisting);
         return true;
@@ -489,8 +488,7 @@ public sealed class ScriptFileSystem
                 throw new IOException("复制后的临时文件校验失败，目标文件未提交。");
 
             cancellationToken.ThrowIfCancellationRequested();
-            RenameByHandle(commitHandle, destinationDirectory,
-                Path.GetFileName(destinationPath), overwrite);
+            RenameByHandle(commitHandle, destinationPath, overwrite);
         }
 
         // The rename is the commit boundary. Do not report cancellation after this point.
@@ -558,20 +556,20 @@ public sealed class ScriptFileSystem
 
     private static void RenameByHandle(
         SafeFileHandle fileHandle,
-        SafeFileHandle destinationDirectory,
-        string destinationName,
+        string destinationPath,
         bool overwrite)
     {
-        var nameBytes = Encoding.Unicode.GetBytes(destinationName);
+        var nameBytes = Encoding.Unicode.GetBytes(destinationPath);
         var nameOffset = (IntPtr.Size * 2) + sizeof(uint);
         var bufferSize = nameOffset + nameBytes.Length;
         var buffer = Marshal.AllocHGlobal(bufferSize);
         try
         {
+            // FILE_RENAME_INFO: BOOLEAN ReplaceIfExists, HANDLE RootDirectory
+            // (NULL for fully-qualified paths), DWORD FileNameLength, WCHAR FileName[].
             var zeroed = new byte[bufferSize];
             Marshal.Copy(zeroed, 0, buffer, bufferSize);
             Marshal.WriteByte(buffer, 0, overwrite ? (byte)1 : (byte)0);
-            Marshal.WriteIntPtr(buffer, IntPtr.Size, destinationDirectory.DangerousGetHandle());
             Marshal.WriteInt32(buffer, IntPtr.Size * 2, nameBytes.Length);
             Marshal.Copy(nameBytes, 0, IntPtr.Add(buffer, nameOffset), nameBytes.Length);
             if (!SetFileInformationByHandle(fileHandle, FileRenameInfoClass,
@@ -579,7 +577,7 @@ public sealed class ScriptFileSystem
             {
                 var error = Marshal.GetLastWin32Error();
                 throw new IOException(
-                    $"无法原子重命名/移动文件到 {destinationName}。",
+                    $"无法原子重命名/移动文件到 {destinationPath}。",
                     new Win32Exception(error));
             }
         }
