@@ -1,6 +1,5 @@
 using System.IO;
 using System.IO.Pipes;
-using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Anjian.Core.Api;
@@ -124,37 +123,20 @@ internal static class WorkerProgram
 
     private static void ValidateHandshake(WorkerHandshake handshake)
     {
-        if (!Guid.TryParseExact(handshake.InstanceId, "N", out var instance) ||
-            !string.Equals(instance.ToString("N"), handshake.InstanceId, StringComparison.Ordinal) ||
-            !Guid.TryParseExact(handshake.WorkerAttemptId, "N", out var attempt) ||
-            !string.Equals(attempt.ToString("N"), handshake.WorkerAttemptId, StringComparison.Ordinal) ||
-            handshake.SessionNonce.Length != 64 ||
-            !handshake.SessionNonce.All(Uri.IsHexDigit))
+        if (!WorkerSessionIdentityPolicy.IsValid(
+            handshake.InstanceId, handshake.WorkerAttemptId, handshake.SessionNonce))
             throw new InvalidDataException("Worker 会话身份格式无效。");
     }
 
     private static void ValidateLaunchIdentity(WorkerHandshake handshake, WorkerLaunchPayload launch)
     {
-        if (!string.Equals(handshake.InstanceId, launch.InstanceId, StringComparison.Ordinal) ||
-            !string.Equals(handshake.WorkerAttemptId, launch.WorkerAttemptId, StringComparison.Ordinal) ||
-            !FixedNonceEquals(handshake.SessionNonce, launch.SessionNonce))
+        if (!WorkerSessionIdentityPolicy.Matches(
+            handshake.InstanceId, handshake.WorkerAttemptId, handshake.SessionNonce,
+            launch.InstanceId, launch.WorkerAttemptId, launch.SessionNonce))
             throw new InvalidDataException("Worker 启动载荷身份与当前管道会话不匹配。");
     }
 
-    private static bool FixedNonceEquals(string expected, string actual)
-    {
-        if (expected.Length != 64 || actual.Length != 64)
-            return false;
-        try
-        {
-            return CryptographicOperations.FixedTimeEquals(
-                Convert.FromHexString(expected), Convert.FromHexString(actual));
-        }
-        catch (FormatException)
-        {
-            return false;
-        }
-    }
+
 }
 
 internal sealed class WorkerPipeClient(
@@ -198,12 +180,12 @@ internal sealed class WorkerPipeClient(
 
     private static void ValidateResponseIdentity(JsonElement root, WorkerHandshake expected)
     {
-        if (!root.TryGetProperty("instanceId", out var instance) ||
-            instance.GetString() != expected.InstanceId ||
-            !root.TryGetProperty("workerAttemptId", out var attempt) ||
-            attempt.GetString() != expected.WorkerAttemptId ||
-            !root.TryGetProperty("sessionNonce", out var nonce) ||
-            nonce.GetString() != expected.SessionNonce)
+        var instanceId = root.TryGetProperty("instanceId", out var instance) ? instance.GetString() : null;
+        var attemptId = root.TryGetProperty("workerAttemptId", out var attempt) ? attempt.GetString() : null;
+        var sessionNonce = root.TryGetProperty("sessionNonce", out var nonce) ? nonce.GetString() : null;
+        if (!WorkerSessionIdentityPolicy.Matches(
+            expected.InstanceId, expected.WorkerAttemptId, expected.SessionNonce,
+            instanceId, attemptId, sessionNonce))
             throw new InvalidDataException("主进程响应不属于当前 Worker 会话。");
     }
 }
