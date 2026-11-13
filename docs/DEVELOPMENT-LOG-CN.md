@@ -578,3 +578,27 @@ M4 基础调试器与 M5 可视化录制/动作列表均已完成 Windows CI 验
 - Windows Actions 当前 M9 提交结果尚待检查；在实际获取到 Restore/Build/Test/API handbook/self-contained publish 结果前，不将其标为 PASS。
 - M9-01..M9-08 真实 Windows 桌面验收均 NOT RUN，延后至 M14 功能开发结束后的统一验收；M8-01..M8-18 状态也不改变。
 - 未修改 VERSION、AssemblyVersion、FileVersion；未创建 Release，preview.4 正式 ZIP/SHA256 不变。
+
+
+## 2026-11-13 — M9 OCR 完成 Windows CI（实现/自动化 DONE；实机验收延期）
+
+### 最终代码
+- 最终 M9 实现与修复基线：`41e6d56a6485114e44cc9453b97ce05dd04f4c5d`。
+- API registry 0.7 / 81 个公开函数；Core OCR DTO/interface、PaddleOcrNet 2.4.0 CPU adapter、显式模型管理窗、严格离线 Worker、截图 PNG IPC、OCR/FindText/WaitText、Pause-aware WaitText delay 均已进入 main。
+- M9 模型管理窗下载中关闭时先取消下载，待异步任务 finally 收尾后再关闭；避免窗体释放后异步回调访问控件。
+
+### Windows Actions 最终证据
+- 最终 run [43363150335](https://github.com/xiaobei206/anjian/actions/runs/43363150335)：**SUCCESS**，runner 为 Windows Server 2025。
+- Restore PASS；Release Build PASS（0 warnings / 0 errors）；Core Tests **90 passed / 0 failed / 0 skipped**；API handbook `--check` PASS；self-contained win-x64 publish PASS；ZIP/SHA256 package PASS；artifact upload PASS。
+- 最终临时 artifact：`Anjian2026-preview-win-x64`，Artifact ID `14008744436`，87,078,010 bytes；Actions artifact archive SHA-256 digest `70a0d63982f035b3169c4319867d6a893ed891e8ba5046976a3a328d455f6ccc`；[下载 artifact](https://github.com/xiaobei206/anjian/actions/runs/43363150335/artifacts/14008744436)。该临时构建包不是 GitHub Release。
+- 前一轮完整验证 run [43362673890](https://github.com/xiaobei206/anjian/actions/runs/43362673890) SUCCESS（89/89 tests），但随后针对 Pause-aware delay 和下载窗体关闭做了额外可靠性修正，因此以 43363150335 的 90/90 作为最终结论。
+
+### 失败与修复记录
+- 首批提交的 run 43361831218 等出现 Core OCR IPC 使用 App 层 `WindowApiJson` 的编译边界错误，以及 `IReadOnlyList.IndexOf` 不可用。IndexOf 改为显式索引遍历；Core 改用自己的 `JsonSerializerDefaults.Web` 选项，兼容主进程 camelCase IPC。修复后 run 43362673890 全绿。
+- 可靠性补丁首轮 run [43362993922](https://github.com/xiaobei206/anjian/actions/runs/43362993922) Build FAIL：C# CS0157，不允许从 finally 子句返回。将窗体清理逻辑改为 if/else，不在 finally 中 return；最终 run 43363150335 全部通过。
+- 这些失败均已留下明确根因和修复，不以中间失败作为最终验收，也不隐去最终通过证据。
+
+### 尚未完成与验收边界
+- 本地容器为 Debian 13，无 .NET SDK；本地 Restore/Build/Test：NOT RUN。最终 90 项测试和 Windows x64 发布全部来自 Windows Server 2025 GitHub Actions。
+- M9-01..M9-08 真实 Windows 10/11 桌面验收全部 NOT RUN：包括真实模型下载/哈希、断网识别、中文/英语/日语精度、真实边界框、WaitText Pause/Stop、DPI/多屏与长时稳定性。它们与 M1–M8 桌面项一并延期至 M14 完成后的集中验收。
+- 未修改 VERSION、AssemblyVersion、FileVersion；未创建 Release；v0.1.0-preview.4 官方 ZIP/SHA256 未更改。

@@ -19,7 +19,7 @@
 | M6 坐标系统与窗口自动化 | DONE（按本 handoff 的 API/Win32 范围；最终 Windows CI PASS；桌面验收 NOT RUN） | screen/window/client/anchor/ratio、双向坐标转换、安全窗口引用/枚举/属性/操作/等待 |
 | M7 控件与前后台能力适配 | DONE（Windows CI PASS；桌面验收 NOT RUN） | UI Automation Control View/Pattern；worker 隔离与可停止性；按能力报告语义后台控件操作、受限前台输入和明确 unsupported 边界；run 43350412493：64/64 tests、0 warning/error、API check、win-x64 publish、ZIP/SHA256、artifact upload 均 PASS |
 | M8 截图、图色与模板资源 | DONE（实现/Windows CI；桌面验收延期至 M14 后） | 图像资源 UI、manifest/assets、相对路径/依赖、RGB/hex/颜色块、透明模板、视觉调试 overlay 已进入 main 并通过 Windows CI；M8-01..M8-18 仍 NOT RUN，集中验收 |
-| M9 OCR 与文本识别 | IN_PROGRESS（首轮代码/API 已进入 main；Windows CI 待验证；桌面验收延期至 M14 后） | 本地 OCR 引擎、显式语言模型管理、离线推理、行级文本/置信度/矩形/多边形、FindText 与 WaitText |
+| M9 OCR 与文本识别 | DONE（实现与 Windows CI PASS；桌面验收延期至 M14 后，NOT RUN） | PaddleOcrNet 2.4.0 CPU 适配器、显式 ch/en/japan 模型管理、严格离线推理、行级结果/置信度/边界框、OCR/FindText/WaitText、暂停/停止与资源释放 |
 | M10 参数、配置与脚本自定义 UI | TODO | 参数声明、类型/默认值/范围/选项、校验、持久化和通用表单 |
 | M11 小精灵打包器 | TODO | 独立包/EXE 入口、独立参数界面、图标、依赖收集、运行控制、清单与校验 |
 | M12 内置扩展 API 与插件系统 | TODO | 文件、剪贴板、对话框、进程、HTTP/JSON，插件 manifest/权限/API 版本 |
@@ -256,7 +256,7 @@ M7 实现/CI 已完成不代表 M7-01..M7-10 Windows 桌面验收通过；这些
 - 优先直接在 main 小步提交并保持易回滚；写入前核对最新 HEAD。
 
 
-## M9 — OCR 与文本识别（IN_PROGRESS；桌面验收统一延期）
+## M9 — OCR 与文本识别（实现/Windows CI DONE；桌面验收统一延期至 M14 后）
 
 ### 首轮已进入 main 的实现
 - API registry 从 0.6 升至 0.7，当前公开 API 81 项；新增 `OCR`、`FindText`、`WaitText`，由单一注册表驱动 Lua runtime、编辑器补全/签名和函数手册。
@@ -267,7 +267,36 @@ M7 实现/CI 已完成不代表 M7-01..M7-10 Windows 桌面验收通过；这些
 - 返回逐行全文、confidence、图像局部矩形/多边形；截图另返回 screenX/screenY 并保留虚拟桌面负坐标。
 
 ### M9 后续开发/自动化验收
-- 当前 Core API 测试覆盖 Lua 表结构、文本匹配模式、置信度过滤、屏幕坐标映射、WaitText checkpoint 和截图释放。
-- Windows CI 需要验证 PaddleOcrNet 2.4.0 NuGet restore、win-x64 运行时资产、0 warnings/errors、全部 Core tests、API 手册生成、self-contained publish、ZIP/SHA256。
-- M9 桌面验收行 M9-01..M9-08 保持 NOT RUN，随 M1–M8 一并推迟至 M14 后的集中验收；重点为模型下载/哈希、断网识别、三种语言、文本边界框、超大/损坏图片、WaitText Pause/Stop 和多显示器负坐标。
+- Core API 自动测试覆盖 Lua 表结构、文本匹配模式、置信度过滤、屏幕坐标映射、WaitText checkpoint、Pause-aware delay 与截图释放。
+- Windows Actions 最终 run [43363150335](https://github.com/xiaobei206/anjian/actions/runs/43363150335) SUCCESS：Restore PASS；Release Build 0 warnings / 0 errors；90/90 Core tests；API handbook --check；self-contained win-x64 publish；ZIP/SHA256 与 artifact upload 全 PASS。Artifact ID `14008744436`，87,078,010 bytes；artifact SHA-256 digest `70a0d63982f035b3169c4319867d6a893ed891e8ba5046976a3a328d455f6ccc`。
+- M9 桌面验收行 M9-01..M9-08 仍全部 NOT RUN，随 M1–M8 一并推迟至 M14 后的集中验收；重点为模型下载/哈希、断网识别、三种语言、文本边界框、超大/损坏图片、WaitText Pause/Stop 和多显示器负坐标。Windows CI 仅证明编译与自动化契约测试，不代表真实模型识别质量通过。
 - 上游包规模较小，保留 Core/App 适配边界；若 CI、许可或实际质量不达标，替换 App adapter，不改变稳定 Lua DTO/API 契约。
+
+
+## M10 — 参数、配置与脚本自定义 UI（下一开发阶段）
+
+以 PRD 2.9、2.13、F20/F26 为完整范围，先设计稳定 schema，再实现闭环。M10 不得把脚本运行时变量误当作用户启动参数。
+
+### 目标与基本数据契约
+- 每个脚本/入口可声明具稳定 ID 的参数：机器名、中文标签、类型、必填、默认值、最小/最大值、选项、帮助说明、验证规则和排序。
+- 首轮类型覆盖文本、整数、小数、布尔、下拉/单选、多选、文件路径、目录路径、热键和可选颜色值；所有类型必须定义序列化格式、范围/选项验证、空值和默认值语义。
+- 参数 schema 作为受版本管理的数据模型保存，具有 schemaVersion、scriptId、createdAt/updatedAt 和稳定参数 ID；未知未来 schema 不覆盖原文件。
+- 用户输入在启动前统一校验；错误指出字段、值和具体规则，未通过时不得启动 Worker。成功后将类型明确的参数安全注入 Lua 独立 Worker，区分用户参数与运行中的 Lua 变量。
+- 自定义 UI 根据同一 schema 自动生成通用表单；开发环境和未来小精灵打包器共用 schema/validator/rendering model，不复制第二套参数定义。
+- 配置支持保存、重新载入、恢复默认、导入/导出；使用原子写入/备份和迁移策略；敏感输入默认不写普通日志。
+
+### M10 实施顺序与验收
+1. 读取 PRD 2.9/2.13、Architecture、Decision 与当前 Worker IPC；先更新 ADR/API/架构和验收标准，冻结参数 schema。
+2. 建立 Core 参数定义/值/校验 DTO 与纯函数 validator，覆盖缺少必填、类型不匹配、整数/小数边界、选项、多选重复项、文件/目录路径、热键格式和颜色值。
+3. 确定脚本参数定义的声明方式（建议由一个版本化脚本元数据/参数描述文件承载；不要在 Lua 文件执行前为读取定义而执行用户脚本），并给出未知 schema 保护/迁移设计。
+4. 实现参数编辑器与运行前表单；用户可新增/编辑/删除/排序参数，设置默认值与约束，预览最终运行表单。
+5. 把已校验的强类型值通过独立 IPC 传入 Worker，并提供只读 Lua 参数表入口；不能通过字符串拼接生成 Lua 代码或把用户输入当代码执行。
+6. 实现配置原子持久化、备份、恢复默认、JSON 导入/导出和损坏配置恢复。
+7. 同步 registry（仅在确实新增用户可调用 API 时）、中文函数手册、IDE schema 提示、User Guide、Feature Matrix、Acceptance 与 Development Log；编写 Core/IPC/UI 自动测试。
+
+### M10 自动化验收
+- 每种类型的有效/无效值和默认值、必填、边界、选项、多选、文件/目录/热键/颜色校验。
+- 参数 schema/配置 round-trip、原子写入、备份、损坏恢复、未知 schema 与迁移失败原文件保护。
+- 参数经 Worker IPC 后保持实际类型，不发生代码注入；启动校验失败时 Worker 不启动。
+- UI 与 Lua 读取完全相同值；敏感项不进入普通日志。
+- Windows CI Restore/Build/Core Tests/API handbook/self-contained win-x64 publish/ZIP/SHA256 必须全 PASS。真实 WinForms 表单、DPI 和交互仍延后至 M14 集中验收。

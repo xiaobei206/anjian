@@ -330,3 +330,40 @@ M4 基础调试器已在 main 实现并通过 Windows CI。具体实现提交与
 
 ### 下一会话唯一任务
 先核对本次 M9 首轮代码提交触发的 Windows Actions 结果。若失败，读取真实 job log 并修复；如果通过，按剩余 M9 目标继续补充功能/测试并把 M9 实现与 CI 状态更新为 DONE（桌面验收 NOT RUN、统一延期），然后进入 M10 参数、配置与脚本自定义 UI。不要回头要求先执行 M8 桌面验收，不修改 VERSION，不创建 Release。
+
+
+# 最新交接状态（覆盖此前 M8 阻塞交接，更新于 2026-11-13）
+
+用户最新决策：M1–M13 的 Windows 桌面实机验收统一延期至 M14 全部功能开发完成后集中执行。不得再要求先完成 M8 桌面验收才进入 M9/M10。未执行的 M8-01..18、M9-01..08 等验收行继续保持 NOT RUN；CI 不等于桌面 PASS。M14 正式 1.0.0 发布仍必须等待用户集中实机验收及缺陷修复。
+
+## 当前代码和 CI 状态
+- 最终 main 代码基线：`41e6d56a6485114e44cc9453b97ce05dd04f4c5d`。
+- M9 OCR 已完成实现与 Windows CI：run [43363150335](https://github.com/xiaobei206/anjian/actions/runs/43363150335) SUCCESS（Windows Server 2025）：Restore PASS；Release Build 0 warnings/0 errors；90/90 Core tests；API handbook `--check` PASS；win-x64 self-contained publish、ZIP/SHA256、artifact upload 全 PASS。
+- 临时 artifact：ID `14008744436`，87,078,010 bytes，30 天保留；不是 GitHub Release。没有修改 VERSION，preview.4 正式 ZIP/SHA256 不变。
+- M9 核心：API 0.7 / 81 项；新增 `OCR`、`FindText`、`WaitText`；PaddleOcrNet 2.4.0 CPU adapter；用户显式下载 ch/en/japan 模型；Worker 识别严格离线；16 MP/64 MiB 输入上限；文本置信度/矩形/polygon/屏幕绝对坐标；WaitText 使用 ExecutionGate 可暂停/取消 delay，F12 Stop 终止 Worker；模型管理窗下载取消后安全关闭。
+- 本地 Debian 13 环境没有 .NET SDK；本地 Restore/Build/Test NOT RUN。Windows Actions 的 90/90 是自动化证据；M9-01..M9-08 桌面验收全部 NOT RUN，M1–M13 统一延期 M14。
+- 实际 CI 失败与修复记录见 DEVELOPMENT-LOG-CN.md；最终以 run 43363150335 为准。
+
+## 下一会话唯一开发任务：M10 — 参数、配置与脚本自定义 UI
+
+### 开始前
+1. 核对 main 最新 HEAD，读取 AGENTS.md、README.md、本 handoff、ROADMAP、PRD 第 2.9/2.13 节、FEATURE-MATRIX 的 F20/F26、ARCHITECTURE、DECISIONS、Lua API registry 与当前 Worker IPC。
+2. 依据用户冻结的完整产品目标实施 M10；不回到 M8 实机验收，不缩减完整产品范围，不创建长期分支/PR。
+3. 开始编码前先完成参数 schema / 持久化 / 启动前校验 / Worker 参数注入的 ADR 和规格，避免执行用户脚本来读取参数声明。
+
+### M10 唯一实施范围
+- 建立版本化参数 schema：稳定参数 ID、机器名、中文标签、类型、必填、默认值、最小/最大值、选项、描述、验证规则、排序。
+- 支持文本、整数、小数、布尔、下拉/单选、多选、文件路径、目录路径、热键和可选颜色值。
+- 参数定义和运行值分离；建议使用脚本旁版本化元数据文件或独立安全描述，不能为读取参数定义而提前执行用户 Lua 脚本。
+- 启动前统一校验，失败时指出字段和规则且不得启动 Worker；成功后通过类型安全 IPC 注入独立 Lua Worker，提供只读参数表入口，用户输入绝不能通过 Lua 字符串拼接执行。
+- UI 根据同一 schema 自动生成通用表单；支持参数新增/编辑/删除/排序、默认值、范围/选项、必填与帮助说明。
+- 支持保存/载入、恢复默认、JSON 导入/导出、原子写入、备份、损坏恢复和 schema migration；未知未来 schema 不得覆盖原文件。
+- 敏感参数默认不写普通日志；开发环境与未来小精灵打包器共用 schema/validator。
+- 只有当新增 Lua 公开 API 确实必要时才更新 registry/API version；按 M2 纪律同步函数手册、编辑器提示、测试和日志。
+
+### M10 自动化验收
+- 每种类型的有效/无效值、默认值、必填、边界、选项、多选、文件/目录/热键/颜色校验。
+- 参数 schema/配置 round-trip、原子写入、备份、损坏恢复、未知 schema 与迁移失败原文件保护。
+- 参数经 Worker IPC 后保持实际类型，不发生代码注入；启动校验失败时 Worker 不启动。
+- UI 与 Lua 读取完全相同值；敏感项不进入普通日志。
+- Windows CI Restore/Build/Core Tests/API handbook/self-contained win-x64 publish/ZIP/SHA256 必须全 PASS。真实 WinForms 表单、DPI 和交互仍延后至 M14 集中实机验收。

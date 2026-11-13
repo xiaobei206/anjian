@@ -305,3 +305,6 @@ M1–M13 的桌面实测不再作为进入下一开发阶段的前置条件，�
 | M9-07 | WaitText 超时/暂停/停止 | 分别在文字立即出现、延迟出现、始终不出现时调用；中途 F11 暂停、F12 停止 | 命中返回行；timeout 返回 nil；暂停在检查点生效；Stop 能终止独立 Worker；临时截图/整轮资源最终释放；UI 持续响应 | NOT RUN（桌面） |
 | M9-08 | 大图/损坏输入与稳定性 | 输入超过 16 MP 图片、超过 64 MiB PNG 编码、损坏 PNG、空图；连续识别 100 次 | 超限在分配/推理前明确拒绝；损坏图片报错可诊断；不会使主 UI 崩溃；模型 session 与资源可正常释放 | NOT RUN（桌面） |
 
+
+
+**M9 自动化/构建证据（非桌面 PASS）：** Windows Actions run [43363150335](https://github.com/xiaobei206/anjian/actions/runs/43363150335) SUCCESS：Restore、Release Build（0 warnings / 0 errors）、90/90 Core tests、API handbook check、self-contained win-x64 publish、ZIP/SHA256 和 artifact upload 全 PASS（artifact ID 14008744436）。因此 M9 代码/自动化状态可记 DONE；上表 M9-01..M9-08 仍全部 NOT RUN，必须按用户决定延后至 M14 完成后的 Windows 10/11 集中桌面验收。

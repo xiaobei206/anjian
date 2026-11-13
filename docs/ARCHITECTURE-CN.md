@@ -287,10 +287,10 @@ preview.4 当前采用低级鼠标/键盘 Hook，已纳入 Windows CI 编译与�
 
 ### 14.3 API 与生命周期
 - API registry 0.7 新增 `OCR`、`FindText`、`WaitText`；自动生成函数参考手册并作为编辑器补全/签名提示的数据源。
-- `OCR` 返回全文与 1 起始行数组，每行含 confidence、矩形和 polygon；`FindText` 支持 contains/exact、不区分大小写；`WaitText` 通过主进程截图 IPC 循环检测，每次截图前请求 checkpoint，遵循 Pause；F12 Stop 终止独立 Worker。
+- `OCR` 返回全文与 1 起始行数组，每行含 confidence、矩形和 polygon；`FindText` 支持 contains/exact、不区分大小写；`WaitText` 通过主进程截图 IPC 循环检测，每次截图前请求 checkpoint，间隔使用受 `ExecutionGate` 暂停/取消门控的 `delay` IPC；F12 Stop 终止独立 Worker。
 - WaitText 每轮释放临时截图 ID；即使脚本异常/Stop，PlaybackRunner 仍会清理当前轮全部图像资源。OCR 进程结束时释放模型 session。
 - 当前版本仅公开简体中文 `ch`、英语 `en`、日语 `japan`；缺少对应模型时显式报错。OCR 单次识别的推理阶段不承诺线程内中断，统一 Stop 边界是终止 Worker 进程。
 
 ### 14.4 验证边界
 - Core 的 API 契约测试使用假 OCR 服务，不加载真实模型；它验证 Lua 表结构、屏幕原点换算、置信度过滤、匹配模式和 WaitText 资源释放。
-- Windows CI 负责 NuGet Restore、Windows x64 发布和自动测试；真实语言识别质量、模型下载、离线运行、DPI/多屏与 OCR 性能仍需要最终 Windows 桌面集中验收。CI 不等同于用户桌面验收。
+- Windows Actions run [43363150335](https://github.com/xiaobei206/anjian/actions/runs/43363150335) SUCCESS：NuGet Restore PASS、Release Build 0 warnings / 0 errors、90/90 Core tests、API handbook check、win-x64 self-contained publish、ZIP/SHA256 与 artifact upload 全 PASS；artifact ID `14008744436`。真实语言识别质量、模型下载/断网运行、DPI/多屏与 OCR 性能仍需 M14 后 Windows 桌面集中验收；CI 不等同于用户桌面验收。
