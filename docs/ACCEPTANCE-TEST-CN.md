@@ -621,3 +621,26 @@ M12-09 只实现有上限的显式 HTTP 缓冲请求；不代表大文件流式�
 - Artifact ID 14081741612，87,373,960 bytes，Actions artifact archive digest `sha256:7ea0e15aff79bf89defafdf995ec7739a53045f59d264354c271dae1ef28bc29`，到期时间 2026-12-13；这是临时 Actions artifact，不是 Release。
 - 首轮/中间失败没有隐藏：run 43517447033 的 smoke string CS1003 已修正；run 43517676054 的 row tooltip 与 sanitizer 局部变量 CS1061/CS0136 已修正；run 43517905641 的历史排序测试 fixture 失败通过将 older completed row 的时间调早修正。最终以 run 43517955937 为准。
 - Local .NET SDK 不存在，local Restore/Build/Test NOT RUN；CI runner 的发布包 smoke 不等于 Windows 10/11 桌面实机验收。
+
+
+## M14 桌面实机验收记录（2026-11-13 会话检查）
+
+**记录状态：NOT RUN — 当前自动化会话缺少真实 Windows 桌面。**
+
+| 记录字段 | 当前值 |
+|---|---|
+| main HEAD（本次开始时） | `3fc67c4e5d60163ad686be397389028b36947d4b` |
+| 可交互测试平台 | Linux x86_64；不是 Windows 10/11 |
+| .NET SDK | 未安装；`dotnet --info` 为 command not found |
+| Windows build / 补丁级别 | 未采集 |
+| DPI / 显示器数量与拓扑 / 负坐标 | 未采集 |
+| 实际键盘、鼠标与输入释放观察 | 未执行 |
+| WinForms / 权限弹窗 / 运行实例 / 日志导出 / 托盘退出 | 未执行 |
+| 2 小时长时稳定性 | 未执行 |
+| 截图、应用日志、测试脚本与结果记录 | 未生成 |
+
+以下项目本会话一律保持 **NOT RUN**：键鼠输入与清理、多实例与隔离、运行实例 UI、日志筛选/导出及脱敏、InputArbiter 人工恢复、Windows 10/11 DPI/多屏/权限窗口、隐藏到托盘及明确退出、重复启停和长时运行。不得用 Windows Actions 或 package smoke 的 PASS 替换这些实机结果。
+
+**开发包证据来源（不是 Release）：** [Actions run 43518664871](https://github.com/xiaobei206/anjian/actions/runs/43518664871)，artifact ID `14081447842`；对应的最近可核实应用代码 HEAD 为 `6d9513bec5de35ed8f20f656d8520217d949733a`。artifact archive digest 为 `sha256:a702a44769706fd06dbbc197aa3f34f83cd6fe1dc9f550930326359239e34897`，它是 Actions artifact 外层归档摘要，不应误当作里面应用 ZIP 的 SHA256。下载后仍应核对包内对应 SHA256 sidecar。
+
+**完成方式：** 在实体 Windows 10/11 x64 设备运行开发包，填全本表与上文清单；每个 FAIL 都记录复现步骤、日志和截图，修复后重测相关项。没有设备信息和执行证据时不得更改状态。
