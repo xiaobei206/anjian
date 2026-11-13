@@ -185,12 +185,11 @@ internal sealed class WorkerPipeClient(
 
         using var document = JsonDocument.Parse(response);
         var root = document.RootElement;
+        ValidateResponseIdentity(root, handshake);
         if (!root.GetProperty("ok").GetBoolean())
             throw new InvalidOperationException(root.TryGetProperty("error", out var error)
                 ? error.GetString()
                 : "自动化命令失败。");
-
-        ValidateResponseIdentity(root, handshake);
         return root.TryGetProperty("payload", out var payload) && payload.ValueKind == JsonValueKind.String
             ? payload.GetString()
             : null;
