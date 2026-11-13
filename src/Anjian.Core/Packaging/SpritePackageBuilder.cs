@@ -574,10 +574,17 @@ public static class SpritePackageBuilder
         }
 
         var issues = new List<string>();
+        var manifestFiles = manifest.Files ?? [];
         if (manifest.SchemaVersion != CurrentManifestVersion)
             issues.Add($"不支持 manifest schema 版本 {manifest.SchemaVersion}。");
         if (string.IsNullOrWhiteSpace(manifest.PackageId) || string.IsNullOrWhiteSpace(manifest.ProductName))
             issues.Add("manifest 缺少 PackageId 或 ProductName。");
+        if (manifest.RuntimeOptions is null)
+            issues.Add("manifest 缺少运行选项。");
+        if (manifest.Entries is null || manifest.Entries.Count == 0)
+            issues.Add("manifest 至少需要一个入口脚本。");
+        if (manifest.OcrModels is null)
+            issues.Add("manifest 的 OCR 模型列表缺失。");
         if (!IsSafeRelativePath(manifest.LauncherExecutable))
             issues.Add("启动 EXE 路径无效。");
         else if (!File.Exists(ResolveWithin(root, manifest.LauncherExecutable)))
@@ -585,7 +592,7 @@ public static class SpritePackageBuilder
 
         var declared = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         long totalBytes = 0;
-        foreach (var file in manifest.Files ?? [])
+        foreach (var file in manifestFiles)
         {
             if (!IsSafeRelativePath(file.Path) || !declared.Add(file.Path))
             {
@@ -612,7 +619,7 @@ public static class SpritePackageBuilder
 
         if (totalBytes > MaximumPackageBytes)
             issues.Add("已验证文件总大小超过限制。");
-        if (manifest.Files.Count > MaximumPackageFiles)
+        if (manifestFiles.Count > MaximumPackageFiles)
             issues.Add("manifest 文件数超过限制。");
 
         var manifestRelative = ManifestFileName;
