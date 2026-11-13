@@ -5,6 +5,7 @@ using System.Text.Json;
 using NLua;
 using Anjian.Core.Windows;
 using Anjian.Core.Ocr;
+using Anjian.Core.Permissions;
 
 namespace Anjian.Core.Api;
 
@@ -126,8 +127,9 @@ public static class LuaApiRuntime
  }
 }
 public interface ILuaCommandPipe{void Send(string type,string? name=null,double x=0,double y=0,int milliseconds=0,string? text=null);string? Request(string type,string? name=null,double x=0,double y=0,int milliseconds=0,string? text=null);}
-public sealed partial class WorkerLuaApi(ILuaCommandPipe pipe, Lua? lua = null, IWindowAutomationService? automation = null, IOcrRecognitionService? ocrService = null)
+public sealed partial class WorkerLuaApi(ILuaCommandPipe pipe, Lua? lua = null, IWindowAutomationService? automation = null, IOcrRecognitionService? ocrService = null, ScriptPermissionGrant? permissions = null)
 {
+  internal ScriptPermissionGrant Permissions { get; } = permissions ?? ScriptPermissionGrant.Empty;
  public void MoveTo(double x,double y)=>pipe.Send("move",x:Coord(x),y:Coord(y));
  public void LeftClick(double ms)=>pipe.Send("click","left",milliseconds:Duration(ms));public void RightClick(double ms)=>pipe.Send("click","right",milliseconds:Duration(ms));public void MiddleClick(double ms)=>pipe.Send("click","middle",milliseconds:Duration(ms));
  public void LeftDown()=>pipe.Send("mouse-down","left");public void LeftUp()=>pipe.Send("mouse-up","left");public void RightDown()=>pipe.Send("mouse-down","right");public void RightUp()=>pipe.Send("mouse-up","right");public void MiddleDown()=>pipe.Send("mouse-down","middle");public void MiddleUp()=>pipe.Send("mouse-up","middle");
