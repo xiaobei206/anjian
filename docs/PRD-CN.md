@@ -167,7 +167,7 @@
 
 ### 2.12 插件与扩展命令
 
-插件目录/ZIP 的 schema v1、版本兼容、闭合文件列表、SHA-256 与三方权限交集由本地插件包格式规格 PLUGIN-MANIFEST-CN.md 冻结；该规格定义的是可校验的安装/Worker 执行基础，不代表当前开发版已全部实现。
+插件目录/ZIP 的 schema v1、版本兼容、闭合文件列表、SHA-256 与三方权限交集由本地插件包格式规格 [PLUGIN-MANIFEST-CN.md](PLUGIN-MANIFEST-CN.md) 冻结。M12-10 已在 main 开发版实现本地校验、安装、启停/卸载和独立 Worker 运行；第三方动态注册 Lua API/命令面板与 M12-11 小精灵 sidecar 接入仍是后续任务，真实 Windows 桌面交互统一留 M14。
 
 
 - 提供正式的本地插件/命令包机制，可导入、启用、停用、升级和卸载。

@@ -119,3 +119,10 @@ M12-02B 已完成。M12-07 剪贴板/对话框 API 与 M12-08 受控进程 API �
 
 
 M12-09 受控 HTTP(S)/JSON API 已在 main 开发版实现：新增 HttpRequest(url, options?)，API registry 1.2 / 103 项；沿用 httpHosts/httpMethods/allowInsecureHttp 的逐次批准，HTTPS 默认、HTTP 单独审批、精确 DNS 主机与方法、重定向逐跳重新授权、超时/Stop 取消、1 MiB 请求体与 4 MiB 响应体上限。Windows Actions run [43427860126](https://github.com/xiaobei206/anjian/actions/runs/43427860126) SUCCESS：Restore PASS；Release Build 0 warnings / 0 errors；Core tests **161 passed / 0 failed / 0 skipped**；API handbook check（103 个公开函数）PASS；self-contained win-x64 publish；packaged Sprite/Worker smoke；ZIP/SHA256；artifact upload 全 PASS。Artifact ID `14037418047`，87,234,303 bytes，archive SHA-256 `f8eafdbeb01727c96467a1882a95e9e55db40e4dd83d82e82c19ac3199b314bd`，有效期至 2026-12-13。该临时 artifact 不是 GitHub Release。 M12-09 的真实 Windows 10/11 权限窗口、网络/DPI/Stop 桌面验收仍留 M14。v0.1.0-preview.4、VERSION 和 Release 资产不变。
+
+
+### M12-10 本地插件包（main 开发版，未进入 v0.1.0-preview.4）
+
+main 已包含本地 Lua 插件目录/ZIP 导入、Anjian.Plugin.json manifest 与 SHA-256 闭合文件校验、API 版本兼容、默认停用、启停/卸载、权限三方交集和独立 Worker 执行；主窗口入口为“插件管理”。插件格式、字段、大小上限和安全边界见 [docs/PLUGIN-MANIFEST-CN.md](docs/PLUGIN-MANIFEST-CN.md)。这不是云端市场，不会自动联网，也不加载包内 DLL/EXE。SHA-256 不是数字签名、Worker 不是 OS 沙箱，只使用可信插件。真实 WinForms/DPI/多屏与权限窗口仍待 M14 实机验收。
+
+- Windows Actions run [43433992383](https://github.com/xiaobei206/anjian/actions/runs/43433992383) 对代码 HEAD 582db78d9bddbed820727dd1bf01b19847beb5f6 全 PASS：Restore；Release Build 0 warnings / 0 errors；Core tests 171 passed / 0 failed / 0 skipped；API handbook check；self-contained win-x64 publish；published plugin Worker 与 Sprite Worker smoke；ZIP/SHA256 和 artifact upload 全 PASS。Artifact ID 14042985442，87,263,152 bytes，archive SHA-256 ebe8ca9bc7c4f82723e86628da5755bd783d655a9c1a170c7112336919e95af1，有效至 2026-12-13；这是 Actions 临时 artifact，不是 GitHub Release。

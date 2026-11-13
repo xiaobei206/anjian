@@ -468,3 +468,24 @@ M12-09 只实现有上限的显式 HTTP 缓冲请求；不代表大文件流式�
 - Run [43427860126](https://github.com/xiaobei206/anjian/actions/runs/43427860126) SUCCESS：Restore PASS；Release Build 0 warnings / 0 errors；Core tests **161 passed / 0 failed / 0 skipped**；API handbook check 显示 103 个当前公开函数；self-contained win-x64 publish；packaged Sprite/Worker smoke；ZIP/SHA256；artifact upload 全 PASS。
 - Artifact ID `14037418047`，87,234,303 bytes，archive SHA-256 `f8eafdbeb01727c96467a1882a95e9e55db40e4dd83d82e82c19ac3199b314bd`，有效至 2026-12-13；未创建 Release。
 - M12-09 自动化契约与 host/Worker 网络会话测试 PASS；M12-09-07 真实 WinForms 权限审阅/网络/DPI/Stop 桌面交互继续 NOT RUN，统一延期 M14。
+
+
+## 22. M12-10 本地插件包、manifest 与生命周期
+
+| ID | 场景 | 自动化覆盖/期望 | Windows 桌面状态 |
+|---|---|---|---|
+| M12-10-01 | Manifest 和兼容性 | 顶层与 permissions 子对象 schemaVersion 必须显式为 1；要求 entry 与合法 pluginId/version；缺失/重复/未知 schema、未来 API 区间拒绝 | Windows CI PASS（Run 43433992383）；桌面实测 NOT RUN（M14） |
+| M12-10-02 | 文件清单与路径边界 | manifest files 与磁盘内容闭合；哈希长度/值、大小、扩展名、路径穿越、未登记文件、原生 DLL、非法 processExecutables 拒绝 | Windows CI PASS（Run 43433992383）；桌面实测 NOT RUN（M14） |
+| M12-10-03 | 安全 ZIP 导入 | 本地 ZIP 导入成功；拒绝路径穿越、重复路径、链接/特殊文件及超过文件数/字节上限内容 | Windows CI PASS（Run 43433992383）；桌面实测 NOT RUN（M14） |
+| M12-10-04 | 启停/版本/卸载 | 新安装默认 disabled；启用一个版本会关闭同 ID 其他版本；disabled 才可卸载；损坏/未来 catalog 不被静默覆盖 | Windows CI PASS（Run 43433992383）；桌面实测 NOT RUN（M14） |
+| M12-10-05 | 权限三方交集 | 文件根取较窄重叠路径；集合精确交集；布尔 AND；缺少 sidecar 时无有效能力；每条 IPC 由 host 再校验 | Windows CI PASS（Run 43433992383）；桌面审阅 UI NOT RUN（M14） |
+| M12-10-06 | 安装后篡改与错误隔离 | 每次列举/执行重新 hash 验证；篡改包不能启动并作为校验失败状态显示；插件入口/模块在独立 Worker | Windows CI PASS（Run 43433992383）；桌面实测 NOT RUN（M14） |
+| M12-10-07 | 发布包真实 Worker smoke | 用 Windows self-contained 发布的 Anjian.App.exe 启动临时本地插件，验证 hash-pinned entry/module 与 require 执行，日志包含 plugin-worker-ok:verified-module | Windows CI PASS（Run 43433992383）；这不是 GUI 实机验收 |
+| M12-10-08 | WinForms 权限提示与用户操作 | 目录/ZIP 导入、权限审阅、启停、卸载确认、Pause/Stop、DPI/多屏、失败后的 UI 响应 | NOT RUN（M14） |
+
+本地开发容器无 .NET SDK，因此 local Restore/Build/Test NOT RUN。Windows Actions 证明了该提交的 Windows 构建、Core tests 和发布包 smoke，但不替代真实 Windows 10/11 桌面交互、权限窗口或 DPI/多屏验收。
+
+### M12-10 最终 Windows Actions 验证
+
+- Windows Actions run [43433992383](https://github.com/xiaobei206/anjian/actions/runs/43433992383) 对代码 HEAD 582db78d9bddbed820727dd1bf01b19847beb5f6 全 PASS：Restore；Release Build 0 warnings / 0 errors；Core tests 171 passed / 0 failed / 0 skipped；API handbook check；self-contained win-x64 publish；published plugin Worker 与 Sprite Worker smoke；ZIP/SHA256 和 artifact upload 全 PASS。Artifact ID 14042985442，87,263,152 bytes，archive SHA-256 ebe8ca9bc7c4f82723e86628da5755bd783d655a9c1a170c7112336919e95af1，有效至 2026-12-13；这是 Actions 临时 artifact，不是 GitHub Release。
+真实 Windows 10/11 WinForms 权限审阅、管理 UI、DPI/多屏与用户交互仍 NOT RUN（M14）；CI smoke 仅覆盖发布包中真实启动的插件 Worker 与既有 Sprite Worker。

@@ -721,3 +721,23 @@ M12-02 验收前不做剪贴板、对话框、进程、HTTP 或插件加载。�
 范围：本地目录/ZIP 插件包；版本化 manifest、稳定插件 ID、版本/API 兼容；闭合文件清单与 SHA-256；插件 Lua entry/module 只在独立 Worker；插件声明权限与脚本声明及用户本次批准权限取交集；启用/停用/卸载和失败隔离。不加载任意 DLL，不在主 UI 执行第三方 Lua。先冻结 ADR 与 manifest schema，再实现 Core validator/loader boundary、host/Worker IPC、测试和文档。不得默认联网，也不扩大现有脚本 Grant。
 
 同步 FEATURE-MATRIX、ROADMAP、ARCHITECTURE、DECISIONS、ACCEPTANCE、USER-GUIDE、DEVELOPMENT-LOG 和本 handoff；按直接提交 main、小步提交、真实构建/测试执行。不要创建 Release，不将 CI 通过当作 M14 桌面验收通过。
+
+
+## 下一会话唯一任务：M12-11 — 小精灵包权限 sidecar 收集与逐次审阅
+
+M12-10 已完成本地插件包/manifest/生命周期与独立 Worker 基础；不要再重做 M12-10，也不要提前执行 M14 桌面实机验收。开始时重新核对 main 最新 HEAD，并读取 AGENTS.md、README.md、本 handoff、docs/ROADMAP-CN.md、PRD/FEATURE-MATRIX、ADR、API registry、SpritePackageBuilder 与 Launcher。
+
+### 范围与验收条件
+
+1. 每个小精灵入口收集其同名 <entry>.permissions.json sidecar；必须将 sidecar 纳入小精灵 manifest 文件清单和 SHA-256 校验，不允许遗漏/绕过，也不能因为包构建而扩大请求能力。
+2. Launcher 运行入口脚本前复用现有逐次权限审阅流程；用户拒绝、sidecar 缺失、损坏或 hash 不匹配时能力默认为空/拒绝启动，按已冻结产品规范处理，不静默授予权限。
+3. 保持脚本请求 ∩ 用户本次批准的既有 Grant。host 对每条 IPC 再验证；不能信任包内 JSON 自己声明为授权。对多个入口分别绑定侧车，避免不同脚本的权限串用。
+4. 增加 Core 对 sidecar 收集/manifest/hash/缺失或篡改失败的测试，并增加已发布 self-contained 小精灵运行 smoke；更新用户指南、功能矩阵、路线图、验收表、开发日志与本 handoff。
+5. 直接小步提交 main、运行实际 Windows CI，不创建 Release。CI PASS 不替代 M14 的真实 WinForms/权限/DPI/多屏验收。
+
+### M12-10 交付/验证基线
+
+- 实现代码基线：582db78d9bddbed820727dd1bf01b19847beb5f6；其中包含 manifest 显式 schema 校验、目录/ZIP store、权限交集、插件管理器和 hash-pinned Worker entry/module。
+- 自动化 Windows run [43433992383](https://github.com/xiaobei206/anjian/actions/runs/43433992383) 对上述代码 HEAD 已 SUCCESS：171/171 Core tests，0 warnings/0 errors，API handbook check、self-contained win-x64 publish、published plugin Worker/Sprite Worker smoke、ZIP/SHA256 与 artifact upload 全 PASS。Artifact 14042985442，87,263,152 bytes，SHA-256 ebe8ca9bc7c4f82723e86628da5755bd783d655a9c1a170c7112336919e95af1，有效至 2026-12-13；不是 Release。
+- 不增加内置 Lua API；registry 是 1.2 / 103，函数手册/IDE 提示无变更。真实 Windows 10/11 管理界面和权限交互 NOT RUN（M14）。
+- 本地容器无 .NET SDK，本地 Restore/Build/Test NOT RUN。未改版本号/发布资产，不创建 tag/Release。

@@ -820,3 +820,15 @@ M4 基础调试器与 M5 可视化录制/动作列表均已完成 Windows CI 验
 - Artifact ID `14037418047`，87,234,303 bytes，archive digest `sha256:f8eafdbeb01727c96467a1882a95e9e55db40e4dd83d82e82c19ac3199b314bd`，有效至 2026-12-13。
 - 早期验证记录保留：run 43426945855 暴露 SocketsHttpHandler.UnsupportedProperty 编译错误；run 43427230805 首次 Build PASS 但旧 API 测试断言失败；run 43427568497 Build PASS；160/161 tests，唯一失败为既有 ScriptFileSystemTests 采用 20ms 定时取消导致的速度竞争；提交 e0301a36 将该用例改为确定性的预取消令牌。对应修复提交已进入最终 PASS HEAD e0301a36。最终 CI 结果覆盖前述失败。
 - Windows 10/11 权限 UI、真实 HTTPS/HTTP/重定向、网络 Pause/Stop、DPI/多屏仍 NOT RUN（M14）。本地容器无 .NET SDK，local Restore/Build/Test NOT RUN。
+
+
+### M12-10 本地插件包、manifest 与生命周期（2026-11-13）
+
+- 规格先行：新增 docs/PLUGIN-MANIFEST-CN.md，ADR-030 冻结目录/ZIP schema v1、pluginId/version、API 兼容、闭合 file/hash 清单、允许内容类型/资源上限、catalog 生命周期、权限三方交集与 Worker 边界。顶层及 permissions 子对象都要求显式 schemaVersion=1。
+- Core 新增 PluginPackageValidator、PluginPackageStore、PluginPermissionIntersection：安全路径/大小/扩展名/哈希和 reparse point 校验、ZIP 安全解包、版本化目录、默认 disabled、单版本启用、disabled 后方可卸载、原子 catalog 保存、损坏/未来 schema 不自动覆盖。篡改后的包在 listing 中作为校验失败隔离。
+- App 新增插件管理入口与 WinForms 管理窗口，可导入目录/ZIP、查看声明能力、启用/停用/卸载和运行；入口脚本权限审阅复用现有 service。插件 Worker 运行前验证 hash-pinned entry，require 只加载登记且 hash 匹配的 Lua 文件；关闭普通 io/debug/dofile/loadfile/package，不加载任意 DLL/EXE。host 对 IPC 仍按有效 grant fail-closed。
+- Permission grant 为 entry sidecar request ∩ plugin manifest ceiling ∩ 本次用户批准。文件根求交集时保留较窄的重叠根；进程、HTTP host/method、dialog 精确相交，布尔权限 AND；没有 sidecar/批准则为空。processExecutables 相对路径需留在包根内；完全限定绝对路径可以声明，但仍需 sidecar 与用户批准精确匹配。
+- 未增加公共 Lua 函数：API registry 保持 1.2 / 103，docs/FUNCTION-REFERENCE-CN.md 与 IDE 补全不需生成变化。暂不支持第三方插件动态 API 注册/命令面板，M12-11 才接小精灵权限 sidecar。
+- 验证历史：早期 CI 曾分别发现 xUnit 集合断言风格问题、权限 schemaVersion 省略、被篡改包 listing 异常未隔离、NLua 未暴露 os 库时模块加载失败；均据日志修复。最终代码 HEAD 582db78d9bddbed820727dd1bf01b19847beb5f6 的 Windows Actions run [43433992383](https://github.com/xiaobei206/anjian/actions/runs/43433992383) 已 SUCCESS；171/171 Core tests、0 warnings/0 errors、API handbook check、self-contained win-x64 publish、真实启动发布包的插件 Worker 与 Sprite Worker smoke、ZIP/SHA256 和 artifact upload 全 PASS。Artifact ID 14042985442，87,263,152 bytes，archive SHA-256 ebe8ca9bc7c4f82723e86628da5755bd783d655a9c1a170c7112336919e95af1，有效至 2026-12-13；不是 GitHub Release。
+- 安全边界：manifest/hash 不是数字签名/发布者身份保证；独立 Worker 不等于 OS 沙箱。只导入可信插件。此实现不会加载任意 DLL、自动联网或把第三方函数动态加入公共 registry。
+- 本地容器无 .NET SDK，本地 Restore/Build/Test 为 NOT RUN；Windows CI 与本机 WinForms 实测分开记录。M14 的 Windows 10/11 权限窗口、管理 UI、DPI/多屏、Pause/Stop 与用户交互仍 NOT RUN。未改变 VERSION、AssemblyVersion、FileVersion，不创建 tag/Release；v0.1.0-preview.4 官方资产不变。

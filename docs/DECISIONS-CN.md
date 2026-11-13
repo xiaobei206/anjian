@@ -236,12 +236,16 @@
 
 ## ADR-030：本地 Lua 插件包、权限交集与 Worker 生命周期
 
-- 状态：ACCEPTED（M12-10 契约冻结；具体实现与 CI 状态以路线图/handoff 最新条目为准）。
+- 状态：ACCEPTED（M12-10 实现落地；Windows CI 最终结果见路线图、开发日志与 handoff；真实桌面验收仍留 M14）。
 - 插件采用本地目录或 ZIP 包，根 manifest 为 Anjian.Plugin.json，schemaVersion=1。格式详见本地插件包格式规格 PLUGIN-MANIFEST-CN.md。pluginId 稳定、版本语义化，按 pluginId/version 独立安装；初次安装默认禁用。
 - manifest 声明 minApiVersion/maxApiVersion（major.minor），以唯一 Lua API registry 当前 apiVersion 做区间兼容检查；不修改当前 Lua API registry，也不将插件提供的函数伪装成已注册的内置 API。
 - files 排除 manifest 自身、但必须精确列出包内其余文件和 SHA-256；安装和每次运行都校验完整闭合文件集、SHA、大小、路径边界和 reparse/symlink。拒绝 DLL/EXE/Shell/驱动/安装器，不执行包内原生代码；ZIP 解包有文件数与解压字节上限，拒绝穿越、重复路径和链接。
 - 插件 entry 和模块仅由单独 Worker 执行。Worker 对 entry/module 的读取使用 manifest hash；require 只加载模块根下 manifest 已登记的 Lua 文件，未知模块、改动文件或加载异常会失败，不影响主 UI 进程。
-- 权限取三层交集：插件 manifest permissions、entry sidecar entry.lua.permissions.json 中的脚本请求及用户本次逐项批准 Grant。文件根求交集时仅保留较窄重叠根；EXE 路径/HTTP host/method/dialog 为精确交集，clipboard/HTTP 明文 bool 使用 AND；缺少批准则为空 Grant。host 每条 IPC 仍复核有效 Grant，unknown IPC fail-closed。
+- 权限取三层交集：插件 manifest permissions、entry sidecar entry.lua.permissions.json 中的脚本请求及用户本次逐项批准 Grant。文件根求交集时仅保留较窄重叠根；EXE 路径/HTTP host/method/dialog 为精确交集，clipboard/HTTP 明文 bool 使用 AND；缺少 sidecar/批准则为空 Grant。相对 processExecutables 路径拒绝越界，完全限定绝对路径只有在同样被脚本请求和用户本次批准后才有效。host 每条 IPC 仍复核有效 Grant，unknown IPC fail-closed。
 - Catalog schemaVersion=1，原子写入并保留未来版本/损坏文件；安装/升级不覆盖现有不同内容，同 ID/版本目录已存在而 hash 不符时失败。禁用项不可运行，卸载仅允许已禁用项；用户数据与包文件分离。
 - M12-10 不增加 Lua 公共函数，因此 API registry 保持 1.2 / 103，FUNCTION-REFERENCE 和 IDE 补全来源不变。插件动态贡献 API、命令面板集成与 M12-11 小精灵 sidecar 接入不在此子任务范围。
 - 验证分为 Core 包/哈希/ZIP/权限交集/生命周期自动测试、Windows CI Worker smoke；真实 WinForms/DPI/权限交互继续属于 M14，不以 CI 代替。
+
+- M12-10 自动化边界：不增加公开 Lua API，因此 registry 为 1.2 / 103、函数手册与 IDE 补全保持同一来源；管理器不提供第三方 API 动态注册或内置命令面板集成。SHA-256 非数字签名，Worker 非 OS 沙箱，不作为任意恶意代码隔离承诺。
+
+- Windows Actions run [43433992383](https://github.com/xiaobei206/anjian/actions/runs/43433992383) 对代码 HEAD 582db78d9bddbed820727dd1bf01b19847beb5f6 全 PASS：Restore；Release Build 0 warnings / 0 errors；Core tests 171 passed / 0 failed / 0 skipped；API handbook check；self-contained win-x64 publish；published plugin Worker 与 Sprite Worker smoke；ZIP/SHA256 和 artifact upload 全 PASS。Artifact ID 14042985442，87,263,152 bytes，archive SHA-256 ebe8ca9bc7c4f82723e86628da5755bd783d655a9c1a170c7112336919e95af1，有效至 2026-12-13；这是 Actions 临时 artifact，不是 GitHub Release。

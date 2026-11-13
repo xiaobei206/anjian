@@ -421,3 +421,14 @@ preview.4 当前采用低级鼠标/键盘 Hook，已纳入 Windows CI 编译与�
 - Windows Actions run [43427860126](https://github.com/xiaobei206/anjian/actions/runs/43427860126) 对功能/测试 HEAD `e0301a3641a123792a9aa584fd4a8b09b4c7409b` 全 PASS：Restore；Release Build 0 warnings / 0 errors；161/161 Core tests、0 skipped；API handbook check（103 个公开函数）；self-contained win-x64 publish；packaged Sprite/Worker smoke；ZIP/SHA256 与 artifact upload。
 - Artifact ID `14037418047`，87,234,303 bytes，archive SHA-256 `f8eafdbeb01727c96467a1882a95e9e55db40e4dd83d82e82c19ac3199b314bd`。没有创建 GitHub Release；该临时 artifact 有效至 2026-12-13。
 - M12-09 的真实 Windows 10/11 权限审阅窗口、TLS/HTTP/重定向、网络错误、Pause/Stop、DPI 与实际桌面交互仍 NOT RUN，统一留 M14；CI PASS 不等于桌面实机验收。
+
+
+### 18.4 M12-10 本地插件包与扩展 Worker
+
+- PluginPackageValidator 负责 manifest schema、身份/semver/API 兼容、路径/扩展名和资源限制、精确 files 清单、SHA-256、sidecar 与源树 reparse point 检查；PluginPackageStore 负责 directory/ZIP staging 安装、版本目录、catalog、启停与卸载。
+- Catalog 位于用户本机插件根目录；包根目录为 %LOCALAPPDATA%/Anjian2026/Plugins/<pluginId>/<version>。初次安装关闭；同 ID 只允许一个启用版本；禁用版本不可解析为执行计划，卸载仅限 disabled；损坏或未知未来 schema 不自动覆盖。
+- 插件入口和模块 hash 清单经 Worker launch payload 传给独立 Worker。Worker 在执行前验证入口相对路径和 SHA-256；自定义 require 只允许已登记的模块，模块读取再次验证 SHA-256。插件代码不在 WinForms UI 线程执行，也不通过 plugin manifest 动态修改公开 API registry。
+- 有效 grant 是脚本 sidecar request、插件 manifest ceiling 与用户本次 approved Grant 的交集。文件路径集合保留较窄的重叠路径，进程可执行文件/HTTP host/method/dialog 集合精确相交，clipboard/allowInsecureHttp 用 AND；host 对每条 IPC 仍执行既有 grant 校验。
+- SHA-256 只检测与 manifest 不一致的修改，不是发布者签名或可信来源证明；能够同时改写 manifest 和文件的人仍可构造自洽包。独立 Worker 是执行隔离边界，不是完整 OS 沙箱。只导入可信插件，不加载 DLL/EXE，不承诺隔离任意恶意同用户代码。
+
+- Windows Actions run [43433992383](https://github.com/xiaobei206/anjian/actions/runs/43433992383) 对代码 HEAD 582db78d9bddbed820727dd1bf01b19847beb5f6 全 PASS：Restore；Release Build 0 warnings / 0 errors；Core tests 171 passed / 0 failed / 0 skipped；API handbook check；self-contained win-x64 publish；published plugin Worker 与 Sprite Worker smoke；ZIP/SHA256 和 artifact upload 全 PASS。Artifact ID 14042985442，87,263,152 bytes，archive SHA-256 ebe8ca9bc7c4f82723e86628da5755bd783d655a9c1a170c7112336919e95af1，有效至 2026-12-13；这是 Actions 临时 artifact，不是 GitHub Release。

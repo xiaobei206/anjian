@@ -264,7 +264,7 @@ M7 实现/CI 已完成不代表 M7-01..M7-10 Windows 桌面验收通过；这些
 1. M12-07：已完成；Windows Actions run 43408020908 全 PASS，真实剪贴板/对话框交互待 M14。
 2. M12-08：DONE（Windows CI run 43414530292 全 PASS）；精确 EXE 启动/等待/查询及退出状态，不开放任意 Shell；真实桌面验收留 M14。
 3. M12-09：DONE（Windows Actions run 43427860126 全 PASS：161/161 Core tests、0 warnings/0 errors、API handbook 103 项、自包含 win-x64/Sprite Worker smoke/ZIP/SHA256 上传全通过）；HttpRequest、精确主机/方法、HTTPS 默认、HTTP 单独审批、重定向逐跳授权、超时/Stop、请求/响应上限；真实网络桌面验收留 M14。
-4. M12-10：本地插件目录/ZIP manifest、稳定 ID、版本/API 兼容、文件清单/hash、脚本声明/插件声明/用户批准权限取交集，启停/卸载及错误隔离；不加载任意 DLL，不在主 UI 执行插件 Lua。
+4. M12-10：DONE（本地 manifest/目录 ZIP、安全校验、API 兼容、三方权限交集、版本隔离、管理窗口与独立 Worker；自动化结果见下方 M12-10 实施与验证记录；真实桌面验收 M14）。不加载任意 DLL，不在主 UI 执行插件 Lua。
 5. M12-11：小精灵包构建/manifest 收集 permissions sidecar，Launcher 复用逐次权限审阅；不得在缺少批准时扩大 Grant。
 6. 每批功能完成后同步 registry/API version、中文函数手册、IDE 提示和契约测试；Windows CI 不替代 M14 桌面验收。
 
@@ -370,3 +370,14 @@ M7 实现/CI 已完成不代表 M7-01..M7-10 Windows 桌面验收通过；这些
 - 手动最多 5 次重定向，每一跳重新授权；301/302 POST 和 303 非 HEAD 改 GET，307/308 保持；跨 origin 不转发 Authorization/自定义凭据头。
 - 请求头 32 项/32 KiB、正文 1 MiB、响应头 32 KiB/64 项、解压后响应正文 4 MiB；timeout 1–120 秒；Stop 取消发送和响应流读取。
 - 仅有界缓冲请求；不实现 Cookie、代理配置、WebSocket、任意 TCP 或大文件流式传输。真实桌面验收留 M14。
+
+
+### M12-10 本地插件包、manifest 与生命周期（2026-11-13）
+
+- 状态：代码与 Windows 自动化验证完成。本地手动 Restore/Build/Test 因执行容器未安装 .NET SDK 而 NOT RUN；Windows 10/11 WinForms 权限审阅、DPI、多屏及真实用户交互仍 NOT RUN（统一留 M14）。
+- Windows Actions run [43433992383](https://github.com/xiaobei206/anjian/actions/runs/43433992383) 对代码 HEAD 582db78d9bddbed820727dd1bf01b19847beb5f6 全 PASS：Restore；Release Build 0 warnings / 0 errors；Core tests 171 passed / 0 failed / 0 skipped；API handbook check；self-contained win-x64 publish；published plugin Worker 与 Sprite Worker smoke；ZIP/SHA256 和 artifact upload 全 PASS。Artifact ID 14042985442，87,263,152 bytes，archive SHA-256 ebe8ca9bc7c4f82723e86628da5755bd783d655a9c1a170c7112336919e95af1，有效至 2026-12-13；这是 Actions 临时 artifact，不是 GitHub Release。
+- 目录/ZIP 导入只接受包根 Anjian.Plugin.json；要求顶层及 permissions 子对象都显式为 schemaVersion=1、稳定全小写 pluginId、语义版本、API 兼容区间、根级 Lua entry、可选 modulesRoot，以及不含 manifest 自身的闭合 files 清单。每个内容文件用 SHA-256 校验；启动时再次校验，require 仅加载 manifest 登记且 hash 匹配的 Lua 模块。
+- 限制包内容类型、路径、重解析点/链接、文件数量及单文件/总大小；拒绝 DLL/EXE/Shell/驱动/安装器和 ZIP 路径穿越/重复路径/链接。ZIP 解压后经同卷 staging 完整校验再移动到 pluginId/version 版本目录。
+- 安装默认停用；catalog schema v1 原子写入并保留损坏/未来版本；同 ID/版本不覆盖不同内容；启用一个版本会停用同 ID 其他版本，卸载需先停用。已损坏安装包在列表中隔离显示并不能运行。
+- 权限为脚本入口 sidecar 请求 ∩ 插件 manifest 声明 ∩ 用户本次明确批准；文件根只保留重叠的较窄根，EXE/HTTP/dialog 集合精确相交，布尔权限 AND。没有 sidecar/批准时能力为空；host 对每条 IPC 再校验。插件在单独 Worker 的 Lua state 执行，受限 require 禁止普通 io/debug/dofile/loadfile/package 原生模块入口。
+- 管理 UI 可导入目录/ZIP、查看声明权限、显式启用/停用/卸载、逐次审阅权限并运行/暂停/停止插件。此任务没有新增公共 Lua API；registry 仍为 1.2 / 103，函数手册与 IDE 补全仍以 registry 为唯一来源，因此无需改写 FUNCTION-REFERENCE。
