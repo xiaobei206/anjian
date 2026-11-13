@@ -225,19 +225,19 @@ internal sealed class ScheduledTaskEditorForm : Form
         _scriptPath.Text = original?.ScriptPath ?? "";
         _timeZone.Text = original?.TimeZoneId ?? TimeZoneInfo.Local.Id;
 
-        AddChoices(_trigger,
+        AddChoices<ScheduledTriggerKind>(_trigger,
             new(ScheduledTriggerKind.OnceAtUtc, "指定日期和时间"),
             new(ScheduledTriggerKind.OnceAfterDelay, "延迟启动"),
             new(ScheduledTriggerKind.DailyLocalTime, "每天"),
             new(ScheduledTriggerKind.WeeklyLocalTime, "每周"));
-        AddChoices(_misfire,
+        AddChoices<ScheduledMisfirePolicy>(_misfire,
             new(ScheduledMisfirePolicy.Skip, "错过则跳过"),
             new(ScheduledMisfirePolicy.RunOnce, "宽限期内补跑一次"));
-        AddChoices(_overlap,
+        AddChoices<ScheduledOverlapPolicy>(_overlap,
             new(ScheduledOverlapPolicy.Skip, "上次未结束则跳过"),
             new(ScheduledOverlapPolicy.QueueOne, "最多排队一个触发"),
             new(ScheduledOverlapPolicy.Parallel, "允许并行（受全局 4+16 限额约束）"));
-        AddChoices(_failure,
+        AddChoices<ScheduledFailurePolicy>(_failure,
             new(ScheduledFailurePolicy.Stop, "失败后禁用任务"),
             new(ScheduledFailurePolicy.Continue, "记录失败并继续后续计划"),
             new(ScheduledFailurePolicy.Retry, "有限重试，之后继续计划"));
@@ -357,12 +357,19 @@ internal sealed class ScheduledTaskEditorForm : Form
         var localDateTime = DateTime.SpecifyKind(_dateTime.Value, DateTimeKind.Unspecified);
         var days = _weekdays.CheckedItems.Cast<DayOfWeek>().ToArray();
         var now = DateTimeOffset.UtcNow;
+        var delayFromCreation = TimeSpan.FromSeconds((double)_delaySeconds.Value);
 
         var scriptPath = _scriptPath.Text.Trim();
         if (string.IsNullOrWhiteSpace(scriptPath) || !Path.IsPathFullyQualified(scriptPath))
             throw new ArgumentException("请选择一个有效的 Lua 脚本文件。");
         if (!File.Exists(scriptPath))
             throw new FileNotFoundException("指定的 Lua 脚本文件不存在。", scriptPath);
+
+        var createdAtUtc = trigger == ScheduledTriggerKind.OnceAfterDelay &&
+            _original?.TriggerKind == ScheduledTriggerKind.OnceAfterDelay &&
+            _original.DelayFromCreation == delayFromCreation
+                ? _original.CreatedAtUtc
+                : now;
 
         var definition = new ScheduledTaskDefinition
         {
@@ -371,8 +378,8 @@ internal sealed class ScheduledTaskEditorForm : Form
             ScriptPath = Path.GetFullPath(scriptPath),
             Enabled = _original?.Enabled ?? true,
             TriggerKind = trigger,
-            CreatedAtUtc = now,
-            DelayFromCreation = TimeSpan.FromSeconds((double)_delaySeconds.Value),
+            CreatedAtUtc = createdAtUtc,
+            DelayFromCreation = delayFromCreation,
             OnceAtUtc = trigger == ScheduledTriggerKind.OnceAtUtc
                 ? ScheduledTaskCalculator.ResolveLocalTime(localDateTime, zone)
                 : null,

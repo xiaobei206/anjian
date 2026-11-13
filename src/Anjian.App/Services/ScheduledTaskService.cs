@@ -395,10 +395,13 @@ internal sealed class ScheduledTaskService : IAsyncDisposable
                 if (active <= 1)
                 {
                     _inFlight.Remove(taskId);
-                    if (!deferPendingUntilCapacityCheck &&
+                    if (!_engine.IsEnabled(taskId))
+                    {
+                        _pendingOne.Remove(taskId);
+                    }
+                    else if (!deferPendingUntilCapacityCheck &&
                         _pendingOne.Remove(taskId, out var next) &&
-                        !_disposed && !_shutdown.IsCancellationRequested &&
-                        _engine.GetCursor(taskId) is not null)
+                        !_disposed && !_shutdown.IsCancellationRequested)
                     {
                         pending = next;
                         _inFlight[taskId] = 1;
@@ -432,7 +435,7 @@ internal sealed class ScheduledTaskService : IAsyncDisposable
                 var active = _inFlight.GetValueOrDefault(item.Key);
                 if (item.Value.Task.OverlapPolicy == ScheduledOverlapPolicy.QueueOne && active > 0)
                     continue;
-                if (_engine.GetCursor(item.Key) is null)
+                if (!_engine.IsEnabled(item.Key))
                 {
                     _pendingOne.Remove(item.Key);
                     continue;
