@@ -328,5 +328,5 @@ M1–M13 的桌面实测不再作为进入下一开发阶段的前置条件，�
 
 
 ### M10 自动化测试补充（2026-11-13）
-- Windows CI run 43366381240 对 M10 代码基线 98/98 tests PASS；最新 HEAD 新增两项覆盖 number、相对文件/目录路径、正则、可选空值与必填空值的测试，run 43366600434 尚待验证。
+- Windows CI run 43367065279 对 M10 实现通过 100/100 Core tests、Build 0 warnings/errors、API handbook check 与 win-x64 publish。自动化覆盖数值、相对文件/目录路径、正则、可选空值、必填空值和未来配置版本保护。
 - 这些是 Core 自动化测试，不是 M10-01..M10-10 的桌面验收。全部桌面项目仍 NOT RUN，统一延期至 M14 后。
