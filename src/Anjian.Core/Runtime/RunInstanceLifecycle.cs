@@ -74,6 +74,7 @@ public static class RunInstanceLimits
     // Each active instance owns a separate Worker process and Lua state.
     public const int MaximumActiveInstances = 4;
     public const int MaximumQueuedInstances = 16;
+    public const int WorkerStartupTimeoutMilliseconds = 30_000;
     public const int WorkerCancellationGracePeriodMilliseconds = 2_000;
 }
 
@@ -95,6 +96,7 @@ public static class RunInstanceLifecycle
 
             new RunInstanceTransition(RunInstanceState.Starting, RunInstanceState.Running),
             new RunInstanceTransition(RunInstanceState.Starting, RunInstanceState.StopRequested),
+            new RunInstanceTransition(RunInstanceState.Starting, RunInstanceState.TimeoutRequested),
             new RunInstanceTransition(RunInstanceState.Starting, RunInstanceState.ForceTerminating),
             new RunInstanceTransition(RunInstanceState.Starting, RunInstanceState.CleaningUp),
 
