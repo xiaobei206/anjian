@@ -1151,11 +1151,15 @@ internal sealed class MainForm : Form
         var buttonText = !_recordSessionActive ? "● 开始录制" : _recordingPaused ? "▶ 继续录制" : "Ⅱ 暂停录制";
         _recordButton.Text = buttonText;
         _stopRecordButton.Enabled = _recordSessionActive;
-        _recordButton.Enabled = !_playback.IsRunning;
+        _recordButton.Enabled = !_playback.HasActiveInstances && _playback.QueuedCount == 0;
         _scripts.Enabled = !_recordSessionActive;
         _clickOnlyCheck.Enabled = !_recordSessionActive;
         _playButton.Enabled = !_recordSessionActive && _playback.CanAccept;
-        _status.Text = !_recordSessionActive ? "未运行" : _recordingPaused ? "录制已暂停" : "正在录制…";
+        _status.Text = !_recordSessionActive
+            ? (_playback.HasActiveInstances || _playback.QueuedCount > 0
+                ? $"运行中 {_playback.ActiveCount} 个实例，排队 {_playback.QueuedCount} 个"
+                : "未运行")
+            : _recordingPaused ? "录制已暂停" : "正在录制…";
         UpdateFloatingState();
         UpdateDebuggerButtons(isPaused: false);
         UpdateActionEditorButton();
@@ -1215,7 +1219,7 @@ internal sealed class MainForm : Form
 
     private void TogglePause()
     {
-        if (!_playback.IsRunning) return;
+        if (!_playback.SelectedCanPause) return;
         if (_playback.IsPaused)
         {
             _playback.Resume();
@@ -1245,7 +1249,7 @@ internal sealed class MainForm : Form
     private void SetIdle()
     {
         _playButton.Enabled = !_recordSessionActive && _playback.CanAccept;
-        _pauseButton.Enabled = !_recordSessionActive && _playback.IsRunning && !_playback.IsPaused;
+        _pauseButton.Enabled = !_recordSessionActive && _playback.SelectedCanPause;
         _stopButton.Enabled = !_recordSessionActive && _playback.IsRunning;
         _pauseButton.Text = _playback.IsPaused ? "继续" : "暂停";
         _status.Text = !_recordSessionActive
@@ -1280,7 +1284,7 @@ internal sealed class MainForm : Form
 
     private void OpenRecorderActionList()
     {
-        if (_recordSessionActive || _playback.IsRunning || _activeTab is null || _current is null)
+        if (_recordSessionActive || _playback.HasActiveInstances || _playback.QueuedCount > 0 || _activeTab is null || _current is null)
             return;
         if (_activeTab.RecorderDocumentLoadFailed)
         {
@@ -1406,7 +1410,8 @@ internal sealed class MainForm : Form
 
     private async Task StartDebugAsync()
     {
-        if (_recordSessionActive || !_playback.CanAccept || _activeTab is null || _current is null || !SaveCurrent())
+        if (_recordSessionActive || !_playback.CanAccept || _playback.HasDebuggingInstances ||
+            _activeTab is null || _current is null || !SaveCurrent())
             return;
 
         if (string.IsNullOrWhiteSpace(_editor.Text))
@@ -1427,9 +1432,9 @@ internal sealed class MainForm : Form
         var playbackOptions = new PlaybackOptions { RepeatCount = 1, IntervalMilliseconds = 0 };
 
         ClearDebuggerView();
-        _scripts.Enabled = false;
-        _editorTabs.Enabled = false;
-        _playButton.Enabled = false;
+        _scripts.Enabled = true;
+        _editorTabs.Enabled = true;
+        _playButton.Enabled = _playback.CanAccept;
         _recordButton.Enabled = false;
         _pauseButton.Enabled = false;
         _status.Text = "正在启动调试…";
@@ -1538,7 +1543,6 @@ internal sealed class MainForm : Form
 
     private void UpdateDebuggerButtons(bool isPaused)
     {
-        var running = _playback.IsRunning;
         var debugging = _playback.IsDebugging;
         _debugStartButton.Enabled = !_recordSessionActive && _playback.CanAccept && _activeTab is not null;
         _debugContinueButton.Enabled = debugging && isPaused;
@@ -1677,7 +1681,8 @@ internal sealed class MainForm : Form
     private bool CanHandleGlobalHotkey(int action) => action switch
     {
         GlobalHotkeyManager.StartAction => !_recordSessionActive && _playback.CanAccept,
-        GlobalHotkeyManager.PauseResumeAction or GlobalHotkeyManager.StopAction => !_recordSessionActive && _playback.IsRunning,
+        GlobalHotkeyManager.PauseResumeAction => !_recordSessionActive && _playback.SelectedCanPause,
+        GlobalHotkeyManager.StopAction => !_recordSessionActive && _playback.IsRunning,
         _ => false
     };
 
@@ -1710,7 +1715,7 @@ internal sealed class MainForm : Form
                         _ = StartPlaybackAsync();
                     break;
                 case GlobalHotkeyManager.PauseResumeAction:
-                    if (!_recordSessionActive && _playback.IsRunning)
+                    if (!_recordSessionActive && _playback.SelectedCanPause)
                         TogglePause();
                     break;
                 case GlobalHotkeyManager.StopAction:
