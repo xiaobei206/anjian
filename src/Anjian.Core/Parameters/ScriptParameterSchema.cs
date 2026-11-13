@@ -76,24 +76,24 @@ public static class ScriptParameterValidator
             if (string.IsNullOrWhiteSpace(p.Id) || !ids.Add(p.Id))
                 issues.Add(new(p.Id ?? "", label, "参数 ID 不能为空且必须唯一。"));
             if (string.IsNullOrWhiteSpace(p.Name) || !LuaIdentifier.IsMatch(p.Name) || !names.Add(p.Name))
-                issues.Add(new(p.Id, label, "参数名必须是唯一的 Lua 标识符。"));
+                issues.Add(new(p.Id ?? string.Empty, label, "参数名必须是唯一的 Lua 标识符。"));
             if (string.IsNullOrWhiteSpace(p.Label))
-                issues.Add(new(p.Id, label, "中文标签不能为空。"));
+                issues.Add(new(p.Id ?? string.Empty, label, "中文标签不能为空。"));
             if (!SupportedTypes.Contains(p.Type))
-                issues.Add(new(p.Id, label, $"不支持的参数类型：{p.Type}。"));
+                issues.Add(new(p.Id ?? string.Empty, label, $"不支持的参数类型：{p.Type}。"));
             if (p.Minimum.HasValue && p.Maximum.HasValue && p.Minimum > p.Maximum)
-                issues.Add(new(p.Id, label, "最小值不能大于最大值。"));
+                issues.Add(new(p.Id ?? string.Empty, label, "最小值不能大于最大值。"));
             if (p.Type is "select" or "multiSelect")
             {
                 if (p.Options is null || p.Options.Count == 0)
-                    issues.Add(new(p.Id, label, "单选/多选参数至少需要一个选项。"));
+                    issues.Add(new(p.Id ?? string.Empty, label, "单选/多选参数至少需要一个选项。"));
                 else if (p.Options.Distinct(StringComparer.Ordinal).Count() != p.Options.Count)
-                    issues.Add(new(p.Id, label, "选项不能重复。"));
+                    issues.Add(new(p.Id ?? string.Empty, label, "选项不能重复。"));
             }
             if (!string.IsNullOrWhiteSpace(p.Pattern))
             {
                 try { _ = new Regex(p.Pattern, RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100)); }
-                catch (ArgumentException) { issues.Add(new(p.Id, label, "正则验证规则无效。")); }
+                catch (ArgumentException) { issues.Add(new(p.Id ?? string.Empty, label, "正则验证规则无效。")); }
             }
             if (p.DefaultValue is { } defaultValue && defaultValue.ValueKind != JsonValueKind.Undefined)
             {
@@ -133,13 +133,13 @@ public static class ScriptParameterValidator
             else
             {
                 if (p.Required)
-                    issues.Add(new(p.Id, label, "此参数为必填项。"));
+                    issues.Add(new(p.Id ?? string.Empty, label, "此参数为必填项。"));
                 continue;
             }
 
             var errors = ValidateValue(p, value, baseDirectory);
             foreach (var error in errors)
-                issues.Add(new(p.Id, label, error));
+                issues.Add(new(p.Id ?? string.Empty, label, error));
             if (errors.Count == 0)
                 values[p.Name] = value.Clone();
         }
