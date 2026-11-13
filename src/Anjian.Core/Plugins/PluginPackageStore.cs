@@ -104,7 +104,7 @@ public sealed class PluginPackageStore
                     var inspection = PluginPackageValidator.Inspect(directory, _currentApiVersion);
                     result.Add(ToSummary(inspection, entry.Enabled, null));
                 }
-                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or JsonException or NotSupportedException)
+                catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException or ArgumentException or JsonException or NotSupportedException)
                 {
                     result.Add(new PluginPackageSummary(entry.PluginId, entry.Version, entry.Enabled,
                         entry.PluginId, "插件包校验失败", directory, null, ex.Message));

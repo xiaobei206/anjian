@@ -61,7 +61,7 @@ public sealed class PluginPackageStoreTests : IDisposable
     [Fact]
     public void InstallDirectoryIsClosedAndDisabledUntilExplicitEnable()
     {
-        var source = CreatePackage(Path.Combine(_temporaryRoot, "source"));
+        var source = CreatePackage(Path.Combine(_temporaryRoot, "source"), manifestReadRoot: "data/sub");
         var installed = _store.InstallDirectory(source);
 
         Assert.False(installed.Enabled);
@@ -76,6 +76,7 @@ public sealed class PluginPackageStoreTests : IDisposable
         Assert.Equal("entry.lua", plan.EntryRelativePath);
         Assert.Single(plan.ModuleHashes);
         Assert.True(plan.Permissions.AllowsFileRead(Path.Combine(installed.PackageDirectory, "data", "sub", "input.txt")));
+        Assert.False(plan.Permissions.AllowsFileRead(Path.Combine(installed.PackageDirectory, "data", "outside.txt")));
         Assert.False(plan.Permissions.AllowsClipboardWrite);
         Assert.True(plan.Permissions.AllowsClipboardRead);
         Assert.True(plan.Permissions.AllowsHttp(new Uri("https://api.example.com/items"), "GET"));
@@ -237,7 +238,7 @@ public sealed class PluginPackageStoreTests : IDisposable
         var request = ScriptPermissionPolicy.ParseRequest(File.ReadAllText(sidecar), installed.PackageDirectory);
         return ScriptPermissionPolicy.CreateGrant(request, new ScriptPermissionApproval
         {
-            FileReadRoots = ["data/sub"],
+            FileReadRoots = ["data"],
             ClipboardRead = true,
             Dialogs = ["message"],
             HttpHosts = ["api.example.com"],
@@ -251,7 +252,8 @@ public sealed class PluginPackageStoreTests : IDisposable
         string version = "1.0.0",
         string minimumApiVersion = "1.2",
         bool includeSidecar = true,
-        bool includeModule = true)
+        bool includeModule = true,
+        string manifestReadRoot = "data")
     {
         Directory.CreateDirectory(root);
         File.WriteAllText(Path.Combine(root, "entry.lua"), "local helper = require('sample')\nLog('plugin ' .. helper.value)\n", new UTF8Encoding(false));
@@ -280,7 +282,7 @@ public sealed class PluginPackageStoreTests : IDisposable
             ModulesRoot = includeModule ? "Modules" : null,
             Permissions = new PluginPermissionManifest
             {
-                FileReadRoots = ["data"],
+                FileReadRoots = [manifestReadRoot],
                 ClipboardRead = true,
                 Dialogs = ["message"],
                 HttpHosts = ["api.example.com"],
