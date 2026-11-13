@@ -367,29 +367,33 @@ internal sealed class RunInstanceRuntimeCoordinator : IDisposable
 
     private async Task StartEntryAsync(Entry entry)
     {
+        Task execution;
         lock (_sync)
         {
             if (entry.Started || _disposed)
                 return;
-            entry.Started = true;
-        }
 
-        var execution = entry.Runner.RunAsync(
-            entry.ScriptPath,
-            entry.Options,
-            entry.DebugOptions,
-            entry.Parameters,
-            entry.SpriteRuntimeOptions,
-            entry.Permissions,
-            entry.PluginRuntimeOptions);
-        bool shutdownRequested;
-        lock (_sync)
-            shutdownRequested = _shuttingDown;
-        if (shutdownRequested)
-        {
-            var stop = _model.RequestStop(entry.InstanceId);
-            StateChanged?.Invoke(stop.Snapshot);
-            entry.Runner.Stop();
+            if (_shuttingDown)
+            {
+                var stop = _model.RequestStop(entry.InstanceId);
+                StateChanged?.Invoke(stop.Snapshot);
+                entry.Runner.Dispose();
+                entry.Completion.TrySetResult();
+                return;
+            }
+
+            entry.Started = true;
+            // Start the runner while holding the admission lock. StopAllAsync therefore
+            // either observes a started Worker and cancels it, or prevents a promoted entry
+            // from spawning any process after shutdown has been accepted.
+            execution = entry.Runner.RunAsync(
+                entry.ScriptPath,
+                entry.Options,
+                entry.DebugOptions,
+                entry.Parameters,
+                entry.SpriteRuntimeOptions,
+                entry.Permissions,
+                entry.PluginRuntimeOptions);
         }
 
         Exception? failure = null;
