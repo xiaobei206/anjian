@@ -55,8 +55,17 @@ internal sealed class ScriptParameterDialog : Form
         var ok = new Button { Text = "确定运行", DialogResult = DialogResult.None, AutoSize = true };
         ok.Click += (_, _) => ValidateAndSave();
         var cancel = new Button { Text = "取消", DialogResult = DialogResult.Cancel, AutoSize = true };
+        var defaults = new Button { Text = "恢复默认", AutoSize = true };
+        defaults.Click += (_, _) => ResetToDefaults();
+        var import = new Button { Text = "导入配置", AutoSize = true };
+        import.Click += (_, _) => ImportConfiguration();
+        var export = new Button { Text = "导出配置", AutoSize = true };
+        export.Click += (_, _) => ExportConfiguration();
         buttons.Controls.Add(cancel);
         buttons.Controls.Add(ok);
+        buttons.Controls.Add(export);
+        buttons.Controls.Add(import);
+        buttons.Controls.Add(defaults);
         Controls.Add(layout);
         Controls.Add(buttons);
         AcceptButton = ok;
@@ -149,27 +158,8 @@ internal sealed class ScriptParameterDialog : Form
 
     private void ValidateAndSave()
     {
-        var supplied = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
-        try
-        {
-            foreach (var p in _schema.Parameters)
-            {
-                var control = _fields[p.Name];
-                string json = p.Type switch
-                {
-                    "boolean" => ((CheckBox)control).Checked ? "true" : "false",
-                    "integer" => decimal.ToInt64(((NumericUpDown)control).Value).ToString(System.Globalization.CultureInfo.InvariantCulture),
-                    "number" => ((NumericUpDown)control).Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                    "select" => JsonSerializer.Serialize(((ComboBox)control).SelectedItem?.ToString() ?? ""),
-                    "multiSelect" => JsonSerializer.Serialize(((CheckedListBox)control).CheckedItems.Cast<object>().Select(x => x.ToString()).ToArray()),
-                    "filePath" or "directoryPath" when control is Panel panel =>
-                        JsonSerializer.Serialize(panel.Controls.OfType<TextBox>().First().Text),
-                    _ => JsonSerializer.Serialize(((TextBox)control).Text)
-                };
-                using var document = JsonDocument.Parse(json);
-                supplied[p.Name] = document.RootElement.Clone();
-            }
-        }
+        Dictionary<string, JsonElement> supplied;
+        try { supplied = CollectValues(); }
         catch (Exception ex)
         {
             MessageBox.Show(this, "参数值格式错误：" + ex.Message, "参数验证", MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -195,6 +185,154 @@ internal sealed class ScriptParameterDialog : Form
         catch (Exception ex)
         {
             MessageBox.Show(this, "保存参数配置失败：" + ex.Message, "参数配置", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    private Dictionary<string, JsonElement> CollectValues()
+    {
+        var supplied = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
+        foreach (var p in _schema.Parameters)
+        {
+            var control = _fields[p.Name];
+            string json = p.Type switch
+            {
+                "boolean" => ((CheckBox)control).Checked ? "true" : "false",
+                "integer" => decimal.ToInt64(((NumericUpDown)control).Value).ToString(System.Globalization.CultureInfo.InvariantCulture),
+                "number" => ((NumericUpDown)control).Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                "select" => JsonSerializer.Serialize(((ComboBox)control).SelectedItem?.ToString() ?? ""),
+                "multiSelect" => JsonSerializer.Serialize(((CheckedListBox)control).CheckedItems.Cast<object>().Select(x => x.ToString()).ToArray()),
+                "filePath" or "directoryPath" when control is Panel panel =>
+                    JsonSerializer.Serialize(panel.Controls.OfType<TextBox>().First().Text),
+                _ => JsonSerializer.Serialize(((TextBox)control).Text)
+            };
+            using var document = JsonDocument.Parse(json);
+            supplied[p.Name] = document.RootElement.Clone();
+        }
+        return supplied;
+    }
+
+    private void ResetToDefaults()
+    {
+        foreach (var p in _schema.Parameters)
+        {
+            var control = _fields[p.Name];
+            JsonElement? value = p.DefaultValue;
+            if (control is CheckBox check) check.Checked = value is { ValueKind: JsonValueKind.True };
+            else if (control is ComboBox combo)
+            {
+                var desired = value is { ValueKind: JsonValueKind.String } selected ? selected.GetString() : null;
+                combo.SelectedItem = desired;
+                if (combo.SelectedIndex < 0 && combo.Items.Count > 0) combo.SelectedIndex = 0;
+            }
+            else if (control is CheckedListBox list)
+            {
+                for (var i = 0; i < list.Items.Count; i++) list.SetItemChecked(i, false);
+                if (value is { ValueKind: JsonValueKind.Array } array)
+                {
+                    var selected = array.EnumerateArray().Where(x => x.ValueKind == JsonValueKind.String).Select(x => x.GetString()).ToHashSet(StringComparer.Ordinal);
+                    for (var i = 0; i < list.Items.Count; i++) list.SetItemChecked(i, selected.Contains(list.Items[i]?.ToString()));
+                }
+            }
+            else if (control is NumericUpDown number)
+            {
+                number.Value = value is { ValueKind: JsonValueKind.Number } numeric && numeric.TryGetDecimal(out var n)
+                    ? Math.Clamp(n, number.Minimum, number.Maximum)
+                    : Math.Clamp(0m, number.Minimum, number.Maximum);
+            }
+            else
+            {
+                var text = control is Panel panel ? panel.Controls.OfType<TextBox>().First() : (TextBox)control;
+                text.Text = value is { ValueKind: JsonValueKind.String } stringValue
+                    ? stringValue.GetString() ?? ""
+                    : value is { ValueKind: JsonValueKind.Undefined } or null ? "" : value.Value.GetRawText();
+            }
+        }
+    }
+
+    private void ImportConfiguration()
+    {
+        using var picker = new OpenFileDialog { Filter = "JSON 参数配置 (*.json)|*.json|所有文件 (*.*)|*.*" };
+        if (picker.ShowDialog(this) != DialogResult.OK) return;
+        try
+        {
+            var info = new FileInfo(picker.FileName);
+            if (info.Length > 1_048_576) throw new InvalidDataException("导入文件超过 1 MiB 限制。");
+            var configuration = JsonSerializer.Deserialize<ParameterConfiguration>(File.ReadAllText(picker.FileName),
+                new JsonSerializerOptions(JsonSerializerDefaults.Web))
+                ?? throw new InvalidDataException("配置文件为空。");
+            if (configuration.SchemaVersion != 1) throw new InvalidDataException($"不支持配置版本 {configuration.SchemaVersion}。");
+            var validation = ScriptParameterValidator.ValidateValues(_schema, configuration.Values);
+            if (!validation.IsValid)
+                throw new InvalidDataException(string.Join(Environment.NewLine, validation.Issues.Select(x => $"{x.Label}：{x.Message}")));
+            ApplyValues(validation.Values);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, "导入失败，当前输入未更改：" + ex.Message, "导入配置", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+    }
+
+    private void ExportConfiguration()
+    {
+        Dictionary<string, JsonElement> supplied;
+        try { supplied = CollectValues(); }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, "当前输入无法导出：" + ex.Message, "导出配置", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+        var validation = ScriptParameterValidator.ValidateValues(_schema, supplied, Path.GetDirectoryName(_scriptPath));
+        if (!validation.IsValid)
+        {
+            MessageBox.Show(this, string.Join(Environment.NewLine, validation.Issues.Select(x => $"{x.Label}：{x.Message}")),
+                "导出配置", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        var exported = validation.Values.ToDictionary(x => x.Key, x => x.Value, StringComparer.Ordinal);
+        var sensitiveNames = _schema.Parameters.Where(x => x.Sensitive).Select(x => x.Name).ToHashSet(StringComparer.Ordinal);
+        if (sensitiveNames.Count > 0)
+        {
+            var include = MessageBox.Show(this, "配置含敏感参数。选择“是”将导出敏感值明文；选择“否”将排除敏感字段。",
+                "导出敏感参数", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Warning);
+            if (include == DialogResult.Cancel) return;
+            if (include == DialogResult.No)
+                foreach (var name in sensitiveNames) exported.Remove(name);
+        }
+        using var picker = new SaveFileDialog { Filter = "JSON 参数配置 (*.json)|*.json", FileName = Path.GetFileNameWithoutExtension(_scriptPath) + ".params.json" };
+        if (picker.ShowDialog(this) != DialogResult.OK) return;
+        try
+        {
+            ParameterConfigurationStore.SaveAtomic(picker.FileName, new ParameterConfiguration { Values = exported });
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, "导出失败：" + ex.Message, "导出配置", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    private void ApplyValues(IReadOnlyDictionary<string, JsonElement> values)
+    {
+        foreach (var p in _schema.Parameters)
+        {
+            if (!values.TryGetValue(p.Name, out var value)) continue;
+            var control = _fields[p.Name];
+            if (control is CheckBox check && value.ValueKind is JsonValueKind.True or JsonValueKind.False)
+                check.Checked = value.GetBoolean();
+            else if (control is ComboBox combo && value.ValueKind == JsonValueKind.String)
+                combo.SelectedItem = value.GetString();
+            else if (control is CheckedListBox list && value.ValueKind == JsonValueKind.Array)
+            {
+                var selected = value.EnumerateArray().Where(x => x.ValueKind == JsonValueKind.String).Select(x => x.GetString()).ToHashSet(StringComparer.Ordinal);
+                for (var i = 0; i < list.Items.Count; i++) list.SetItemChecked(i, selected.Contains(list.Items[i]?.ToString()));
+            }
+            else if (control is NumericUpDown number && value.ValueKind == JsonValueKind.Number && value.TryGetDecimal(out var numeric))
+                number.Value = Math.Clamp(numeric, number.Minimum, number.Maximum);
+            else
+            {
+                var text = control is Panel panel ? panel.Controls.OfType<TextBox>().First() : control as TextBox;
+                if (text is not null) text.Text = value.ValueKind == JsonValueKind.String ? value.GetString() ?? "" : value.GetRawText();
+            }
         }
     }
 
