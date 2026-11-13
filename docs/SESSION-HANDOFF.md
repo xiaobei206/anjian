@@ -908,3 +908,14 @@ M13-02 的重点是隔离协调器与全局输入仲裁。M13-03 才增加单次
 7. 不改 VERSION、不创建 tag/Release。M14 Windows 10/11 实机验收仍保持 NOT RUN。
 
 M13-03 的核心是确定性的调度与超时/失败策略；完成后唯一下一任务才是 M13-04 的实例列表、日志筛选和恢复 UI。
+
+---
+
+## M13-02 最终 Windows CI 验收覆盖（2026-11-14）
+
+- 最终代码 HEAD d6854f872a36263f6e3658eb9cf2b7e9f252c947 的 Windows Actions run [43461688129](https://github.com/xiaobei206/anjian/actions/runs/43461688129) SUCCESS。Restore PASS；Release Build 0 warnings / 0 errors；Core tests 202/202；API handbook 103/103；self-contained win-x64 publish PASS；Sprite/Plugin/MultiInstance package smoke 3/3 PASS；ZIP/SHA256 与 artifact upload PASS。
+- MultiInstance package smoke 验证两个 Worker 不同 PID 并发存活、停止第一个时第二个继续；随后外部杀掉第二个，第三个 Worker 不受影响并正常结束。
+- Artifact ID 14056846918，87,318,097 bytes，archive SHA-256 393bd08c9da97368cb9ddb39c0de790000befa9ecad27ce161accaf8892987c8；临时 Actions artifact，不是 GitHub Release。
+- 此最终记录覆盖之前提到 run 43460841956 package smoke pending/failed 的临时状态。其失败揭露 worker crash during Delay IPC 时 host 没有及时取消 dispatch；当前实现已并行监视 Worker exit 与 pipe connect、handshake 和 IPC dispatch，最终 run 全部通过。
+- 当前 main HEAD 可能因本 handoff/文档更新提交改变；代码验收基线仍是上列 ${codeHead}。文档提交触发的新 Actions run 需核对，不能把本次代码 HEAD 的结果伪称为文档 HEAD 的结果。
+- 本地容器无 .NET SDK，local Restore/Build/Test NOT RUN。M14 Windows 10/11 实际键鼠、KeyUp、WinForms、DPI/多屏、托盘退出与长时稳定性仍 NOT RUN。

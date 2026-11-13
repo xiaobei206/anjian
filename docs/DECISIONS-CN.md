@@ -300,3 +300,9 @@
 - Worker pipe 经 current-user ACL、OS 客户端 PID、instanceId/attemptId/nonce 三重绑定；Worker 无权上传/覆盖 Grant，host 每条受保护 IPC 仍按实例端权威 Grant 检查。
 - 全局 InputArbiter 已实现公平 FIFO 租约、owner re-entry 用于 Up/清理、等待取消、故障锁定与人工恢复；自动化测试覆盖租约交接、故障拒绝与恢复。
 - MainForm 提供基本 selected instance 控制和 StopAll 退出；完整实例列表/筛选/日志视图留 M13-04。定时触发、运行超时用户配置和失败重试留 M13-03。
+
+### ADR-033 M13-02 最终验收补记（2026-11-14）
+
+- Windows Actions [43461688129](https://github.com/xiaobei206/anjian/actions/runs/43461688129) 对代码 HEAD d6854f872a36263f6e3658eb9cf2b7e9f252c947 SUCCESS：Release Build 0 warnings / 0 errors、202/202 Core tests、API handbook 103 项、自包含 win-x64 publish、Sprite/Plugin/MultiInstance smoke 3/3、ZIP/SHA256 和 artifact upload 全 PASS。
+- Artifact ID 14056846918，87,318,097 bytes，SHA-256 393bd08c9da97368cb9ddb39c0de790000befa9ecad27ce161accaf8892987c8；这是临时 Actions artifact，不是正式 Release。
+- Worker crash-in-flight-IPC 故障已修复：宿主并行观察 process exit 与当前 dispatch；Worker 提前退出会取消 host token，阻止向断开的 pipe 写响应，并将失败限制在所属实例。停止/崩溃清理仍受 OS 进程崩溃边界约束。

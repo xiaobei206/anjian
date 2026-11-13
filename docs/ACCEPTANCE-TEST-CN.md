@@ -566,3 +566,11 @@ M12-09 只实现有上限的显式 HTTP 缓冲请求；不代表大文件流式�
 - M13-02 不增加 Lua 公共 API，registry 保持 1.2 / 103；不改 VERSION / AssemblyVersion / FileVersion；不创建 tag 或 GitHub Release，已发布 v0.1.0-preview.4 资产不变。
 - Windows CI 最终结果以本节最后更新时当前 main 代码 HEAD 对应的最新 Actions run 为准。M13-02 的可机读契约包括 RunInstanceCoordinator、RunInstanceRuntimeCoordinator、WorkerSessionIdentityPolicy 与 InputArbiter；core tests、OS Worker/PID smoke 和 package tests 不能代替 Windows 10/11 桌面验收。
 - 本地容器未安装 .NET SDK，local Restore/Build/Test 为 NOT RUN。Windows 10/11 的实际 SendInput/Up 清理、WinForms UI、DPI、多屏、托盘/退出及长时稳定性仍 NOT RUN（M14）。
+
+### M13-02 最终 Windows 自动化验收结果（2026-11-14）
+
+- 最终代码 HEAD d6854f872a36263f6e3658eb9cf2b7e9f252c947 对应 Windows Actions [43461688129](https://github.com/xiaobei206/anjian/actions/runs/43461688129) SUCCESS：Restore；Release Build 0 warnings / 0 errors；Core 202/202；API handbook 103 项；self-contained win-x64 publish；Sprite/Plugin/MultiInstance package smoke 3/3；ZIP/SHA256 与 artifact upload 全通过。
+- MultiInstance package smoke 真实启动两个不同 PID 的 Worker 并确认并行存活，Stop 一个后另一个继续；随后杀掉第二个 Worker，第三个 Worker仍运行至结束。此为 Windows CI 子进程验收，不是 Windows 10/11 桌面 UI / SendInput 实测。
+- Actions artifact ID 14056846918，87,318,097 bytes，archive SHA-256 393bd08c9da97368cb9ddb39c0de790000befa9ecad27ce161accaf8892987c8；临时 artifact，非 Release。
+- 调试收敛记录：多 Worker 初版 smoke 揭示 Worker 被杀时 host 可能仍等待 Delay IPC；PlaybackRunner 已修复为在 pipe connect、worker-ready handshake 和 dispatch 过程中同时监视 Worker 进程退出并取消当前请求。早期失败 run 保留在 Actions 历史，最终 run 43461688129 覆盖并通过。
+- 本地 Restore/Build/Test NOT RUN（容器无 .NET SDK）；Windows 10/11 实际键鼠输入/KeyUp、WinForms、DPI/多屏、托盘退出、2 小时稳定性继续 NOT RUN（M14）。

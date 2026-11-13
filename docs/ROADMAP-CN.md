@@ -23,7 +23,7 @@
 | M10 参数、配置与脚本自定义 UI | DONE（实现与 Windows 自动化验收完成；WinForms/桌面实测延期 M14） | 参数 sidecar schema v1、10 种类型、统一 validator、配置持久化/恢复、播放/调试前表单、参数设计器、JSON 导入导出、typed Worker IPC、递归只读 Lua Args、脚本目录相对路径解析 |
 | M11 小精灵打包器 | DONE（Windows CI run 229 PASS；WinForms/DPI/真实输入桌面验收延期 M14，NOT RUN） | 独立便携目录 + EXE 启动 ZIP、依赖/资源收集、M10 参数 UI、运行控制、manifest/SHA256、构建日志与离线函数参考 Markdown |
 | M12 内置扩展 API 与插件系统 | DONE（M12-01..M12-12 实现与 Windows CI 自动化完成；WinForms/权限/DPI/多屏桌面验收延期 M14） | 文件/剪贴板/对话框/进程/HTTP(S)/JSON 双层授权；本地插件 manifest/hash/三方 Grant 交集、入口 sidecar 与受限 Lua contribution；内置 API registry 1.2 / 103 |
-| M13 多实例与定时任务 | IN_PROGRESS（M13-01 契约 DONE；M13-02 运行时协调器/Worker/IPC/InputArbiter 实现 DONE；M13-03 下一步） | 4 active + 16 FIFO queue、独立 Worker/脚本快照/Grant/会话、单实例 Stop/Pause、全局输入公平仲裁与故障恢复已实现；定时/周期触发和完整实例管理 UI 尚未实现 |
+| M13 多实例与定时任务 | IN_PROGRESS（M13-01/02 DONE；M13-03 下一步） | M13-02 已完成并通过 Windows Actions：4 active + 16 FIFO、独立 Worker/Grant/源码快照、IPC identity/PID 绑定、全局 InputArbiter、独立 Stop 与 Worker crash 隔离；定时/周期触发、用户运行超时/重试和完整实例管理 UI 尚未实现 |
 | M14 1.0 稳定化与发布 | TODO | 自动与手工验收、依赖许可、离线帮助、性能/长时测试和正式稳定版发布 |
 
 ## 统一 Windows 桌面实机验收策略（用户决定，2026-11-13）
@@ -419,3 +419,11 @@ M13-01 不是新 release；不得以设计文件代替实现测试证据，也�
 - 主进程 FIFO InputArbiter 串行化 SendInput/SetCursorPos；Down 租约由 owner 持有至 Up，原子 Click/KeyPress/TypeText 不交错；Stop/Worker exit 仅清理本实例 held 输入。释放失败锁定新输入并提供人工检查/恢复入口。
 - MainForm 已连接 Start/Pause/Stop-selected 与明确退出 StopAll；关闭主窗体隐藏到托盘仍继续运行。完整实例列表、切换/筛选与独立日志浏览留 M13-04。M13-03 的定时器、用户配置运行超时和重试尚未实现。
 - M14 的 Windows 10/11 实际键鼠、WinForms、DPI、多显示器、托盘/退出与长时稳定性仍 NOT RUN；不得以发布包 smoke 代替桌面验收。
+
+### M13-02 Windows Actions 最终验收（2026-11-14）
+
+- 代码 HEAD d6854f872a36263f6e3658eb9cf2b7e9f252c947 的 Windows Actions run [43461688129](https://github.com/xiaobei206/anjian/actions/runs/43461688129) SUCCESS：Restore PASS；Release Build 0 warnings / 0 errors；Core tests 202/202 PASS；API handbook check 103/103；self-contained win-x64 publish PASS；发布包 Sprite、Plugin 与 MultiInstance Worker smoke 3/3 PASS；ZIP/SHA256 与 artifact upload PASS。
+- 发布包 MultiInstance smoke 验证两个 Worker 真实并发存活、Stop 第一个后第二个仍存活；随后强制结束第二个 Worker，第三个 Worker 继续运行，证明 Worker crash 只影响所属实例。
+- Actions artifact ID 14056846918，87,318,097 bytes，uploaded artifact archive SHA-256 393bd08c9da97368cb9ddb39c0de790000befa9ecad27ce161accaf8892987c8；临时 Actions artifact，不是 GitHub Release。
+- 早期 package crash smoke run 43460703769 / 43460805818 / 43460823813 / 43460841956 失败揭示 Worker 在 host IPC Delay 中途退出不能及时取消 dispatch；已在 PlaybackRunner 中同时监听 Worker process exit、取消当前 dispatch，并覆盖 pipe connect / worker-ready handshake；最终 HEAD 对应 run 全通过。
+- 本地容器没有 .NET SDK，local Restore/Build/Test NOT RUN。Windows 10/11 实际键鼠输入、WinForms、DPI/多屏、托盘/退出与长时稳定性仍 NOT RUN（M14）。

@@ -487,3 +487,9 @@ M13-01 先冻结契约；新增 Core 类型只负责身份、状态转换和并�
 - Worker pipe 使用 current-user ACL、OS client PID 绑定、identity policy 逐消息检查和响应检查；无效、跨实例、跨 attempt 或 nonce 不匹配均拒绝。
 - 全局 InputArbiter 在故障时拒绝新 lease，Input release failure 需人工恢复；这不解决宿主进程崩溃/断电下操作系统无法收到 KeyUp 的边界。
 - MainForm 目前仅提供选中/最新实例的基础 Pause/Resume/Stop、容量状态与输入故障恢复；没有完整运行实例列表、筛选和实例日志独立视图。定时/用户配置运行超时/重试尚未实现。
+
+### 19.6 M13-02 最终验证记录（2026-11-14）
+
+- Windows Actions [43461688129](https://github.com/xiaobei206/anjian/actions/runs/43461688129) 对代码 HEAD d6854f872a36263f6e3658eb9cf2b7e9f252c947 SUCCESS：Release Build 0 warnings / 0 errors、202/202 Core tests、API handbook 103 项、自包含 win-x64 publish、Sprite/Plugin/MultiInstance smoke 3/3、ZIP/SHA256 与 artifact upload 全 PASS。
+- MultiInstance 发布包 smoke 先确认两个 Worker PID 不同且同时存活，停止其中一个后另一个保持运行；再杀掉另一个 Worker，第三个 Worker 保持运行并完成，验证进程级故障隔离。
+- Worker crash while host dispatching IPC 现在由 Worker exit monitor 及时取消宿主 dispatch；connect、ready handshake、执行 IPC 三段均监视对应 Worker 进程退出。真实 SendInput/KeyUp 和 WinForms 桌面交互仍 NOT RUN（M14）。

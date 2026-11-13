@@ -88,3 +88,9 @@ F31 由“未实现”调整为“部分实现”，只代表 Core 契约与状�
 ## M13-02 状态注记（2026-11-14）
 
 F31 从 M13-01 的“契约/状态模型部分实现”更新为 M13-02“运行时多实例部分实现”。这不等于完整的定时/多任务功能已经完成：M13-03 仍负责延迟/定时/周期触发、实例运行超时与失败重试；M13-04 仍负责完整实例列表、筛选、日志浏览和恢复体验。最新 Windows Actions run 43460841956（代码 HEAD f1ad298e）在文档提交时仍在执行；桌面验收一律保持 NOT RUN（M14）。
+
+## M13-02 最终自动化状态（2026-11-14）
+
+- F31 的多实例运行时部分已完成：Windows Actions [43461688129](https://github.com/xiaobei206/anjian/actions/runs/43461688129) 对代码 HEAD d6854f872a36263f6e3658eb9cf2b7e9f252c947 SUCCESS，202/202 Core tests、0 warnings/errors、自包含 win-x64 发布、Sprite/Plugin/MultiInstance Worker smoke 3/3、ZIP/SHA256 与 artifact upload 全 PASS。
+- 发布包 smoke 覆盖真实 Worker 并行、单实例 Stop 隔离及 Worker crash 隔离；InputArbiter 的公平 FIFO/故障锁定仍由 Core 测试验证，真实 SendInput/KeyUp 则留 M14。
+- F31 仍为 PARTIAL：定时/周期触发、可配置运行超时与失败重试属于 M13-03；完整实例列表/筛选/按实例日志属于 M13-04。Windows 10/11 桌面验收 NOT RUN（M14）。
