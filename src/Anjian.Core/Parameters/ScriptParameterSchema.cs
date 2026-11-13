@@ -48,6 +48,12 @@ public sealed class ParameterValidationResult
 public static class ScriptParameterValidator
 {
     private static readonly Regex LuaIdentifier = new(@"^[A-Za-z_][A-Za-z0-9_]*$", RegexOptions.CultureInvariant);
+    private static readonly HashSet<string> LuaKeywords = new(StringComparer.Ordinal)
+    {
+        "and", "break", "do", "else", "elseif", "end", "false", "for", "function",
+        "goto", "if", "in", "local", "nil", "not", "or", "repeat", "return",
+        "then", "true", "until", "while"
+    };
     private static readonly Regex ColorValue = new(@"^#(?:[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$", RegexOptions.CultureInvariant);
     private static readonly Regex HotkeyValue = new(@"^(?:(?:Ctrl|Alt|Shift|Win)\+){0,4}(?:[A-Z0-9]|F(?:[1-9]|1[0-2])|Enter|Escape|Space|Tab|Backspace|Delete|Insert|Home|End|PageUp|PageDown|Up|Down|Left|Right)$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
     private static readonly HashSet<string> SupportedTypes = new(StringComparer.Ordinal)
@@ -72,15 +78,25 @@ public static class ScriptParameterValidator
         var names = new HashSet<string>(StringComparer.Ordinal);
         foreach (var p in schema.Parameters)
         {
+            if (p is null)
+            {
+                issues.Add(new("", "参数定义", "参数项不能为 null。"));
+                continue;
+            }
             var label = string.IsNullOrWhiteSpace(p.Label) ? p.Name : p.Label;
             if (string.IsNullOrWhiteSpace(p.Id) || !ids.Add(p.Id))
                 issues.Add(new(p.Id ?? "", label, "参数 ID 不能为空且必须唯一。"));
-            if (string.IsNullOrWhiteSpace(p.Name) || !LuaIdentifier.IsMatch(p.Name) || !names.Add(p.Name))
-                issues.Add(new(p.Id ?? string.Empty, label, "参数名必须是唯一的 Lua 标识符。"));
+            if (string.IsNullOrWhiteSpace(p.Name) || !LuaIdentifier.IsMatch(p.Name)
+                || LuaKeywords.Contains(p.Name) || !names.Add(p.Name))
+                issues.Add(new(p.Id ?? string.Empty, label, "参数名必须是唯一且非保留字的 Lua 标识符。"));
             if (string.IsNullOrWhiteSpace(p.Label))
                 issues.Add(new(p.Id ?? string.Empty, label, "中文标签不能为空。"));
             if (!SupportedTypes.Contains(p.Type))
                 issues.Add(new(p.Id ?? string.Empty, label, $"不支持的参数类型：{p.Type}。"));
+            if (p.Minimum.HasValue && !double.IsFinite(p.Minimum.Value))
+                issues.Add(new(p.Id ?? string.Empty, label, "最小值必须是有限数值。"));
+            if (p.Maximum.HasValue && !double.IsFinite(p.Maximum.Value))
+                issues.Add(new(p.Id ?? string.Empty, label, "最大值必须是有限数值。"));
             if (p.Minimum.HasValue && p.Maximum.HasValue && p.Minimum > p.Maximum)
                 issues.Add(new(p.Id ?? string.Empty, label, "最小值不能大于最大值。"));
             if (p.Type is "select" or "multiSelect")
@@ -153,6 +169,37 @@ public static class ScriptParameterValidator
         return new(values, issues);
     }
 
+    public static IReadOnlyDictionary<string, JsonElement> ResolveRuntimePaths(
+        ScriptParameterSchema schema,
+        IReadOnlyDictionary<string, JsonElement> validatedValues,
+        string baseDirectory)
+    {
+        ArgumentNullException.ThrowIfNull(schema);
+        ArgumentNullException.ThrowIfNull(validatedValues);
+        ArgumentException.ThrowIfNullOrWhiteSpace(baseDirectory);
+
+        var pathNames = schema.Parameters
+            .Where(p => p is not null && (p.Type is "filePath" or "directoryPath"))
+            .Select(p => p.Name)
+            .ToHashSet(StringComparer.Ordinal);
+        var scriptDirectory = Path.GetFullPath(baseDirectory);
+        var resolved = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
+        foreach (var pair in validatedValues)
+        {
+            if (pathNames.Contains(pair.Key) && pair.Value.ValueKind == JsonValueKind.String)
+            {
+                var rawPath = pair.Value.GetString();
+                if (!string.IsNullOrWhiteSpace(rawPath))
+                {
+                    resolved[pair.Key] = JsonSerializer.SerializeToElement(Path.GetFullPath(rawPath, scriptDirectory));
+                    continue;
+                }
+            }
+            resolved[pair.Key] = pair.Value.Clone();
+        }
+        return resolved;
+    }
+
     private static bool IsEmpty(JsonElement value) => value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined
         || value.ValueKind == JsonValueKind.String && string.IsNullOrWhiteSpace(value.GetString())
         || value.ValueKind == JsonValueKind.Array && !value.EnumerateArray().Any();
@@ -201,12 +248,24 @@ public static class ScriptParameterValidator
             case "directoryPath":
                 if (value.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(value.GetString()))
                     errors.Add("必须是非空路径。");
-                else if (p.MustExist && checkPathExists)
+                else
                 {
-                    var raw = value.GetString()!;
-                    var path = Path.IsPathRooted(raw) ? raw : Path.GetFullPath(raw, baseDirectory ?? Environment.CurrentDirectory);
-                    var exists = p.Type == "filePath" ? File.Exists(path) : Directory.Exists(path);
-                    if (!exists) errors.Add(p.Type == "filePath" ? "文件不存在。" : "目录不存在。");
+                    string path;
+                    try
+                    {
+                        path = Path.GetFullPath(value.GetString()!, baseDirectory ?? Environment.CurrentDirectory);
+                    }
+                    catch (Exception ex) when (ex is ArgumentException or NotSupportedException or IOException or System.Security.SecurityException)
+                    {
+                        errors.Add("路径格式无效。");
+                        break;
+                    }
+
+                    if (p.MustExist && checkPathExists)
+                    {
+                        var exists = p.Type == "filePath" ? File.Exists(path) : Directory.Exists(path);
+                        if (!exists) errors.Add(p.Type == "filePath" ? "文件不存在。" : "目录不存在。");
+                    }
                 }
                 break;
             case "hotkey":
