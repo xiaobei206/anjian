@@ -50,7 +50,7 @@ M1–M13 的 Windows 桌面实机验收统一延期至 M14 全部功能开发完
 | F26 | 自定义用户界面 | 标签、文本/数字框、开关、选项、文件/目录、热键等参数控件 | DONE（M10 参数设计器/动态表单及 M11 小精灵复用同一 schema/validator；配置跨包版本稳定隔离；自动化 PASS；WinForms/DPI/交互验收 M14） | M10/M11 | UI 可配置、参数验证和用户运行状态完整 |
 | F27 | 插件扩展 | 本地插件包、manifest、API 版本、权限提示、启停/卸载 | 未实现插件包；权限声明/审阅基础已实现 | M12 | 插件能注册函数和文档，崩溃/异常不会拖垮主 UI |
 | F28 | 文件/目录/剪贴板 | 受控文件操作、剪贴板、对话框与常用数据 API | PARTIAL：受控文件/目录 13 项与剪贴板/对话框 5 项 API 已实现；均使用本次 Grant 双层校验；Windows Actions run 43408020908 的 147/147 tests、Build、API handbook、自包含发布与 Sprite/Worker smoke 全 PASS；真实桌面交互待 M14 | M12 | 文件权限/链接/上限/取消契约测试；剪贴板读写、三类对话框、默认拒绝、伪造 IPC 与主线程/停止路径验证 |
-| F29 | 进程/应用控制 | 启动、等待、查询、明确权限的结束操作 | PARTIAL：StartProcess/WaitProcess/GetProcessInfo 已实现并使用精确 EXE 逐次批准、Worker/host 双层 Grant、参数数组 ArgumentList 安全传递与本轮随机句柄；不提供终止进程/Shell；桌面验收待 M14 | M12 | 精确路径默认拒绝；参数边界；超时/Stop/Pause；查询退出码；句柄不可跨会话或查询任意 PID |
+| F29 | 进程/应用控制 | 启动、等待、查询、明确权限的结束操作 | PARTIAL：StartProcess/WaitProcess/GetProcessInfo 已实现；Windows Actions run 43414530292 的 152/152 tests、0 warnings/errors、API handbook、win-x64 发布、Sprite/Worker smoke、ZIP/SHA 与 artifact 上传全 PASS；不提供任意进程终止/Shell，桌面验收 M14 | M12 | 精确路径默认拒绝；参数边界；超时/Stop/Pause；查询退出码；句柄不可跨会话或查询任意 PID |
 | F30 | 网络/JSON | 显式 HTTP(S)、超时、状态码、JSON、上传/下载 | API 未实现；精确主机/方法及 HTTPS/明文 HTTP 授权字段已定义 | M12 | 无网络时核心功能正常；网络函数超时和异常不冻结 UI |
 | F31 | 定时与多实例 | 定时运行、独立实例、任务状态、超时和失败策略 | 未实现 | M13 | 互相隔离，能分别停止、查看日志和处理输入状态 |
 | F32 | 扩展兼容性 | 稳定 API 版本、弃用策略、迁移说明、插件 API 约束 | API registry 已递增至 1.0 / 99 项；插件兼容尚未实现 | M12 | 公开 API 不静默改变语义，破坏性变更有迁移说明 |

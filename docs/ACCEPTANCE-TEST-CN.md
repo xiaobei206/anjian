@@ -367,7 +367,7 @@ M1–M13 的桌面实测不再作为进入下一开发阶段的前置条件，�
 | M12-05 | 主进程 IPC 二次检查 | 文件类 IPC 每次在 PlaybackRunner 再检查 Grant；未知/伪造 IPC 默认拒绝 | PASS（ScriptFileSystemTests 覆盖空 Grant 拒绝、只读 Grant 拒绝写入、伪造/未知命令拒绝；Windows CI run 241） |
 | M12-06 | 文件/目录 API | 文本读/写/追加、存在性、列文件/目录、单级创建、复制/移动/重命名与受控临时文件/目录；授权、链接/硬链接、上限、取消、覆盖/提交行为 | PASS（13 个 API 已注册；Windows CI run 43385033936：142/142 tests，0 warnings/0 errors，API handbook、win-x64 publish、Sprite/Worker smoke 和 artifact upload 全 PASS；M14 桌面实机仍 NOT RUN） |
 | M12-07 | 剪贴板/对话框 API | 读写剪贴板；消息/输入/确认对话框；主线程调度和取消 | NOT IMPLEMENTED |
-| M12-08 | 进程 API | 精确 EXE 白名单、启动/等待/查询/退出状态、超时与取消；不开放任意 Shell | 自动化测试加入，Windows Actions 待确认；桌面实测 NOT RUN（M14） |
+| M12-08 | 进程 API | 精确 EXE 白名单、启动/等待/查询/退出状态、超时与取消；不开放任意 Shell | Windows Actions run 43414530292 自动化 PASS（152/152 tests）；桌面实测 NOT RUN（M14） |
 | M12-09 | HTTP/JSON API | 精确主机/方法；HTTPS 默认；可选明文 HTTP 单独审批；重定向重新授权、超时/响应上限/取消 | NOT IMPLEMENTED |
 | M12-10 | 插件包/兼容/生命周期 | 本地目录/ZIP manifest、稳定 ID、API 兼容、文件 hash、启停/卸载、错误隔离 | NOT IMPLEMENTED |
 | M12-11 | 小精灵权限 | 包构建/manifest 收集 permissions sidecar；Launcher 复用逐次权限审阅 | NOT IMPLEMENTED |
@@ -430,12 +430,19 @@ Windows Actions run [43385033936](https://github.com/xiaobei206/anjian/actions/r
 
 | ID | 场景 | 自动化覆盖/期望 | Windows 桌面状态 |
 |---|---|---|---|
-| M12-08-01 | 精确 EXE 授权 | 无 Grant/未批准/路径不同/相对路径误解析均拒绝；只允许当前请求与批准集合精确匹配 | NOT RUN（M14） |
-| M12-08-02 | 参数安全传递 | 字符串数组逐项进入 ArgumentList；空格、引号、Unicode、Shell 元字符不拆分、不经 Shell；限制 64 项/单项 8,192/总长 32,768 | 自动化契约与 Windows 进程会话测试；CI 待确认 |
-| M12-08-03 | 启动边界 | 只接受现存 .exe；拒绝非 exe、reparse point 路径、超过每轮 32 个进程和错误路径；不开放任意 Shell | 自动化契约与 Windows 进程会话测试；CI 待确认 |
-| M12-08-04 | 等待语义 | 默认 30 秒、最大 600,000ms、0 立即查询；超时 false，退出 true；等待期间响应 Pause | 自动化契约与 Windows 进程会话测试；CI 待确认 |
-| M12-08-05 | Stop 取消 | Stop 取消等待 IPC/Worker，但不终止外部进程；取消后仍可由同一运行查询退出状态 | Windows 进程会话自动化；CI 待确认 |
-| M12-08-06 | 查询与句柄隔离 | 返回 processId/hasExited/exitCode；仅允许当前运行自己启动的随机句柄，任意 PID/其他会话句柄拒绝 | 自动化契约与 Windows 进程会话测试；CI 待确认 |
+| M12-08-01 | 精确 EXE 授权 | 无 Grant/未批准/路径不同/相对路径误解析均拒绝；只允许当前请求与批准集合精确匹配 | 自动化 PASS（Run 43414530292）；桌面实测 NOT RUN（M14） |
+| M12-08-02 | 参数安全传递 | 字符串数组逐项进入 ArgumentList；空格、引号、Unicode、Shell 元字符不拆分、不经 Shell；限制 64 项/单项 8,192/总长 32,768 | 自动化 PASS（Run 43414530292）；桌面实测 NOT RUN（M14） |
+| M12-08-03 | 启动边界 | 只接受现存 .exe；拒绝非 exe、reparse point 路径、超过每轮 32 个进程和错误路径；不开放任意 Shell | 自动化 PASS（Run 43414530292）；桌面实测 NOT RUN（M14） |
+| M12-08-04 | 等待语义 | 默认 30 秒、最大 600,000ms、0 立即查询；超时 false，退出 true；等待期间响应 Pause | 自动化 PASS（Run 43414530292）；桌面实测 NOT RUN（M14） |
+| M12-08-05 | Stop 取消 | Stop 取消等待 IPC/Worker，但不终止外部进程；取消后仍可由同一运行查询退出状态 | 自动化 PASS（Run 43414530292）；桌面实测 NOT RUN（M14） |
+| M12-08-06 | 查询与句柄隔离 | 返回 processId/hasExited/exitCode；仅允许当前运行自己启动的随机句柄，任意 PID/其他会话句柄拒绝 | 自动化 PASS（Run 43414530292）；桌面实测 NOT RUN（M14） |
 | M12-08-07 | 真实 WinForms/桌面 | 从权限审阅窗口批准/拒绝 EXE；实际打开应用、Stop/脚本结束后应用保留、DPI/多屏/权限错误提示 | NOT RUN（M14） |
 
 自动化不得写成任意进程终止或 OS 沙箱；用户批准的 EXE 仍会按其自身逻辑运行。CI 成功不等于 Windows 10/11 桌面验收成功。
+
+
+### M12-08 Windows Actions 最终自动化结果
+
+- Run [43414530292](https://github.com/xiaobei206/anjian/actions/runs/43414530292) SUCCESS：Restore PASS；Release Build 0 warnings / 0 errors；Core tests **152 passed / 0 failed / 0 skipped**；API handbook check 显示 102 个当前公开函数；self-contained win-x64 publish；packaged Sprite/Worker smoke；ZIP/SHA256；artifact upload 全 PASS。
+- Artifact ID `14030797666`，87,218,351 bytes，archive SHA-256 `0985b5bb96d639a51bc2a947a87869cb82b655a316651204b0b6d7a1b4b4dc25`，有效至 2026-12-13。没有创建 GitHub Release，preview.4 资产保持不变。
+- M12-08-01 至 M12-08-06 自动化契约/Windows 进程会话测试 PASS；M12-08-07 真实 WinForms 权限审阅和桌面应用生命周期仍 NOT RUN，统一延期 M14。

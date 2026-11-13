@@ -792,3 +792,12 @@ M4 基础调试器与 M5 可视化录制/动作列表均已完成 Windows CI 验
 - Run [43414314883](https://github.com/xiaobei206/anjian/actions/runs/43414314883)（HEAD `0f7a424da9481be2123bd1fedb3205eb04dda8ac`）：Restore PASS，Build FAILED，0 warnings / 1 error；CS0246 无法解析 `System.Diagnostics.Process`，因为 pause-aware timeout 修正中误删了仍为 Process 对象字段所需的 using。
 - Run [43414416720](https://github.com/xiaobei206/anjian/actions/runs/43414416720)（HEAD `0ebd376629cca035bd71cd5b3a7b51c1689beeb3`）：同样在 Build 阶段遇到上项未修复错误，0 warnings / 1 error；Test 与发布步骤跳过。
 - 已在提交 `bd848281b1125e4c8441d941119de54fdd252744` 补回 `using System.Diagnostics`，该提交触发最新 run [43414530292](https://github.com/xiaobei206/anjian/actions/runs/43414530292)；当前状态以 Actions 实时结果为准。
+
+
+## 2026-11-13 — M12-08 Windows Actions 最终验收（SUCCESS）
+
+- 首轮 run [43413876754](https://github.com/xiaobei206/anjian/actions/runs/43413876754)：Restore PASS、Build 0 warnings/0 errors；151/152 tests，唯一失败为旧图像 API 测试仍断言 registry 1.0。API version 更新后发现该测试还残留 count=99，修正到 102。
+- Run [43414314883](https://github.com/xiaobei206/anjian/actions/runs/43414314883) 和 [43414416720](https://github.com/xiaobei206/anjian/actions/runs/43414416720)：Restore PASS；Build 因误删 `using System.Diagnostics` 导致 `Process` CS0246，0 warnings / 1 error；测试与后续步骤跳过。随后补回 using，并将 WaitProcess 改为仅递减实际运行中的等待时间，Pause 期间不消耗 timeout。
+- 最终代码提交：`bd848281b1125e4c8441d941119de54fdd252744`。Windows Actions run [43414530292](https://github.com/xiaobei206/anjian/actions/runs/43414530292) **SUCCESS**：Restore PASS；Release Build PASS（0 warnings / 0 errors）；Core tests **152 passed / 0 failed / 0 skipped**；API handbook check PASS（102 个当前公开函数）；self-contained win-x64 publish PASS；packaged Sprite/Worker smoke PASS；ZIP/SHA256 PASS；artifact upload PASS。
+- Artifact ID `14030797666`，87,218,351 bytes，archive digest `sha256:0985b5bb96d639a51bc2a947a87869cb82b655a316651204b0b6d7a1b4b4dc25`，有效期至 2026-12-13。Read release version / Create GitHub Release 跳过（本次不是 release 提交）；未修改 VERSION、AssemblyVersion、FileVersion；v0.1.0-preview.4 不变。
+- M12-08-01..06 自动化 PASS；Windows 10/11 实际应用启动、权限审阅 UI、Stop 后应用生命周期、UIPI/DPI/多屏桌面实测仍 NOT RUN，统一留 M14。

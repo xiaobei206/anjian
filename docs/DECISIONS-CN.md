@@ -208,7 +208,7 @@
 
 ## ADR-028：受控进程 API 仅操作本次批准的 EXE 与本次运行句柄
 
-- 状态：ACCEPTED（M12-08；Windows 自动化测试执行后更新最终 CI 结果，桌面实机留 M14）。
+- 状态：ACCEPTED（M12-08；Windows Actions run 43414530292 自动化验收 PASS，152/152 tests、0 warnings/0 errors；桌面实机留 M14）。
 - 公开 API：`StartProcess(executablePath, arguments?)`、`WaitProcess(processHandle, timeoutMs?)`、`GetProcessInfo(processHandle)`；API registry 从 1.0 / 99 项升为 1.1 / 102 项。
 - 授权：复用 ADR-024 的 `processExecutables` 精确 .exe 路径声明；路径相对入口脚本目录解析。每次运行由现有权限审阅 UI 逐项默认拒绝，批准集合必须是请求集合子集。Worker bridge 和 PlaybackRunner host 分别重新验证精确完整路径；空 Grant/伪造 IPC 一律拒绝。
 - 启动：仅启动批准路径中的现存 .exe；拒绝路径链中的 reparse point。使用 `ProcessStartInfo.UseShellExecute=false` 与 `ArgumentList` 逐项传递参数，不构造 shell 命令、不调用 cmd/PowerShell。参数最多 64 项，单项 8,192 字符、总长 32,768 字符；每轮 RunAsync 最多启动 32 个进程。

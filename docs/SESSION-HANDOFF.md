@@ -662,3 +662,26 @@ M12-02 验收前不做剪贴板、对话框、进程、HTTP 或插件加载。�
 - `0f7a424da9481be2123bd1fedb3205eb04dda8ac`：run 43414314883；Build 因缺少 `using System.Diagnostics` 导致 Process CS0246 失败。
 - `0ebd376629cca035bd71cd5b3a7b51c1689beeb3`：run 43414416720；同一编译错误，Build 0 warnings/1 error，后续步骤跳过。此 commit 同时把旧测试函数数量断言从 99 更新至 102。
 - 当前 main 最新：`bd848281b1125e4c8441d941119de54fdd252744`，恢复 `using System.Diagnostics`。Windows Actions run [43414530292](https://github.com/xiaobei206/anjian/actions/runs/43414530292) 正在执行，必须以此 run 的最终结果继续修复或记录 PASS。
+
+
+---
+
+# 最新交接状态覆盖：M12-08 已完成；Windows CI PASS（2026-11-13）
+
+本节为当前状态权威记录，覆盖本文之前的 M12-08 待确认状态。
+
+## 当前 main 与验收证据
+- 最新已知 main HEAD（本状态文档提交前）：`736d73920a1b2cf4c1b1604fe594e3836d0131b7`；受控进程代码在提交 `bd848281b1125e4c8441d941119de54fdd252744`。
+- M12-08 Windows Actions run [43414530292](https://github.com/xiaobei206/anjian/actions/runs/43414530292) SUCCESS：Restore；Release Build 0 warnings/0 errors；152/152 Core tests、0 skipped；API handbook check（102 个函数）；self-contained win-x64 publish；packaged Sprite/Worker smoke；ZIP/SHA256；artifact upload 全 PASS。
+- Artifact ID `14030797666`，87,218,351 bytes，archive digest `sha256:0985b5bb96d639a51bc2a947a87869cb82b655a316651204b0b6d7a1b4b4dc25`，有效至 2026-12-13。没有创建 Release，preview.4 资产不变；VERSION/AssemblyVersion/FileVersion 未改。
+- 当前公开 API registry 1.1 / 102 项。StartProcess/WaitProcess/GetProcessInfo 使用 processExecutables 精确 EXE 逐次批准，Worker/host 双层 Grant；参数通过 ArgumentList；仅本轮随机句柄，Wait 的 Pause 不消耗 timeout，Stop 不终止已启动应用。
+- Windows 10/11 权限审阅 UI、实际启动 GUI 应用、Stop 后生命周期、UIPI/DPI/多屏仍 NOT RUN（M14）。CI PASS 不等于桌面验收。
+
+## 本阶段已发生的 CI 修正
+- Run 43413876754：151/152 tests，旧 API 版本断言错误；已修正版本和数量到 1.1 / 102。
+- Run 43414314883 与 43414416720：Build 因缺少 System.Diagnostics using 失败；已修复。
+- 最终 run 43414530292 全 PASS，以上失败已由最终成功版本覆盖验证。
+
+## 下一会话唯一任务：M12-09 — 受控 HTTP(S)/JSON API
+
+按 ADR-024 的既有 `httpHosts`、`httpMethods` 与 `allowInsecureHttp` 权限字段，先冻结公开 API 的请求/返回/错误、超时/取消、响应体大小、header 限制和 redirect 语义，再实现 HTTP(S)/JSON 能力。必须 HTTPS 默认；明文 HTTP 只有单独批准才可用；主机/方法精确匹配、不支持通配符；每次重定向必须重新对目标 host/method 授权；超时、响应/下载上限、Stop cancellation；不得默认自动联网。仍须 Worker 与主进程双层 Grant、未知 IPC fail-closed。不得顺带开始插件 M12-10 或小精灵 sidecar 审阅 M12-11。同步 registry、函数手册、IDE 提示、测试、开发日志、验收、路线图；不修改产品版本、不创建 Release；直接 main 小步提交。真实 Windows 桌面验收仍 M14。

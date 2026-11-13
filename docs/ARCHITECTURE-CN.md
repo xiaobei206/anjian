@@ -397,3 +397,10 @@ preview.4 当前采用低级鼠标/键盘 Hook，已纳入 Windows CI 编译与�
 - 启动必须 `.exe`、文件存在、路径链不经过 reparse point；WorkingDirectory 固定为 EXE 所在目录。UseShellExecute=false，ArgumentList 保留参数边界，不经 Shell。
 - 每轮最多 32 个进程；参数上限 64 项/单项 8,192 字符/总长 32,768 字符；Wait 默认 30 秒、上限 10 分钟。运行结束释放 Process 句柄但不结束外部进程。
 - 只允许当前运行会话创建的句柄；不允许传入 PID、任意进程枚举、附加、终止或 Shell。此能力不是对已批准 EXE 的 OS 级沙箱；真实应用启动、窗口交互、UIPI/DPI 和 Stop 边界仍需 M14 实机验收。
+
+
+### 18.1 M12-08 Windows 自动化验证结果
+
+- Windows Actions run [43414530292](https://github.com/xiaobei206/anjian/actions/runs/43414530292) 对代码 HEAD `bd848281b1125e4c8441d941119de54fdd252744` 全 PASS：Restore；Release Build 0 warnings/0 errors；152/152 Core tests、0 skipped；API handbook check（102 个公开函数）；self-contained win-x64 publish；packaged Sprite/Worker smoke；ZIP/SHA256；artifact upload。
+- Artifact ID `14030797666`，87,218,351 bytes，archive digest `sha256:0985b5bb96d639a51bc2a947a87869cb82b655a316651204b0b6d7a1b4b4dc25`。该 artifact 是 CI 临时构建资产，不是 GitHub Release。
+- 真实 Windows 10/11 权限审阅 UI、实际 GUI EXE 启动/生命周期、DPI/UIPI、多屏和用户 Stop 交互仍 NOT RUN，统一留 M14；CI 结果不代表桌面实机 PASS。
