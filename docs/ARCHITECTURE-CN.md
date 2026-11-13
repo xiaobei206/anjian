@@ -404,3 +404,20 @@ preview.4 当前采用低级鼠标/键盘 Hook，已纳入 Windows CI 编译与�
 - Windows Actions run [43414530292](https://github.com/xiaobei206/anjian/actions/runs/43414530292) 对代码 HEAD `bd848281b1125e4c8441d941119de54fdd252744` 全 PASS：Restore；Release Build 0 warnings/0 errors；152/152 Core tests、0 skipped；API handbook check（102 个公开函数）；self-contained win-x64 publish；packaged Sprite/Worker smoke；ZIP/SHA256；artifact upload。
 - Artifact ID `14030797666`，87,218,351 bytes，archive digest `sha256:0985b5bb96d639a51bc2a947a87869cb82b655a316651204b0b6d7a1b4b4dc25`。该 artifact 是 CI 临时构建资产，不是 GitHub Release。
 - 真实 Windows 10/11 权限审阅 UI、实际 GUI EXE 启动/生命周期、DPI/UIPI、多屏和用户 Stop 交互仍 NOT RUN，统一留 M14；CI 结果不代表桌面实机 PASS。
+
+
+### 18.2 M12-09 受控 HTTP(S)/JSON
+
+- 新增 Core `ScriptHttpPolicy` 与 `ScriptHttpSession`；Worker `HttpRequest` 将 Lua options 转为受限的 JSON IPC；PlaybackRunner host 每次重新解析当前 Grant 并调用 HTTP 会话，未知 IPC 继续 fail-closed。
+- `SocketsHttpHandler` 关闭自动重定向、Cookie、代理和凭据继承；Host 最多手动处理 5 跳，每跳验证精确主机、方法和 HTTPS/获批 HTTP。301/302 POST、303 非 HEAD 改 GET；307/308 保留方法/正文；跨 origin 清除 Authorization 和用户自定义凭据头。
+- URL 2,048 字符；默认端口 only；DNS 精确主机、无通配符/IP/userinfo/fragment；仅 GET/POST/PUT/PATCH/DELETE/HEAD。请求头最多 32 项/32 KiB，body/json 最多 1 MiB；响应头最多 64 项/32 KiB，解压后正文最多 4 MiB；JSON 深度 32。
+- timeout 默认 30 秒、1–120 秒；Stop token 贯穿 SendAsync、redirect 与 response stream。HTTP 状态码直接作为正常响应对象返回；无效 UTF-8、错误 JSON、超限、未批准跳转与网络失败报告错误。
+- 请求头/正文和响应正文不自动写应用日志。只实现显式有界缓冲请求，不支持 Cookie jar、代理、自定义 DNS、任意 TCP/WebSocket 或大文件流式传输。
+- 真实 WinForms 权限审阅、HTTPS/HTTP、重定向、DPI 与 Stop 桌面验收继续留 M14。
+
+
+### 18.3 M12-09 Windows 自动化验证结果
+
+- Windows Actions run [43427860126](https://github.com/xiaobei206/anjian/actions/runs/43427860126) 对功能/测试 HEAD `e0301a3641a123792a9aa584fd4a8b09b4c7409b` 全 PASS：Restore；Release Build 0 warnings / 0 errors；161/161 Core tests、0 skipped；API handbook check（103 个公开函数）；self-contained win-x64 publish；packaged Sprite/Worker smoke；ZIP/SHA256 与 artifact upload。
+- Artifact ID `14037418047`，87,234,303 bytes，archive SHA-256 `f8eafdbeb01727c96467a1882a95e9e55db40e4dd83d82e82c19ac3199b314bd`。没有创建 GitHub Release；该临时 artifact 有效至 2026-12-13。
+- M12-09 的真实 Windows 10/11 权限审阅窗口、TLS/HTTP/重定向、网络错误、Pause/Stop、DPI 与实际桌面交互仍 NOT RUN，统一留 M14；CI PASS 不等于桌面实机验收。

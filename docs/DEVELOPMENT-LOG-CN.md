@@ -801,3 +801,22 @@ M4 基础调试器与 M5 可视化录制/动作列表均已完成 Windows CI 验
 - 最终代码提交：`bd848281b1125e4c8441d941119de54fdd252744`。Windows Actions run [43414530292](https://github.com/xiaobei206/anjian/actions/runs/43414530292) **SUCCESS**：Restore PASS；Release Build PASS（0 warnings / 0 errors）；Core tests **152 passed / 0 failed / 0 skipped**；API handbook check PASS（102 个当前公开函数）；self-contained win-x64 publish PASS；packaged Sprite/Worker smoke PASS；ZIP/SHA256 PASS；artifact upload PASS。
 - Artifact ID `14030797666`，87,218,351 bytes，archive digest `sha256:0985b5bb96d639a51bc2a947a87869cb82b655a316651204b0b6d7a1b4b4dc25`，有效期至 2026-12-13。Read release version / Create GitHub Release 跳过（本次不是 release 提交）；未修改 VERSION、AssemblyVersion、FileVersion；v0.1.0-preview.4 不变。
 - M12-08-01..06 自动化 PASS；Windows 10/11 实际应用启动、权限审阅 UI、Stop 后应用生命周期、UIPI/DPI/多屏桌面实测仍 NOT RUN，统一留 M14。
+
+
+## 2026-11-13 — M12-09 受控 HTTP(S)/JSON API
+
+- 基线 main HEAD：`7b19dce5d4853578babe5734c889bdc7d2f43041`；先提交 ADR-029 与 HTTP 契约 `e0ce163633b9bcde64c7f1dfc2c89482c6bb9b0e`。
+- 功能提交：`0e2fc829698108603506f1c01bb22a56ea561080`；首轮 Windows Actions run [43426945855](https://github.com/xiaobei206/anjian/actions/runs/43426945855) Restore PASS，Build 失败，0 warnings / 1 error：SocketsHttpHandler 不存在 UseDefaultCredentials 属性。随后提交 `0b7eec792fb04b508cb87a417cd39118f3dd5ddb` 删除不支持的属性；SocketsHttpHandler Credentials=NULL、UseProxy=false、UseCookies=false 已保持。
+- 新增 `ScriptHttpPolicy`、`ScriptHttpSession`、Worker `HttpRequest` bridge 和 PlaybackRunner host dispatcher；host 与 Worker 均重新校验当前 Grant，unknown IPC fail-closed。使用 HttpClient ResponseHeadersRead，手动重定向、响应流大小控制、UTF-8/JSON 解析和 linked Stop/timeout token。
+- API registry 从 1.1 / 102 升至 1.2 / 103；新增 HttpRequest(url, options?)，更新 LuaApiRegistryTests、脚本权限策略和 API 函数手册生成区。ADR-029 记录范围、HTTP/redirect/timeout/limits 契约。
+- Core 自动化测试覆盖精确 host/method、HTTP 单独批准、端口/IP/userinfo/禁用头、Worker JSON request、空 Grant/伪造 IPC、逐跳 redirect/POST 改 GET、跨源凭据头剥离、HTTP 错误状态 JSON、响应超限和 Stop 取消。Windows Actions run 43427860126 最终 SUCCESS：161/161 Core tests、0 warnings/0 errors、API handbook/self-contained publish/Sprite Worker smoke/ZIP/SHA256/artifact upload 全 PASS；artifact 14037418047，87,234,303 bytes，SHA-256 f8eafdbeb01727c96467a1882a95e9e55db40e4dd83d82e82c19ac3199b314bd。
+- 请求上限 1 MiB，响应上限 4 MiB（解压后实际字节），响应头 32 KiB/64 项，URL 2048 字符，超时 1–120 秒、默认 30 秒，最多 5 次 redirect。只实现显式调用的有界缓冲请求，不开放代理/Cookie/WebSocket/任意 TCP/大文件 streaming。
+- 不修改 VERSION/AssemblyVersion/FileVersion，不创建 tag/Release；v0.1.0-preview.4 不变。M14 真实权限审阅、TLS/HTTP/redirect、DPI 与 Stop 网络桌面交互仍 NOT RUN。
+
+
+### M12-09 最终验证补记
+
+- Run [43427860126](https://github.com/xiaobei206/anjian/actions/runs/43427860126) SUCCESS：Restore、Release Build（0 warnings / 0 errors）、161/161 Core tests（0 skipped）、API handbook check（103 functions）、self-contained win-x64 publish、packaged Sprite/Worker smoke、ZIP/SHA256、artifact upload 全 PASS。
+- Artifact ID `14037418047`，87,234,303 bytes，archive digest `sha256:f8eafdbeb01727c96467a1882a95e9e55db40e4dd83d82e82c19ac3199b314bd`，有效至 2026-12-13。
+- 早期验证记录保留：run 43426945855 暴露 SocketsHttpHandler.UnsupportedProperty 编译错误；run 43427230805 首次 Build PASS 但旧 API 测试断言失败；run 43427568497 Build PASS；160/161 tests，唯一失败为既有 ScriptFileSystemTests 采用 20ms 定时取消导致的速度竞争；提交 e0301a36 将该用例改为确定性的预取消令牌。对应修复提交已进入最终 PASS HEAD e0301a36。最终 CI 结果覆盖前述失败。
+- Windows 10/11 权限 UI、真实 HTTPS/HTTP/重定向、网络 Pause/Stop、DPI/多屏仍 NOT RUN（M14）。本地容器无 .NET SDK，local Restore/Build/Test NOT RUN。

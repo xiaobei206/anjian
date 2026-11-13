@@ -437,3 +437,43 @@ end
 - `WaitProcess(handle, timeoutMs?)`：默认 30 秒，最多 10 分钟；超时返回 false，退出返回 true。Pause 暂停等待轮询，Stop 会取消等待。
 - `GetProcessInfo(handle)`：只查询本次运行启动的进程句柄，不接受任意 PID；返回 PID、退出状态和退出码。
 - Stop/脚本结束不会关闭已启动的外部应用；本轮结束后句柄失效。当前没有 Shell、任意进程终止、进程枚举/附加能力。
+
+
+## M12-09 受控 HTTP(S)/JSON API（main 开发版，不包含在 preview.4）
+
+脚本只在显式调用 HttpRequest 时联网。先在脚本同目录的 `<脚本名>.permissions.json` 声明精确主机和方法；声明不是授权，每次运行仍需在权限窗口逐项批准，默认全部不勾选：
+
+```json
+{
+  "schemaVersion": 1,
+  "httpHosts": ["api.example.com"],
+  "httpMethods": ["GET", "POST"],
+  "allowInsecureHttp": false
+}
+```
+
+主机不接受通配符或 IP 字面量；权限字段不含端口，本批只允许 HTTPS 443 / HTTP 80。HTTPS 默认；HTTP 必须在 sidecar 请求并且用户单独批准。
+
+```lua
+local response = HttpRequest("https://api.example.com/items", {
+  method = "POST",
+  headers = { ["Accept"] = "application/json" },
+  json = { name = "Anjian", enabled = true },
+  timeoutMs = 10000
+})
+
+if response.ok and response.json then
+  Log(response.json.id)
+else
+  Log("HTTP status: " .. tostring(response.statusCode))
+end
+```
+
+- options 可包含 method、headers、body 或 json、timeoutMs、followRedirects；body 与 json 互斥。默认 GET、30 秒、跟随重定向；超时范围 1–120 秒。
+- 请求头最多 32 项、合计最多 32 KiB；请求正文最多 1 MiB。拒绝 Host、Cookie、Content-Length、Transfer-Encoding、Connection、Proxy-Authorization 等由传输层管理或禁止的头。
+- 手动跟随最多 5 次重定向；每一跳重新检查 host、method、协议授权。跨 origin 不转发 Authorization 或自定义凭据头；HTTP 降级必须额外批准。
+- 返回 statusCode、reasonPhrase、ok、url、headers、body、json。4xx/5xx 仍返回响应，不当作传输异常；json 仅在 JSON Content-Type 下解析。
+- 响应头最多 32 KiB；响应正文最多 4 MiB（按解压后的实际读取量计算）。只接受 UTF-8；超限不截断、不返回部分响应。
+- Stop 取消连接、重定向和响应读取；暂停只在请求开始前的命令边界生效，不延长已启动请求的超时。网络异常、权限拒绝、超时和 Stop 取消均通过异常区分。
+
+本批是有界缓冲请求，不提供任意 TCP、WebSocket、Cookie jar、代理配置或大文件流式上传/下载。真实 Windows 10/11 权限窗口、网络/DPI 及 Stop 实机验证留待 M14。

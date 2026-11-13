@@ -238,7 +238,7 @@ M7 实现/CI 已完成不代表 M7-01..M7-10 Windows 桌面验收通过；这些
 ## M12–M13 — 扩展 API、插件和自动运行
 
 
-### M12 当前进度（2026-11-13；M12-02 文件/目录、M12-07 剪贴板/对话框和 M12-08 受控进程 API 已进入 main；M12-08 Windows CI PASS，桌面验收 M14）
+### M12 当前进度（2026-11-13；M12-02 文件/目录、M12-07 剪贴板/对话框、M12-08 受控进程和 M12-09 HTTP(S)/JSON 已进入 main；M12-09 Windows Actions run 43427860126 全 PASS，桌面验收仍留 M14）
 
 - M12-08 已实现三项公开 API：StartProcess、WaitProcess、GetProcessInfo；复用 processExecutables 精确路径请求与每次运行逐项批准，Worker/host 双层 Grant 校验；UseShellExecute=false + ArgumentList，参数数组不经 Shell；当前运行随机句柄隔离，Pause-aware 等待（暂停时间不消耗 timeout），超时/Stop 只取消等待而不终止外部进程；退出后可查 exitCode。API registry 为 1.1 / 102 项。Windows Actions run 43414530292 全 PASS：152/152 tests、Build 0 warnings/0 errors、API handbook、self-contained publish、Sprite/Worker smoke、ZIP/SHA256 与 artifact upload；桌面验收仍留 M14。
 - M12-01 已完成并进入 main：Core 权限请求/批准/Grant 数据模型、schema v1 解析和范围校验；每脚本可选 sidecar 为脚本文件全名后缀 .permissions.json，最大 256 KiB，声明本身不代表授权。
@@ -263,7 +263,7 @@ M7 实现/CI 已完成不代表 M7-01..M7-10 Windows 桌面验收通过；这些
 
 1. M12-07：已完成；Windows Actions run 43408020908 全 PASS，真实剪贴板/对话框交互待 M14。
 2. M12-08：DONE（Windows CI run 43414530292 全 PASS）；精确 EXE 启动/等待/查询及退出状态，不开放任意 Shell；真实桌面验收留 M14。
-3. M12-09：HTTP(S)/JSON，精确主机/方法授权，HTTPS 默认，HTTP 单独审批，重定向重新授权、超时、响应上限和 Stop 取消。
+3. M12-09：DONE（Windows Actions run 43427860126 全 PASS：161/161 Core tests、0 warnings/0 errors、API handbook 103 项、自包含 win-x64/Sprite Worker smoke/ZIP/SHA256 上传全通过）；HttpRequest、精确主机/方法、HTTPS 默认、HTTP 单独审批、重定向逐跳授权、超时/Stop、请求/响应上限；真实网络桌面验收留 M14。
 4. M12-10：本地插件目录/ZIP manifest、稳定 ID、版本/API 兼容、文件清单/hash、脚本声明/插件声明/用户批准权限取交集，启停/卸载及错误隔离；不加载任意 DLL，不在主 UI 执行插件 Lua。
 5. M12-11：小精灵包构建/manifest 收集 permissions sidecar，Launcher 复用逐次权限审阅；不得在缺少批准时扩大 Grant。
 6. 每批功能完成后同步 registry/API version、中文函数手册、IDE 提示和契约测试；Windows CI 不替代 M14 桌面验收。
@@ -361,3 +361,12 @@ M7 实现/CI 已完成不代表 M7-01..M7-10 Windows 桌面验收通过；这些
 - Worker：通过 `worker-ready` 握手接收结构化 JSON 参数，构建 Lua 原生值；`Args` 使用递归代理拦截常规写入，不把用户输入拼接为代码。该只读代理不是恶意脚本沙箱。
 - M10 最终代码 HEAD `a923f1e02dce73629514da39bb10925b1271fc15` 的 Windows CI run [43368224862](https://github.com/xiaobei206/anjian/actions/runs/43368224862) SUCCESS：Restore PASS、Release Build 0 warnings/0 errors、102/102 Core tests、API handbook check、自包含 win-x64 publish、ZIP/SHA256 与 artifact upload 全 PASS。artifact ID `14010789337`，87,099,638 bytes，SHA-256 `324ed884d9938548d2d35b94cd372a4bc46bf081f7abd1c77e17b28d1acf1323`（有效至 2026-12-13；非 Release）。
 - M10-01..M10-10 的桌面实测保持 NOT RUN；按统一策略延期至 M14 后。
+
+
+### M12-09 实施范围（2026-11-13）
+
+- 公开 API：`HttpRequest(url, options?)`；registry 1.2 / 103 项，函数手册由 Catalog 生成，IDE 补全继续读取同一 registry。
+- 复用 ADR-024 的 `httpHosts`、`httpMethods`、`allowInsecureHttp`；逐次批准、主机/方法精确匹配、不接受通配符/IP/非默认端口。HTTPS 默认，HTTP 单独审批。
+- 手动最多 5 次重定向，每一跳重新授权；301/302 POST 和 303 非 HEAD 改 GET，307/308 保持；跨 origin 不转发 Authorization/自定义凭据头。
+- 请求头 32 项/32 KiB、正文 1 MiB、响应头 32 KiB/64 项、解压后响应正文 4 MiB；timeout 1–120 秒；Stop 取消发送和响应流读取。
+- 仅有界缓冲请求；不实现 Cookie、代理配置、WebSocket、任意 TCP 或大文件流式传输。真实桌面验收留 M14。

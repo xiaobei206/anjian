@@ -685,3 +685,39 @@ M12-02 验收前不做剪贴板、对话框、进程、HTTP 或插件加载。�
 ## 下一会话唯一任务：M12-09 — 受控 HTTP(S)/JSON API
 
 按 ADR-024 的既有 `httpHosts`、`httpMethods` 与 `allowInsecureHttp` 权限字段，先冻结公开 API 的请求/返回/错误、超时/取消、响应体大小、header 限制和 redirect 语义，再实现 HTTP(S)/JSON 能力。必须 HTTPS 默认；明文 HTTP 只有单独批准才可用；主机/方法精确匹配、不支持通配符；每次重定向必须重新对目标 host/method 授权；超时、响应/下载上限、Stop cancellation；不得默认自动联网。仍须 Worker 与主进程双层 Grant、未知 IPC fail-closed。不得顺带开始插件 M12-10 或小精灵 sidecar 审阅 M12-11。同步 registry、函数手册、IDE 提示、测试、开发日志、验收、路线图；不修改产品版本、不创建 Release；直接 main 小步提交。真实 Windows 桌面验收仍 M14。
+
+
+---
+
+# 2026-11-13 最新交接覆盖：M12-09 受控 HTTP(S)/JSON API 已完成自动化验收
+
+本节为当前权威交接，覆盖此前所有将 M12-09 标为待实现/待验证的段落。M12-09 已实现、进入 main，并通过完整 Windows Actions 自动化流水线；真实桌面验收仍 NOT RUN（M14）。
+
+## 当前代码与提交
+- M12-09 功能/测试最终 HEAD：`e0301a3641a123792a9aa584fd4a8b09b4c7409b`。
+- 规格与 ADR-029：`e0ce163633b9bcde64c7f1dfc2c89482c6bb9b0e`。
+- 功能实现：`0e2fc829698108603506f1c01bb22a56ea561080`。
+- 编译修复：`0b7eec792fb04b508cb87a417cd39118f3dd5ddb`（移除 SocketsHttpHandler 不支持的 UseDefaultCredentials 属性；Credentials=NULL、UseProxy=false、UseCookies=false 保留）。
+- API 测试与手册同步：`2a70bc99a2ca63a81f8432011a51df87a2d3a8c1`。
+- 稳定化原有文件复制取消测试（消除 20ms 定时器竞争）：`e0301a3641a123792a9aa584fd4a8b09b4c7409b`。
+
+## M12-09 当前实现
+- 唯一新增公开 API：`HttpRequest(url, options?)`；registry 1.2 / 103 项；函数手册由 Catalog 生成，IDE 补全/签名仍读取同一 registry。
+- 复用 ADR-024 的 `httpHosts`、`httpMethods`、`allowInsecureHttp`。逐次用户批准，HTTPS 默认，HTTP 单独批准；只允许精确 DNS 主机和 GET/POST/PUT/PATCH/DELETE/HEAD，不接受通配符、IP 字面量、非默认端口、userinfo 或 fragment。
+- Worker bridge 预检、PlaybackRunner host 对每条 IPC 二次校验；host 对每次 redirect 再校验目标 host/method/scheme。最多 5 跳；301/302 POST 与 303 非 HEAD 改 GET，307/308 保留；跨 origin 不转发 Authorization/自定义凭据头。
+- 请求头最多 32 项/32 KiB；请求 body/json 最多 1 MiB；响应头最多 64 项/32 KiB；解压后响应正文最多 4 MiB；URL 2,048 字符；默认 30 秒 timeout，范围 1–120 秒；Stop 取消发送、跳转与响应流读取。
+- 返回 statusCode、reasonPhrase、ok、url、headers、body、json；4xx/5xx 返回正常响应对象；JSON Content-Type 才解析。只实现有界缓冲请求，不提供 Cookie jar、代理配置、WebSocket、任意 TCP 或大文件流式上传/下载。
+
+## 最终 Windows Actions 验收
+- Run [43427860126](https://github.com/xiaobei206/anjian/actions/runs/43427860126) SUCCESS：Restore；Release Build 0 warnings/0 errors；161/161 Core tests（0 skipped）；API handbook check（103 个函数）；self-contained win-x64 publish；packaged Sprite/Worker smoke；ZIP/SHA256 与 artifact upload 全 PASS。
+- Artifact ID `14037418047`，87,234,303 bytes，archive SHA-256 `f8eafdbeb01727c96467a1882a95e9e55db40e4dd83d82e82c19ac3199b314bd`，有效至 2026-12-13。不是 GitHub Release。
+- 本地容器无 .NET SDK，local Restore/Build/Test NOT RUN。Windows 10/11 权限审阅窗体、真实网络/TLS/HTTP/重定向、DPI、多屏、Stop 和网络错误 UI 仍 NOT RUN，统一留 M14；CI PASS 不代表桌面实机验收。
+- 不修改 VERSION / AssemblyVersion / FileVersion；没有 tag/Release；v0.1.0-preview.4 官方资产不变。
+
+## 下一会话唯一任务：M12-10 — 本地插件包、manifest 与生命周期
+
+只做 M12-10，不要提前执行 M12-11 小精灵权限审阅或 M14 桌面验收。开始时重新核对 main HEAD，读取 AGENTS.md、README.md、本 handoff、ROADMAP、PRD/FEATURE-MATRIX、ADR、API registry 和当前 Worker/PlaybackRunner 边界。
+
+范围：本地目录/ZIP 插件包；版本化 manifest、稳定插件 ID、版本/API 兼容；闭合文件清单与 SHA-256；插件 Lua entry/module 只在独立 Worker；插件声明权限与脚本声明及用户本次批准权限取交集；启用/停用/卸载和失败隔离。不加载任意 DLL，不在主 UI 执行第三方 Lua。先冻结 ADR 与 manifest schema，再实现 Core validator/loader boundary、host/Worker IPC、测试和文档。不得默认联网，也不扩大现有脚本 Grant。
+
+同步 FEATURE-MATRIX、ROADMAP、ARCHITECTURE、DECISIONS、ACCEPTANCE、USER-GUIDE、DEVELOPMENT-LOG 和本 handoff；按直接提交 main、小步提交、真实构建/测试执行。不要创建 Release，不将 CI 通过当作 M14 桌面验收通过。

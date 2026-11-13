@@ -368,7 +368,7 @@ M1–M13 的桌面实测不再作为进入下一开发阶段的前置条件，�
 | M12-06 | 文件/目录 API | 文本读/写/追加、存在性、列文件/目录、单级创建、复制/移动/重命名与受控临时文件/目录；授权、链接/硬链接、上限、取消、覆盖/提交行为 | PASS（13 个 API 已注册；Windows CI run 43385033936：142/142 tests，0 warnings/0 errors，API handbook、win-x64 publish、Sprite/Worker smoke 和 artifact upload 全 PASS；M14 桌面实机仍 NOT RUN） |
 | M12-07 | 剪贴板/对话框 API | 读写剪贴板；消息/输入/确认对话框；主线程调度和取消 | NOT IMPLEMENTED |
 | M12-08 | 进程 API | 精确 EXE 白名单、启动/等待/查询/退出状态、超时与取消；不开放任意 Shell | Windows Actions run 43414530292 自动化 PASS（152/152 tests）；桌面实测 NOT RUN（M14） |
-| M12-09 | HTTP/JSON API | 精确主机/方法；HTTPS 默认；可选明文 HTTP 单独审批；重定向重新授权、超时/响应上限/取消 | NOT IMPLEMENTED |
+| M12-09 | HTTP/JSON API | 精确主机/方法；HTTPS 默认；HTTP 单独审批；逐跳重定向授权、超时/响应上限/Stop 取消、JSON 请求/响应 | 自动化 PASS（Windows Actions run 43427860126：161/161 tests、0 warnings/0 errors、API handbook/发布/包 smoke 全 PASS）；桌面实测 NOT RUN（M14） |
 | M12-10 | 插件包/兼容/生命周期 | 本地目录/ZIP manifest、稳定 ID、API 兼容、文件 hash、启停/卸载、错误隔离 | NOT IMPLEMENTED |
 | M12-11 | 小精灵权限 | 包构建/manifest 收集 permissions sidecar；Launcher 复用逐次权限审阅 | NOT IMPLEMENTED |
 | M12-12 | Windows 桌面审阅 | Windows 10/11 普通权限、取消/批准、错误提示、DPI/多屏 | NOT RUN（统一延期 M14） |
@@ -446,3 +446,25 @@ Windows Actions run [43385033936](https://github.com/xiaobei206/anjian/actions/r
 - Run [43414530292](https://github.com/xiaobei206/anjian/actions/runs/43414530292) SUCCESS：Restore PASS；Release Build 0 warnings / 0 errors；Core tests **152 passed / 0 failed / 0 skipped**；API handbook check 显示 102 个当前公开函数；self-contained win-x64 publish；packaged Sprite/Worker smoke；ZIP/SHA256；artifact upload 全 PASS。
 - Artifact ID `14030797666`，87,218,351 bytes，archive SHA-256 `0985b5bb96d639a51bc2a947a87869cb82b655a316651204b0b6d7a1b4b4dc25`，有效至 2026-12-13。没有创建 GitHub Release，preview.4 资产保持不变。
 - M12-08-01 至 M12-08-06 自动化契约/Windows 进程会话测试 PASS；M12-08-07 真实 WinForms 权限审阅和桌面应用生命周期仍 NOT RUN，统一延期 M14。
+
+
+## 21. M12-09 受控 HTTP(S)/JSON API
+
+| ID | 场景 | 自动化覆盖/期望 | Windows 桌面状态 |
+|---|---|---|---|
+| M12-09-01 | 默认拒绝与精确白名单 | 空 Grant 拒绝；只接受精确 DNS 主机和 GET/POST/PUT/PATCH/DELETE/HEAD；拒绝通配符、IP、非默认端口、userinfo、fragment | 自动化 PASS（Run 43427860126）；桌面实测 NOT RUN（M14） |
+| M12-09-02 | 明文 HTTP 审批 | HTTPS 默认；HTTP 必须同时由 sidecar 声明并由用户单独批准；HTTP 降级重定向重新验证 | 自动化 PASS（Run 43427860126）；桌面实测 NOT RUN（M14） |
+| M12-09-03 | 请求/JSON 契约 | 默认 GET；请求头 32 项/32 KiB，正文 1 MiB；body/json 互斥；Lua JSON table 深度/数组/类型验证；禁止危险头 | 自动化 PASS（Run 43427860126）；桌面实测 NOT RUN（M14） |
+| M12-09-04 | 重定向 | 最多 5 次；301/302 POST、303 非 HEAD 变 GET；307/308 保留；每跳重新授权 host/method/scheme；跨 origin 不转发凭据头 | 自动化 PASS（Run 43427860126）；桌面实测 NOT RUN（M14） |
+| M12-09-05 | 响应契约 | 返回状态/成功标志/最终 URL/头/UTF-8 正文；JSON Content-Type 才解析；4xx/5xx 不当传输失败 | 自动化 PASS（Run 43427860126）；桌面实测 NOT RUN（M14） |
+| M12-09-06 | 超时、Stop 与资源上限 | 1–120 秒超时；Stop 取消连接与响应读取；响应头 32 KiB、解压后正文 4 MiB；超限不得截断返回 | 自动化 PASS（Run 43427860126）；桌面实测 NOT RUN（M14） |
+| M12-09-07 | 桌面权限窗口/真实网络 | 用户逐项批准/拒绝主机、方法、HTTP；真实 TLS、重定向、错误、Pause/Stop、UI 响应性 | NOT RUN（M14） |
+
+M12-09 只实现有上限的显式 HTTP 缓冲请求；不代表大文件流式下载/上传、Cookie、代理或任意 TCP 已实现。Windows CI 通过也不代表 M14 桌面验收通过。
+
+
+### M12-09 Windows Actions 最终自动化结果
+
+- Run [43427860126](https://github.com/xiaobei206/anjian/actions/runs/43427860126) SUCCESS：Restore PASS；Release Build 0 warnings / 0 errors；Core tests **161 passed / 0 failed / 0 skipped**；API handbook check 显示 103 个当前公开函数；self-contained win-x64 publish；packaged Sprite/Worker smoke；ZIP/SHA256；artifact upload 全 PASS。
+- Artifact ID `14037418047`，87,234,303 bytes，archive SHA-256 `f8eafdbeb01727c96467a1882a95e9e55db40e4dd83d82e82c19ac3199b314bd`，有效至 2026-12-13；未创建 Release。
+- M12-09 自动化契约与 host/Worker 网络会话测试 PASS；M12-09-07 真实 WinForms 权限审阅/网络/DPI/Stop 桌面交互继续 NOT RUN，统一延期 M14。

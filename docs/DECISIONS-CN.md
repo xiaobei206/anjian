@@ -231,5 +231,5 @@
 - 取消/暂停：请求在 PlaybackRunner 命令边界等待 Pause；启动后 Pause 不暂停 socket 或延长 timeout，响应完成后下一命令边界继续等待。Stop 令牌贯穿发送、重定向和响应流读取；Stop 立即取消本次操作。timeout 与 Stop 区分报告；两者都不得返回半截响应。
 - 错误：参数/JSON/header/URL 无效、缺少 host/method/明文批准、重定向越权、超时、Stop 取消、响应体/头超限、非 UTF-8 正文、无效 JSON 和网络异常均有明确失败路径；未知 IPC 一律 fail-closed。
 - 范围限制：本批提供有上限的缓冲请求，不是任意 TCP、WebSocket、代理配置、Cookie jar、下载器、上传器或浏览器会话。通过 body/json 可以向已授权服务发送文本/JSON；大文件/流式传输保留后续独立设计。网络请求只由脚本显式调用，不会自动联网。
-- 验证：Core 契约测试使用可注入 HttpMessageHandler 覆盖授权、重定向、请求头、timeout、Stop、响应上限、JSON 与 Worker Lua table；Windows Actions 继续执行 Release Build、全量 Core tests、API handbook、自包含包及 Sprite/Worker smoke。WinForms 权限审阅、真实网络/DPI/Stop 交互仍留 M14。
+- 验证：Core 契约测试使用可注入 HttpMessageHandler 覆盖授权、重定向、请求头、timeout、Stop、响应上限、JSON 与 Worker Lua table。Windows Actions run [43427860126](https://github.com/xiaobei206/anjian/actions/runs/43427860126) SUCCESS：161/161 Core tests、0 warnings/0 errors、103 项 API handbook、自包含包与 Sprite/Worker smoke、ZIP/SHA256/artifact upload 全 PASS；Artifact 14037418047，87,234,303 bytes，SHA-256 f8eafdbeb01727c96467a1882a95e9e55db40e4dd83d82e82c19ac3199b314bd。WinForms 权限审阅、真实网络/DPI/Stop 交互仍留 M14。
 
