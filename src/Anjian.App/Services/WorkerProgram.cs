@@ -59,7 +59,8 @@ internal static class WorkerProgram
                 }
                 else
                 {
-                    scriptSource = File.ReadAllText(fullPath);
+                    scriptSource = launch.ScriptSource
+                        ?? throw new InvalidDataException("普通脚本 Worker 缺少本次启动时的源码快照。");
                 }
                 var scriptDirectory = Path.GetDirectoryName(fullPath)
                     ?? throw new InvalidDataException("无法确定脚本目录。");
