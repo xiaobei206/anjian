@@ -335,7 +335,7 @@ public static class SpritePackageBuilder
                         throw new InvalidDataException($"脚本 {Path.GetRelativePath(projectRoot, currentScript)} 存在动态 require(...)；无法安全确定打包依赖。请改为 require(\"module.name\")。");
                     if (scan.HasDynamicImageLoad)
                     {
-                        var manifestPath = Path.ChangeExtension(currentScript, ".images.json");
+                        var manifestPath = Path.ChangeExtension(entryScript, ".images.json");
                         if (!File.Exists(manifestPath))
                             throw new InvalidDataException($"脚本 {Path.GetRelativePath(projectRoot, currentScript)} 存在动态 LoadImage(...)，但没有图像资源清单；无法保证资源完整。");
                         context.Warnings.Add($"{Path.GetRelativePath(projectRoot, currentScript)} 使用动态 LoadImage；已包含对应 .assets 目录全部登记资源，仍无法识别清单外的动态路径。");
@@ -343,7 +343,7 @@ public static class SpritePackageBuilder
 
                     foreach (var imagePath in scan.ImagePaths)
                     {
-                        var resolvedImage = ResolveSourceFile(Path.GetDirectoryName(currentScript)!, imagePath, projectRoot);
+                        var resolvedImage = ResolveSourceFile(scriptDirectory, imagePath, projectRoot);
                         if (!File.Exists(resolvedImage))
                             throw new FileNotFoundException($"脚本引用的图片不存在：{imagePath}", resolvedImage);
                         var relative = Path.GetRelativePath(projectRoot, resolvedImage);
