@@ -292,6 +292,9 @@ internal sealed class RunInstanceRuntimeCoordinator : IDisposable
             }
         }
 
+        lock (_sync)
+            waits = _entries.Values.Select(entry => entry.Completion.Task).ToList();
+
         await Task.WhenAll(waits).ConfigureAwait(true);
     }
 
@@ -352,9 +355,16 @@ internal sealed class RunInstanceRuntimeCoordinator : IDisposable
     {
         lock (_sync)
         {
-            if (entry.Started || _shuttingDown || _disposed)
+            if (entry.Started || _disposed)
                 return;
             entry.Started = true;
+        }
+
+        if (_shuttingDown)
+        {
+            var stop = _model.RequestStop(entry.InstanceId);
+            StateChanged?.Invoke(stop.Snapshot);
+            entry.Runner.Stop();
         }
 
         Exception? failure = null;
