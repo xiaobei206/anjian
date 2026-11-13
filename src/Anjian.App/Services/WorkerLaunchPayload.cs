@@ -5,8 +5,18 @@ using Anjian.Core.Plugins;
 
 namespace Anjian.App.Services;
 
+internal sealed class WorkerHandshake
+{
+    public string InstanceId { get; set; } = "";
+    public string WorkerAttemptId { get; set; } = "";
+    public string SessionNonce { get; set; } = "";
+}
+
 internal sealed class WorkerLaunchPayload
 {
+    public string InstanceId { get; set; } = "";
+    public string WorkerAttemptId { get; set; } = "";
+    public string SessionNonce { get; set; } = "";
     public LuaDebugLaunchOptions? DebugOptions { get; set; }
     public Dictionary<string, JsonElement> Parameters { get; set; } = new(StringComparer.Ordinal);
     public string? ModuleRootPath { get; set; }
