@@ -236,6 +236,8 @@ internal sealed class PlaybackRunner : IDisposable
         _workerAttemptId = handshake.WorkerAttemptId;
         _sessionNonce = handshake.SessionNonce;
         _workerReadyReceived = false;
+        StreamReader? reader = null;
+        StreamWriter? writer = null;
 
         try
         {
@@ -251,8 +253,8 @@ internal sealed class PlaybackRunner : IDisposable
                     $"Worker 在 {RunInstanceLimits.WorkerStartupTimeoutMilliseconds} ms 内未建立 IPC 连接。");
             }
 
-            using var reader = new StreamReader(server, new UTF8Encoding(false), false, 4096, leaveOpen: true);
-            using var writer = new StreamWriter(server, new UTF8Encoding(false), 4096, leaveOpen: true)
+            reader = new StreamReader(server, new UTF8Encoding(false), false, 4096, leaveOpen: true);
+            writer = new StreamWriter(server, new UTF8Encoding(false), 4096, leaveOpen: true)
             {
                 AutoFlush = true
             };
@@ -347,6 +349,11 @@ internal sealed class PlaybackRunner : IDisposable
                     }
                 }
             }
+
+            try { writer?.Dispose(); }
+            catch (IOException) { /* The Worker may close the pipe immediately after its final response. */ }
+            try { reader?.Dispose(); }
+            catch (IOException) { /* The peer can terminate without a final pipe shutdown handshake. */ }
 
             worker.Dispose();
             _worker = null;
