@@ -87,6 +87,8 @@ internal sealed class RunInstanceRuntimeCoordinator : IDisposable
 
     public int ActiveCount => _model.ActiveCount;
     public int QueuedCount => _model.QueuedCount;
+    public bool InputFaulted => _inputArbiter.IsFaulted;
+    public string? InputFaultReason => _inputArbiter.FaultReason;
     public bool CanAccept
     {
         get { lock (_sync) return !_shuttingDown && !_disposed && !_inputArbiter.IsFaulted && _model.CanAccept; }
