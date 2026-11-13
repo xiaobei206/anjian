@@ -173,7 +173,7 @@ public void ImagingApiDefaultsAndValidationAreRegistered()
  LuaApiRuntime.Register(lua,new WorkerLuaApi(new Recorder()));
  Assert.Equal("function",lua.DoString("return type(FindColor)")[0]?.ToString());
  Assert.Equal("function",lua.DoString("return type(WaitImage)")[0]?.ToString());
- var result=lua.DoString("local a=pcall(CompareColor, 'image', 0, 0, 0xFF0000, 256); local b=pcall(FindImage, 'image', 'template', 1.2, 0, 0, 0, 0, 0, 0, 1); local c=pcall(FindImage, 'image', 'template', 1, 0, 0, 0, 0, 1, false, 4.1); local d=pcall(WaitColor, 0xFF0000, 0, 0, 100, 21); return a,b,c,d");
+ var result=lua.DoString("local a=pcall(CompareColor, 'image', 0, 0, 0xFF0000, 256); local b=pcall(FindImage, 'image', 'template', 1.2, 0, 0, 0, 0, 0, 0, 1); local c=pcall(FindImage, 'image', 'template', 1, 0, 0, 0, 0, 0, 1, false, 4.1); local d=pcall(WaitColor, 0xFF0000, 0, 0, 100, 21); return a,b,c,d");
  Assert.False(Convert.ToBoolean(result[0]));
  Assert.False(Convert.ToBoolean(result[1]));
  Assert.False(Convert.ToBoolean(result[2]));
