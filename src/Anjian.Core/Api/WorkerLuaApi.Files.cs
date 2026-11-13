@@ -77,7 +77,7 @@ public sealed partial class WorkerLuaApi
 
     private bool RequestFileBoolean(string type, object payload)
     {
-        var response = pipe.Request(type, text: JsonSerializer.Serialize(payload, WindowApiJson.Options));
+        var response = pipe.Request(type, text: JsonSerializer.Serialize(payload));
         if (!bool.TryParse(response, out var result))
             throw new InvalidDataException($"文件 API {type} 返回了无效布尔值。");
         return result;
