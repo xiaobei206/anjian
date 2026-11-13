@@ -95,14 +95,20 @@ public sealed class SpritePackageBuilderTests
                 Author = "测试作者",
                 MinimumApiVersion = "0.7",
                 MinimumRuntimeVersion = "10.0",
+                RuntimeOptions = new SpritePackageRuntimeOptions(3, 250, "Ctrl+F10", false, true, 2, true, true),
                 OcrModelDirectories = new Dictionary<string, string> { ["en"] = ocrModels }
             });
 
             Assert.True(Directory.Exists(result.PackageDirectory));
             Assert.True(File.Exists(result.LauncherZip));
+            Assert.True(File.Exists(result.LauncherZipChecksumPath));
+            Assert.Contains("1.2.3", result.LauncherZipChecksumPath, StringComparison.Ordinal);
             Assert.True(File.Exists(Path.Combine(result.PackageDirectory, result.Manifest.LauncherExecutable)));
             Assert.Equal(2, result.Manifest.Entries.Count);
             Assert.Single(result.Manifest.OcrModels);
+            Assert.Equal(3, result.Manifest.RuntimeOptions.RepeatCount);
+            Assert.Equal("Ctrl+F10", result.Manifest.RuntimeOptions.StartupHotkey);
+            Assert.Equal(2, result.Manifest.RuntimeOptions.MaximumRetries);
             Assert.Contains(result.Manifest.Files, f => f.Path.EndsWith("en-det.onnx", StringComparison.Ordinal));
             Assert.NotNull(result.Manifest.Entries[0].ParameterSchemaPath);
 

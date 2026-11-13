@@ -8,14 +8,16 @@ internal sealed class ScriptParameterDialog : Form
 {
     private readonly ScriptParameterSchema _schema;
     private readonly string _scriptPath;
+    private readonly string? _configurationPath;
     private readonly Dictionary<string, Control> _fields = new(StringComparer.Ordinal);
     public IReadOnlyDictionary<string, JsonElement> Values { get; private set; } =
         new Dictionary<string, JsonElement>(StringComparer.Ordinal);
 
     public ScriptParameterDialog(string scriptPath, ScriptParameterSchema schema,
-        IReadOnlyDictionary<string, JsonElement> initialValues)
+        IReadOnlyDictionary<string, JsonElement> initialValues, string? configurationPath = null)
     {
         _scriptPath = scriptPath;
+        _configurationPath = configurationPath;
         _schema = schema;
         Text = "运行参数 - " + Path.GetFileName(scriptPath);
         StartPosition = FormStartPosition.CenterParent;
@@ -176,7 +178,7 @@ internal sealed class ScriptParameterDialog : Form
 
         try
         {
-            ParameterConfigurationStore.SaveAtomic(ScriptParameterService.ConfigurationPath(_scriptPath),
+            ParameterConfigurationStore.SaveAtomic(_configurationPath ?? ScriptParameterService.ConfigurationPath(_scriptPath),
                 new ParameterConfiguration { Values = validation.Values.ToDictionary(x => x.Key, x => x.Value, StringComparer.Ordinal) });
             Values = validation.Values;
             DialogResult = DialogResult.OK;

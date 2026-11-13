@@ -12,9 +12,14 @@ namespace Anjian.App.Services;
 internal sealed class PaddleOcrRecognitionService : IOcrRecognitionService
 {
     private readonly object _sync = new();
-    private readonly PaddleOcrServiceOptions _options = OcrModelPaths.CreateServiceOptions(offline: true);
+    private readonly PaddleOcrServiceOptions _options;
     private PaddleOcrService? _engine;
     private bool _disposed;
+
+    public PaddleOcrRecognitionService(string? modelCacheDirectory = null)
+    {
+        _options = OcrModelPaths.CreateServiceOptions(offline: true, modelCacheDirectory);
+    }
 
     public OcrRecognitionResult Recognize(ReadOnlyMemory<byte> pngBytes, string language, double minConfidence)
     {

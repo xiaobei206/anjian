@@ -9,9 +9,11 @@ internal static class OcrModelPaths
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "Anjian2026", "Ocr", "Models");
 
-    public static PaddleOcrServiceOptions CreateServiceOptions(bool offline) => new()
+    public static PaddleOcrServiceOptions CreateServiceOptions(bool offline, string? modelCacheDirectory = null) => new()
     {
-        ModelCachePath = CacheDirectory,
+        ModelCachePath = string.IsNullOrWhiteSpace(modelCacheDirectory)
+            ? CacheDirectory
+            : Path.GetFullPath(modelCacheDirectory),
         MaxResidentRecognizers = 1,
         MaxImagePixels = 16_000_000,
         ExecutionProvider = OcrExecutionProvider.Cpu,

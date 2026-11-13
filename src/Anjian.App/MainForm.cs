@@ -236,6 +236,7 @@ internal sealed class MainForm : Form
         toolbar.Controls.Add(MakeButton("图像资源", (_, _) => OpenImageResources()));
         toolbar.Controls.Add(MakeButton("OCR 模型", (_, _) => OpenOcrModelManager()));
         toolbar.Controls.Add(MakeButton("参数定义", (_, _) => OpenParameterDesigner()));
+        toolbar.Controls.Add(MakeButton("小精灵打包", (_, _) => OpenSpritePackager()));
         _visualDebugButton = MakeButton("视觉调试：关", (_, _) => ToggleVisualDebug());
         toolbar.Controls.Add(_visualDebugButton);
         toolbar.Controls.Add(MakeButton("返回悬浮窗", (_, _) => HideMainWindow(showFloatingWindow: true)));
@@ -1749,6 +1750,19 @@ internal sealed class MainForm : Form
         _applicationIcon?.Dispose();
         _applicationIcon = null;
         base.OnFormClosing(e);
+    }
+    private void OpenSpritePackager()
+    {
+        try
+        {
+            using var form = new SpritePackageBuilderForm(_repository.RootDirectory);
+            form.ShowDialog(this);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, "打开小精灵打包器失败：" + ex.Message,
+                "小精灵打包", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
     }
 }
 

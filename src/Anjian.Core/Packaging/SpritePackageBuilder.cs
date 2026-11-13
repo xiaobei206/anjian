@@ -2,6 +2,7 @@ using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Anjian.Core;
 using Anjian.Core.Imaging;
 using Anjian.Core.Parameters;
 
@@ -22,6 +23,7 @@ public sealed class SpritePackageBuildOptions
     public string? IconPath { get; init; }
     public string MinimumApiVersion { get; init; } = "0.7";
     public string MinimumRuntimeVersion { get; init; } = "10.0";
+    public SpritePackageRuntimeOptions RuntimeOptions { get; init; } = new(1, 0, null, false, true, 0, false, true);
     public IReadOnlyDictionary<string, string> OcrModelDirectories { get; init; } =
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 }
@@ -43,6 +45,16 @@ public sealed record SpritePackageEntry(
 
 public sealed record SpritePackageOcrModel(string Language, string RelativePath, IReadOnlyList<string> Files);
 
+public sealed record SpritePackageRuntimeOptions(
+    int RepeatCount,
+    int IntervalMilliseconds,
+    string? StartupHotkey,
+    bool AutoStart,
+    bool SingleInstance,
+    int MaximumRetries,
+    bool AdvancedLog,
+    bool CleanupOnExit);
+
 public sealed record SpritePackageManifest(
     int SchemaVersion,
     string PackageId,
@@ -56,6 +68,7 @@ public sealed record SpritePackageManifest(
     string? IconPath,
     string MinimumApiVersion,
     string MinimumRuntimeVersion,
+    SpritePackageRuntimeOptions RuntimeOptions,
     DateTimeOffset CreatedAtUtc,
     IReadOnlyList<SpritePackageEntry> Entries,
     IReadOnlyList<SpritePackageOcrModel> OcrModels,
@@ -64,6 +77,7 @@ public sealed record SpritePackageManifest(
 public sealed record SpritePackageBuildResult(
     string PackageDirectory,
     string LauncherZip,
+    string LauncherZipChecksumPath,
     SpritePackageManifest Manifest,
     IReadOnlyList<string> Warnings);
 
@@ -422,9 +436,9 @@ public static class SpritePackageBuilder
                 var source = Path.GetFullPath(model.Value);
                 if (!Directory.Exists(source))
                     throw new DirectoryNotFoundException($"已选择的 OCR 模型目录不存在：{source}");
-                var relative = "Content/Ocr/Models/" + language;
+                var relative = "Content/Ocr/Models";
                 var destination = ResolveWithin(staging, relative);
-                var modelFiles = CopyDirectory(source, destination);
+                var modelFiles = CopyDirectoryMerge(source, destination);
                 if (modelFiles.Count == 0)
                     throw new InvalidDataException($"OCR 模型目录为空：{source}");
                 ocrModels.Add(new SpritePackageOcrModel(language, relative, modelFiles));
@@ -458,7 +472,7 @@ public static class SpritePackageBuilder
                 .AppendLine($"Entries: {entryManifests.Count}")
                 .AppendLine($"Minimum API: {options.MinimumApiVersion}")
                 .AppendLine($"Minimum runtime: {options.MinimumRuntimeVersion}")
-                .AppendLine($"Runtime source: {runtimeRoot}")
+                .AppendLine("Runtime source: self-contained win-x64 publish directory")
                 .AppendLine($"Created: {DateTimeOffset.UtcNow:O}");
             foreach (var warning in warnings.Distinct(StringComparer.Ordinal))
                 buildLog.AppendLine("WARNING: " + warning);
@@ -495,6 +509,7 @@ public static class SpritePackageBuilder
                 iconRelative,
                 options.MinimumApiVersion.Trim(),
                 options.MinimumRuntimeVersion.Trim(),
+                options.RuntimeOptions,
                 DateTimeOffset.UtcNow,
                 entryManifests,
                 ocrModels,
@@ -521,12 +536,17 @@ public static class SpritePackageBuilder
             Directory.Move(staging, packageDirectory);
             ZipFile.CreateFromDirectory(packageDirectory, zipTemporary, CompressionLevel.Optimal, includeBaseDirectory: true);
             File.Move(zipTemporary, launcherZip);
-            return new(packageDirectory, launcherZip, manifest, warnings.Distinct(StringComparer.Ordinal).ToArray());
+            var zipChecksumPath = launcherZip + ".sha256";
+            WriteText(zipChecksumPath, HashFile(launcherZip) + "  " + Path.GetFileName(launcherZip) + Environment.NewLine);
+            return new(packageDirectory, launcherZip, zipChecksumPath, manifest, warnings.Distinct(StringComparer.Ordinal).ToArray());
         }
         catch
         {
             try { if (Directory.Exists(staging)) Directory.Delete(staging, recursive: true); } catch (IOException) { }
+            try { if (Directory.Exists(packageDirectory)) Directory.Delete(packageDirectory, recursive: true); } catch (IOException) { }
             try { if (File.Exists(zipTemporary)) File.Delete(zipTemporary); } catch (IOException) { }
+            try { if (File.Exists(launcherZip)) File.Delete(launcherZip); } catch (IOException) { }
+            try { if (File.Exists(launcherZip + ".sha256")) File.Delete(launcherZip + ".sha256"); } catch (IOException) { }
             throw;
         }
     }
@@ -554,7 +574,6 @@ public static class SpritePackageBuilder
         }
 
         var issues = new List<string>();
-        var manifestFiles = manifest.Files ?? [];
         if (manifest.SchemaVersion != CurrentManifestVersion)
             issues.Add($"不支持 manifest schema 版本 {manifest.SchemaVersion}。");
         if (string.IsNullOrWhiteSpace(manifest.PackageId) || string.IsNullOrWhiteSpace(manifest.ProductName))
@@ -566,7 +585,7 @@ public static class SpritePackageBuilder
 
         var declared = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         long totalBytes = 0;
-        foreach (var file in manifestFiles)
+        foreach (var file in manifest.Files ?? [])
         {
             if (!IsSafeRelativePath(file.Path) || !declared.Add(file.Path))
             {
@@ -593,7 +612,7 @@ public static class SpritePackageBuilder
 
         if (totalBytes > MaximumPackageBytes)
             issues.Add("已验证文件总大小超过限制。");
-        if (manifestFiles.Count > MaximumPackageFiles)
+        if (manifest.Files.Count > MaximumPackageFiles)
             issues.Add("manifest 文件数超过限制。");
 
         var manifestRelative = ManifestFileName;
@@ -653,15 +672,82 @@ public static class SpritePackageBuilder
             }
         }
 
+        var requiredRuntimeFiles = new[]
+        {
+            "Anjian.App.dll", "Anjian.App.deps.json", "Anjian.App.runtimeconfig.json",
+            "hostfxr.dll", "coreclr.dll"
+        };
+        foreach (var required in requiredRuntimeFiles)
+        {
+            if (!declared.Contains(required))
+                issues.Add("运行时清单缺少必要文件：" + required);
+        }
+
         foreach (var entry in manifest.Entries ?? [])
         {
             if (!IsSafeRelativePath(entry.ScriptPath) || !File.Exists(ResolveWithin(root, entry.ScriptPath)))
                 issues.Add("入口脚本缺失或路径无效：" + entry.ScriptPath);
             if (!IsSafeRelativePath(entry.ModuleRootPath) || !Directory.Exists(ResolveWithin(root, entry.ModuleRootPath)))
                 issues.Add("模块目录缺失或路径无效：" + entry.ModuleRootPath);
-            if (entry.ParameterSchemaPath is not null &&
-                (!IsSafeRelativePath(entry.ParameterSchemaPath) || !File.Exists(ResolveWithin(root, entry.ParameterSchemaPath))))
-                issues.Add("参数定义缺失或路径无效：" + entry.ParameterSchemaPath);
+            if (entry.ParameterSchemaPath is not null)
+            {
+                if (!IsSafeRelativePath(entry.ParameterSchemaPath) || !File.Exists(ResolveWithin(root, entry.ParameterSchemaPath)))
+                {
+                    issues.Add("参数定义缺失或路径无效：" + entry.ParameterSchemaPath);
+                }
+                else
+                {
+                    try
+                    {
+                        var schema = JsonSerializer.Deserialize<ScriptParameterSchema>(
+                            File.ReadAllText(ResolveWithin(root, entry.ParameterSchemaPath)), JsonOptions)
+                            ?? throw new InvalidDataException("参数定义为空。");
+                        var schemaIssues = ScriptParameterValidator.ValidateSchema(schema);
+                        if (schemaIssues.Count > 0)
+                            issues.Add("参数定义无效：" + entry.ParameterSchemaPath + "：" +
+                                string.Join("；", schemaIssues.Select(x => x.Label + "：" + x.Message)));
+                    }
+                    catch (Exception ex) when (ex is IOException or JsonException or InvalidDataException)
+                    {
+                        issues.Add("参数定义无法读取：" + entry.ParameterSchemaPath + "：" + ex.Message);
+                    }
+                }
+            }
+            if (entry.ImageManifestPath is not null)
+            {
+                if (!IsSafeRelativePath(entry.ImageManifestPath) || !File.Exists(ResolveWithin(root, entry.ImageManifestPath)))
+                {
+                    issues.Add("图像资源清单缺失或路径无效：" + entry.ImageManifestPath);
+                }
+                else
+                {
+                    try
+                    {
+                        var catalog = new ImageResourceCatalog(ResolveWithin(root, entry.ScriptPath));
+                        var invalidResources = catalog.ValidateAll().Where(x => x.Status != "valid").ToArray();
+                        if (invalidResources.Length > 0)
+                            issues.Add("图像资源清单校验失败：" + string.Join("；", invalidResources.Select(x => x.Name + "：" + x.Message)));
+                    }
+                    catch (Exception ex) when (ex is IOException or JsonException or InvalidDataException or ArgumentException)
+                    {
+                        issues.Add("图像资源清单无法读取：" + entry.ImageManifestPath + "：" + ex.Message);
+                    }
+                }
+            }
+        }
+
+        foreach (var model in manifest.OcrModels ?? [])
+        {
+            if (!IsSafeRelativePath(model.RelativePath) || !Directory.Exists(ResolveWithin(root, model.RelativePath)))
+            {
+                issues.Add("OCR 模型目录缺失或路径无效：" + model.RelativePath);
+                continue;
+            }
+            foreach (var file in model.Files ?? [])
+            {
+                if (!IsSafeRelativePath(file) || !File.Exists(ResolveWithin(ResolveWithin(root, model.RelativePath), file)))
+                    issues.Add("OCR 模型文件缺失或路径无效：" + model.Language + "/" + file);
+            }
         }
 
         return issues;
@@ -685,6 +771,14 @@ public static class SpritePackageBuilder
             throw new InvalidDataException("最低 API 版本不能为空或过长。");
         if (string.IsNullOrWhiteSpace(options.MinimumRuntimeVersion) || options.MinimumRuntimeVersion.Length > 32)
             throw new InvalidDataException("最低运行时版本不能为空或过长。");
+        if (options.RuntimeOptions.RepeatCount is < 0 or > PlaybackOptions.MaximumRepeatCount)
+            throw new InvalidDataException($"重复次数必须为 0–{PlaybackOptions.MaximumRepeatCount}（0 表示无限）。");
+        if (options.RuntimeOptions.IntervalMilliseconds is < 0 or > PlaybackOptions.MaximumIntervalMilliseconds)
+            throw new InvalidDataException($"轮间隔必须为 0–{PlaybackOptions.MaximumIntervalMilliseconds} ms。");
+        if (options.RuntimeOptions.MaximumRetries is < 0 or > 20)
+            throw new InvalidDataException("失败重试次数必须为 0–20。");
+        if (!options.RuntimeOptions.CleanupOnExit)
+            throw new InvalidDataException("退出时释放 Worker 和模拟输入是必需安全项，不能关闭。");
         EnsureSelfContainedRuntime(options.RuntimeDirectory);
     }
 
@@ -775,6 +869,19 @@ public static class SpritePackageBuilder
             var destination = ResolveWithin(destinationDirectory, relative);
             CopyFile(source, destination);
             copied.Add(ToPackagePath(Path.GetRelativePath(destinationDirectory, destination)));
+        }
+        return copied;
+    }
+
+    private static IReadOnlyList<string> CopyDirectoryMerge(string sourceDirectory, string destinationDirectory)
+    {
+        var copied = new List<string>();
+        foreach (var source in EnumeratePackageFiles(sourceDirectory))
+        {
+            var relative = Path.GetRelativePath(sourceDirectory, source);
+            var destination = ResolveWithin(destinationDirectory, relative);
+            CopyFileIfMissing(source, destination);
+            copied.Add(ToPackagePath(relative));
         }
         return copied;
     }
