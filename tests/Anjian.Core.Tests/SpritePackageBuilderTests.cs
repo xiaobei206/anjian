@@ -105,6 +105,7 @@ public sealed class SpritePackageBuilderTests
             Assert.True(File.Exists(result.LauncherZipChecksumPath));
             Assert.Contains("1.2.3", result.LauncherZipChecksumPath, StringComparison.Ordinal);
             Assert.True(File.Exists(Path.Combine(result.PackageDirectory, result.Manifest.LauncherExecutable)));
+            Assert.True(File.Exists(Path.Combine(result.PackageDirectory, "Content", "Help", "FUNCTION-REFERENCE-CN.md")));
             Assert.Equal(2, result.Manifest.Entries.Count);
             Assert.Single(result.Manifest.OcrModels);
             Assert.Equal(3, result.Manifest.RuntimeOptions.RepeatCount);
@@ -409,7 +410,8 @@ public sealed class SpritePackageBuilderTests
             "Anjian.App.deps.json",
             "Anjian.App.runtimeconfig.json",
             "hostfxr.dll",
-            "coreclr.dll"
+            "coreclr.dll",
+            "FUNCTION-REFERENCE-CN.md"
         })
         {
             File.WriteAllText(Path.Combine(directory, file), "runtime:" + file);

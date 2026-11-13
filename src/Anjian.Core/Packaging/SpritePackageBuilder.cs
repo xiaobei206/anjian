@@ -491,6 +491,7 @@ public static class SpritePackageBuilder
                 .AppendLine("启动方式：双击 " + launcherName)
                 .AppendLine("本包采用 .NET 10 自包含文件夹运行时；EXE 是启动入口，不是单文件程序。请保留全部伴随文件和 Content 目录。")
                 .AppendLine("运行参数与用户配置存放在 %LOCALAPPDATA%\\Anjian2026\\Sprites，不写入本发布目录。")
+                .AppendLine("离线函数参考：Content/Help/FUNCTION-REFERENCE-CN.md")
                 .AppendLine("完整性检查：使用随包提供的 SHA256SUMS.txt 验证文件。")
                 .AppendLine();
             WriteText(Path.Combine(staging, "README-Sprite.txt"), readme.ToString());
@@ -688,7 +689,7 @@ public static class SpritePackageBuilder
         var requiredRuntimeFiles = new[]
         {
             "Anjian.App.dll", "Anjian.App.deps.json", "Anjian.App.runtimeconfig.json",
-            "hostfxr.dll", "coreclr.dll"
+            "hostfxr.dll", "coreclr.dll", "Content/Help/FUNCTION-REFERENCE-CN.md"
         };
         foreach (var required in requiredRuntimeFiles)
         {
@@ -868,6 +869,8 @@ public static class SpritePackageBuilder
             var name = Path.GetFileName(source);
             if (name.Equals("Anjian.App.exe", StringComparison.OrdinalIgnoreCase))
                 relative = Path.Combine(Path.GetDirectoryName(relative) ?? "", launcherName);
+            else if (name.Equals("FUNCTION-REFERENCE-CN.md", StringComparison.OrdinalIgnoreCase))
+                relative = Path.Combine("Content", "Help", name);
             var destination = ResolveWithin(destinationRoot, relative);
             CopyFile(source, destination);
         }
@@ -962,6 +965,7 @@ public static class SpritePackageBuilder
     {
         var relative = ToPackagePath(Path.GetRelativePath(root, path));
         if (relative.StartsWith("Content/Ocr/", StringComparison.OrdinalIgnoreCase)) return "ocr-model";
+        if (relative.StartsWith("Content/Help/", StringComparison.OrdinalIgnoreCase)) return "offline-help";
         if (relative.StartsWith("Content/Entries/", StringComparison.OrdinalIgnoreCase))
         {
             if (relative.EndsWith(".params.json", StringComparison.OrdinalIgnoreCase)) return "parameter-schema";
