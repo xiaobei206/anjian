@@ -115,10 +115,13 @@ public sealed class ScriptProcessTests
         Assert.True(File.Exists(ping), "Windows ping.exe must be available on the CI runner.");
         var grant = new ScriptPermissionGrant([], [], false, false, [], [Path.GetFullPath(ping)], [], [], false);
         using var session = new ScriptProcessSession();
+        using var otherInstanceSession = new ScriptProcessSession();
         var start = new ScriptProcessStartRequest(Path.GetFullPath(ping), ["-n", "12", "127.0.0.1"]);
         var payload = JsonSerializer.Serialize(start);
         var handle = JsonSerializer.Deserialize<string>(session.Start(grant, Path.GetTempPath(), payload));
         Assert.False(string.IsNullOrWhiteSpace(handle));
+        var handlePayload = JsonSerializer.Serialize(new ScriptProcessHandleRequest(handle!));
+        Assert.Throws<UnauthorizedAccessException>(() => otherInstanceSession.GetInfo(grant, handlePayload));
 
         using var initial = JsonDocument.Parse(session.GetInfo(grant,
             JsonSerializer.Serialize(new ScriptProcessHandleRequest(handle!))));
