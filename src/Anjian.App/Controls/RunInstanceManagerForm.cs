@@ -214,11 +214,16 @@ internal sealed class RunInstanceManagerForm : Form
         _lastStatuses = _coordinator.GetInstanceStatuses();
         var scriptText = _scriptFilter.Text.Trim();
         var stateText = _stateFilter.SelectedItem as string ?? "全部状态";
-        var filtered = _lastStatuses
-            .Where(status => string.IsNullOrWhiteSpace(scriptText) ||
-                status.ScriptPath.Contains(scriptText, StringComparison.OrdinalIgnoreCase) ||
-                Path.GetFileName(status.ScriptPath).Contains(scriptText, StringComparison.OrdinalIgnoreCase))
-            .Where(status => MatchesStateFilter(status, stateText))
+        var filteredDescriptors = RunInstanceListQuery.Filter(
+            _coordinator.GetInstances(),
+            scriptText,
+            snapshot => MatchesSnapshotFilter(snapshot, stateText));
+        var visibleIds = filteredDescriptors.Select(item => item.InstanceId).ToHashSet();
+        var statusesById = _lastStatuses.ToDictionary(status => status.InstanceId);
+        var filtered = filteredDescriptors
+            .Where(descriptor => statusesById.ContainsKey(descriptor.InstanceId))
+            .Select(descriptor => statusesById[descriptor.InstanceId])
+            .Where(status => visibleIds.Contains(status.InstanceId))
             .OrderByDescending(status => status.CreatedAtUtc)
             .ToArray();
 
@@ -374,11 +379,10 @@ internal sealed class RunInstanceManagerForm : Form
         };
     }
 
-    private static bool MatchesStateFilter(RunInstanceRuntimeStatus status, string filter)
+    private static bool MatchesSnapshotFilter(RunInstanceSnapshot snapshot, string filter)
     {
         if (filter == "全部状态")
             return true;
-        var snapshot = status.Snapshot;
         return filter switch
         {
             "排队" => snapshot.State == RunInstanceState.Queued,
