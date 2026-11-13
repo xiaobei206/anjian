@@ -609,3 +609,22 @@ M4 基础调试器与 M5 可视化录制/动作列表均已完成 Windows CI 验
 - M9 Windows Actions run 43363150335：Restore、Release Build（0 warnings/0 errors）、90/90 Core tests、API handbook check、self-contained win-x64、ZIP/SHA256 和 artifact upload 全 PASS；真实桌面仍 NOT RUN。
 - M10 先冻结 ADR-022：脚本旁版本化 params schema、独立用户运行配置、10 种参数类型、统一 Core validator、启动前拒绝、typed Worker IPC、Lua 只读 Args、原子写入/备份/损坏恢复/未知 schema 保护和敏感字段脱敏。
 - 当前阶段仅完成规格与验收定义；代码和 Windows CI 尚未验证，不得标记 M10 完成。接下来实现 Core schema/validator/store 和测试，再接入 Worker/UI。
+
+
+## 2026-11-13 — M10 首轮参数 schema / UI / Worker 集成
+
+### 已进入 main
+- ADR-022 冻结 sidecar schema v1：`<script>.params.json`，独立于 Lua 源码；读取定义不执行脚本。
+- 新增 Core `ScriptParameterSchema`、`ScriptParameterValidator`、`ParameterConfigurationStore`、`LuaParameterInjector`。支持 text/integer/number/boolean/select/multiSelect/filePath/directoryPath/hotkey/color；范围、必填、选项、重复多选、路径存在性、热键/颜色格式、文本正则均有统一验证入口。
+- 配置按脚本路径 SHA-256 派生键保存于 LocalAppData；原子写入、有效备份、损坏恢复；未来 schema 版本拒绝读取/覆盖，保护原文件。导入配置先完整验证。
+- WinForms 新增“参数定义”按钮、DataGridView 参数设计器和 schema 驱动运行表单；播放与调试均在启动 Worker 前收集并验证参数，取消/错误不启动 Worker。表单支持恢复默认、JSON 导入/导出、文件/目录选择与敏感字段遮蔽/导出确认。
+- Worker 启动握手通过结构化 JSON 传递已验证值，Lua 获得原生类型 `Args`；不将用户字符串拼接为 Lua 源码。常规顶层/嵌套赋值会被只读代理拒绝；这不是安全沙箱。敏感配置目前本地明文保存，不进入普通运行日志。
+- 没有新增公开 Lua API，因此 API registry 仍为 0.7 / 81 项，函数手册不需要变更。
+
+### CI 失败与修复
+- 初次 Build 因 JSON 反序列化可产生 null ID 而触发 CS8604；所有字段级错误构造改为安全 ID 回退。
+- 后续 Build 发现参数设计器的辅助方法 `Text(DataGridViewRow, string)` 隐藏了 Form.Text 并导致编译错误；改名为 `CellText`。
+- 测试编译发现 JSON 字符串字面量转义错误，修复测试输入；测试又揭示配置读取未使用 Web JSON options（camelCase 配置丢失 Values）以及未来 schema 测试未预置有效备份，已修正序列化读取和测试夹具。
+- run [43366381240](https://github.com/xiaobei206/anjian/actions/runs/43366381240) 对 M10 代码基线通过：Restore PASS、Release Build 0 warnings/0 errors、98/98 Core tests、API handbook check、自包含 win-x64 发布、ZIP/SHA256 和 artifact upload 全 PASS；artifact ID 14011010562，87,098,604 bytes，digest `7d5f988b7cdaabd3f0c3db2fe3f9b8c1ecb2fb205ee9963ca3614c745dc12b17`。
+- 随后增加数值/相对路径/正则与可选空值的 2 项 Core tests；最新 run [43366600434](https://github.com/xiaobei206/anjian/actions/runs/43366600434) 仍待结果。本地环境没有 .NET SDK，本地 Build/Test NOT RUN。
+- M10-01..M10-10 的 Windows 桌面验收仍 NOT RUN，延期至 M14 后；未修改 VERSION、未创建 Release。

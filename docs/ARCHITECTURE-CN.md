@@ -318,3 +318,14 @@ preview.4 当前采用低级鼠标/键盘 Hook，已纳入 Windows CI 编译与�
 - 配置写入采用同目录临时文件、flush 和原子替换；保留上一份有效备份。损坏时先尝试恢复备份，失败后可用默认值但须明确告知用户；未知未来 schema 不得写回/覆盖。
 - JSON 导入只接收受限大小的 UTF-8 JSON，校验后才能替换配置；导出使用同 schema/validator。迁移必须保留原文件副本，失败则回滚。
 - M11 小精灵参数 UI 直接复用 Core schema/validator，不能另造第二套参数定义或校验语义。
+
+
+### 15.5 当前 main 实现映射（M10 首轮）
+- `src/Anjian.Core/Parameters/ScriptParameterSchema.cs`：schema DTO 和单一类型验证器。
+- `src/Anjian.Core/Parameters/ParameterConfigurationStore.cs`：1 MiB 上限、原子替换、上一份有效备份、损坏恢复和未来版本拒绝。
+- `src/Anjian.Core/Parameters/LuaParameterInjector.cs`：递归构建 Lua 表，常规赋值经 proxy 抛错；Lua 标准库中的 `rawset`/debug 能力意味着这不是恶意脚本沙箱。
+- `src/Anjian.App/Services/ScriptParameterService.cs`：sidecar `<script>.params.json` 与 LocalAppData 用户配置路径解析。
+- `src/Anjian.App/Controls/ScriptParameterDesignerForm.cs`：参数定义表格编辑、类型选择、JSON 默认值、范围、选项、正则、敏感标记和排序。
+- `src/Anjian.App/Controls/ScriptParameterDialog.cs`：由 schema 生成的运行表单、文件/目录选择、恢复默认、JSON 导入/导出和敏感值导出确认。
+- `PlaybackRunner` 的 worker-ready 握手将已验证参数作为独立 JSON payload 传递；`WorkerProgram` 注入 `Args`。MainForm 在播放和调试前先收集参数。
+- 配置文件为本地 JSON 明文；Sensitive 只做 UI 遮蔽、导出提醒和日志不记录，不提供静态加密。

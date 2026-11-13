@@ -266,3 +266,81 @@ end
 - 单张 OCR 图像最多 16,000,000 像素；PNG IPC 最多 64 MiB。超大截图先 CropImage 缩小区域。
 - OCR 读取当前桌面可见合成画面；被遮挡窗口的后台像素不保证可见，不绕过 UIPI/UAC/安全桌面。
 - PaddleOcrNet 适配器只在独立 Lua Worker 中运行，主 UI 不执行 OCR 推理。桌面识别精度、速度、语言模型体积和长时间内存表现需要后续 Windows 10/11 集中实机验收。
+
+
+## 11. 脚本参数与自定义运行表单（M10，main 开发版）
+
+在主窗口选择脚本后，点击 **“参数定义”**。参数定义保存在 Lua 文件旁边，例如 `hello.lua` 对应 `hello.params.json`。读取参数定义不需要、也不会执行脚本。保存定义后点击“播放”或“启动调试”，程序会先显示运行参数表单；用户确认并通过验证后才会启动 Worker。
+
+### 参数定义示例
+
+以下是 `hello.params.json` 的内容示例（保存时参数设计器会自动生成相同 schema）：
+
+```json
+{
+  "SchemaVersion": 1,
+  "ScriptId": "hello",
+  "Parameters": [
+    {
+      "Id": "count",
+      "Name": "count",
+      "Label": "运行次数",
+      "Type": "integer",
+      "Required": true,
+      "DefaultValue": 3,
+      "Minimum": 1,
+      "Maximum": 20,
+      "Options": [],
+      "Description": "本次任务的循环次数",
+      "Order": 0
+    },
+    {
+      "Id": "enabled",
+      "Name": "enabled",
+      "Label": "启用操作",
+      "Type": "boolean",
+      "Required": false,
+      "DefaultValue": true,
+      "Options": [],
+      "Description": "关闭后只执行脚本中的非操作逻辑",
+      "Order": 1
+    },
+    {
+      "Id": "title",
+      "Name": "title",
+      "Label": "窗口标题",
+      "Type": "text",
+      "Required": true,
+      "DefaultValue": "记事本",
+      "Pattern": ".+",
+      "Options": [],
+      "Description": "示例文本参数",
+      "Order": 2
+    }
+  ]
+}
+```
+
+字段说明：
+- `Id`：定义内稳定 ID；`Name`：Lua 参数名，必须是唯一 Lua 标识符；`Label`：表单中文标签。
+- `Type`：`text`、`integer`、`number`、`boolean`、`select`、`multiSelect`、`filePath`、`directoryPath`、`hotkey` 或 `color`。
+- `Required`、`DefaultValue`、`Minimum`、`Maximum`、`Options`、`Pattern`、`MustExist`、`Sensitive`、`Description` 和 `Order` 控制校验、选项、路径存在性、敏感值遮蔽、帮助和排序。默认值必须是 JSON 原生类型，不要把数字/布尔值写成字符串。
+
+### 在 Lua 脚本中读取
+
+```lua
+Log("运行次数：" .. tostring(Args.count))
+Log("窗口标题：" .. Args.title)
+
+if Args.enabled then
+    Log("启用状态为 true")
+end
+```
+
+`Args` 由 Worker 启动握手注入，字符串不会被拼接成 Lua 源码；常规的顶层或嵌套赋值会报只读错误。它用于防止意外修改，不是对抗恶意脚本的安全沙箱。参数校验失败或用户取消表单时，不会启动 Worker。
+
+### 配置保存与安全
+- 用户填写值与 `.params.json` 定义分离，保存到 `%LOCALAPPDATA%\\Anjian2026\\ScriptParameters\\` 下按脚本路径散列命名的 JSON 配置。
+- 配置支持原子写入、上一份有效备份、损坏恢复、恢复默认、JSON 导入/导出。未知的未来配置版本会被拒绝，不会自动回退并覆盖原文件。
+- 标记为 `Sensitive` 的输入在表单中遮蔽，普通日志不记录参数值；导出时会询问是否包含敏感字段。当前本地配置文件**不加密**，不要把高敏感凭据保存在其中。
+- 当前功能已通过 Windows CI 自动化验证；参数表单的 DPI、文件/目录选择、真实播放/调试交互仍待 M14 后统一 Windows 10/11 桌面验收。
