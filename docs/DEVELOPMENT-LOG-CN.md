@@ -781,3 +781,8 @@ M4 基础调试器与 M5 可视化录制/动作列表均已完成 Windows CI 验
 - 同时审查发现 WaitProcess 的暂停时间不应消耗 timeout；后续修正改为每完成一个 pause-aware 等待片段才递减剩余预算，并新增暂停不消耗超时的自动化断言。此修正仍需下一轮 Windows CI 验证。
 
 - 第二轮修正准备前复核发现同一旧契约测试还有函数数量断言 99；随第二轮测试版本修正一并更新为 102，防止版本断言修复后继续暴露陈旧数量预期。
+
+### M12-08 第二轮 Windows Actions 构建结果（run 43414314883）
+- Restore PASS。
+- Build FAILED，0 warnings / 1 error：`ScriptProcessSession.cs(145,63)` 的 `Process` 类型无法解析（CS0246）。原因是调整 WaitProcess 暂停计时后移除了 `using System.Diagnostics`，但该文件仍使用 `System.Diagnostics.Process` 类型；下一提交补回 using。
+- Test 与 API handbook / publish / Sprite Worker / package/upload 因 Build 失败全部跳过。此 run 对应 commit 0f7a424da9481be2123bd1fedb3205eb04dda8ac；不能作为验证通过。

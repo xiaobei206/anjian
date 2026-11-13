@@ -652,3 +652,6 @@ M12-02 验收前不做剪贴板、对话框、进程、HTTP 或插件加载。�
 - 当前 M14 Windows 10/11 GUI、权限审批、Stop 后真实应用生命周期、DPI/UIPI 与多显示器实机验收仍 NOT RUN。
 
 - 补充修正：`ImagingApiDefaultsAndValidationAreRegistered` 同时存在旧 API 数量断言 99；已与版本断言一起更新为 102，第二轮 CI 将验证。
+
+
+- 第二轮 run [43414314883](https://github.com/xiaobei206/anjian/actions/runs/43414314883) 对 commit `0f7a424da9481be2123bd1fedb3205eb04dda8ac`：Restore PASS，Build 因 `ScriptProcessSession.cs` 缺少 `using System.Diagnostics` 导致 CS0246 失败（0 warnings / 1 error）；Test/后续步骤跳过。已定位，随下一修正提交补回引用。
