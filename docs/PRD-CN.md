@@ -163,6 +163,8 @@
 - 环境信息、屏幕/显示器信息、路径、应用版本、运行实例信息和诊断信息。
 - API 必须尊重路径边界、超时、错误处理和用户权限；不暴露任意 .NET 反射或不受控 Shell 执行作为默认脚本能力。
 
+**实现状态注记（main 开发版，2026-11-13；不缩减冻结范围）：** 首批已落地 ReadTextFile、WriteTextFile、AppendTextFile、FileExists、DirectoryExists、ListFiles、ListDirectories、CreateDirectory，并由 Worker 与主进程 IPC 双层检查文件读取/写入授权。文件文本采用严格 UTF-8 和 4 MiB 上限；目录枚举非递归并限制 1000 项。复制、移动、重命名、受控临时文件/目录仍是本节必需能力，安排在 M12-02B；剪贴板、对话框、进程和 HTTP API 仍待后续 M12 子任务。当前 main API registry 为 0.8 / 89 项，该开发版未改变已发布的 v0.1.0-preview.4。
+
 ### 2.12 插件与扩展命令
 
 - 提供正式的本地插件/命令包机制，可导入、启用、停用、升级和卸载。

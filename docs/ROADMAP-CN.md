@@ -238,23 +238,26 @@ M7 实现/CI 已完成不代表 M7-01..M7-10 Windows 桌面验收通过；这些
 ## M12–M13 — 扩展 API、插件和自动运行
 
 
-### M12 当前进度（2026-11-13；仅权限基础阶段）
+### M12 当前进度（2026-11-13；M12-02 首批文件 API 已实现，整体仍进行中）
 
-- M12-01 已进入 main：Core 权限请求/批准/Grant 数据模型、schema v1 解析和范围校验；每脚本可选 sidecar 为脚本名后缀 .permissions.json，最大 256 KiB，声明不代表授权。
-- MainForm 普通播放与调试启动前均调用权限审阅；审批每次运行重新进行，所有选项默认不勾选，取消即不运行。缺少 sidecar 时使用空授权；损坏/未来 schema/重解析点 sidecar 会拒绝启动。
-- Worker 启动载荷携带本次 ScriptPermissionGrant，并注入 WorkerLuaApi。目前没有公开文件/剪贴板/进程/HTTP 扩展 API，因此 grant 尚未用于任何新增 OS 操作；主进程 PlaybackRunner.DispatchAsync 二次授权拦截尚未实现，不得提前开放这些 API。
-- Windows Actions run [234](https://github.com/xiaobei206/anjian/actions/runs/43377155430) 对代码 HEAD 2a69776374abb9b472aa4db3b6bc5dd32c0f6a92 PASS：0 warnings / 0 errors、122/122 Core tests、API handbook check、自包含 win-x64 publish、小精灵 EXE/Worker smoke、ZIP/SHA256、artifact upload。Artifact ID 14014463955，87,176,294 bytes，SHA-256 c17f159787d8129031e97e364e991bec9a6ea3a72b9b612567867acd1d93d770。
-- API registry 仍为 0.7 / 81 项；本轮没有新公开 API，函数手册/IDE 注册表不需改动。
-- 权限审阅窗体的实机交互、文件系统链接/竞态防护以及 M1–M13 其余桌面验收继续 NOT RUN，统一留到 M14。小精灵 Launcher 尚未读取/审阅权限 sidecar。
+- M12-01 已完成并进入 main：Core 权限请求/批准/Grant 数据模型、schema v1 解析和范围校验；每脚本可选 sidecar 为脚本文件全名后缀 .permissions.json，最大 256 KiB，声明本身不代表授权。
+- 主程序普通播放/调试启动前逐项审阅本次请求，默认全不勾选、取消不启动 Worker；缺少 sidecar 使用空 Grant，损坏/未来 schema/重解析点 sidecar 拒绝启动。
+- M12-02 主机边界已接通：WorkerLuaApi 文件 bridge 发 IPC 前检查 Grant；PlaybackRunner 在每条文件/目录 IPC 上使用本轮 Grant 再检查，未知命令默认拒绝。SpriteLauncherForm 复用 PlaybackRunner；未提供 sidecar 的小精灵运行路径保持 Empty Grant，不会继承桌面主程序授权。
+- 第一批 8 个公开 Lua API：ReadTextFile、WriteTextFile、AppendTextFile、FileExists、DirectoryExists、ListFiles、ListDirectories、CreateDirectory。API registry 由 0.7/81 项升级为 main 开发版 0.8/89 项；FUNCTION-REFERENCE 已由注册表生成并通过一致性检查，IDE 补全/签名继续读取相同注册表。
+- Windows 文件适配：相对路径按脚本目录解析；拒绝设备/扩展设备路径、盘符相对路径与 NTFS ADS；使用 Windows OPEN_REPARSE_POINT 句柄逐级校验目录链和最终文件，目录句柄不共享删除以阻止路径链被重命名替换；拒绝 reparse point/符号链接及多硬链接文件。文本使用严格 UTF-8，单文件/写入文本上限 4 MiB；目录枚举非递归，最多检查 1000 项；目录创建只允许一级，父目录必须已存在；写入同目录临时文件、flush 后原子替换。该实现不是恶意同用户进程的完整 OS 沙箱。
+- Windows Actions run [237](https://github.com/xiaobei206/anjian/actions/runs/43379800469) 先验证主机文件适配与链接防护：Build 0 warnings/0 errors、132/132 Core tests、API handbook、自包含 win-x64、包内 Worker smoke、ZIP/SHA256 和 artifact upload 全 PASS（artifact ID 14015698410）。
+- Windows Actions run [241](https://github.com/xiaobei206/anjian/actions/runs/43381018127) 对最终首批 Lua API 代码 HEAD fdfa70db62870502d2d4a8211cc7d525effef3dc 全 PASS：Restore、Release Build 0 warnings/0 errors、134/134 Core tests、API handbook check、自包含 win-x64 publish、包内 Sprite/Worker smoke、ZIP/SHA256 和 artifact upload；artifact ID 14016840736，87,187,479 bytes，SHA-256 db2b6ac754543d9ca821434bb3f3edc98b4735e58359ebe843a1c25d9a692534。
+- 当前仍未实现文件复制/移动/重命名和受控临时路径；剪贴板/对话框、进程、HTTP 和插件系统都未开放。主程序权限窗口实际交互、小精灵逐次权限审阅以及 M1–M13 其他桌面验收继续 NOT RUN，统一留到 M14。没有改变 VERSION/AssemblyVersion/FileVersion，没有创建 tag/Release；v0.1.0-preview.4 发布资产保持不变。
 
 ### M12 后续实施顺序（必须按安全依赖推进）
 
-1. M12-02：先做文件/目录 API 与主进程 IPC 二次授权。Lua bridge 和 host dispatcher 对每个操作分别检查；规范化路径、目录边界、符号链接/reparse point 拒绝、写入原子性/大小限制、错误和 Stop 取消均要有测试。在二次校验未完成前，不注册可用文件 API。
+1. M12-02B：补齐文件复制/移动/重命名与受控临时文件/目录 API。源路径必须读取授权、目标路径必须写入授权；跨卷移动需先复制到目标目录临时文件、flush/校验成功后再删除源；所有路径继续拒绝 reparse point、符号链接和多硬链接文件，定义覆盖/同卷原子性/跨卷失败与取消语义；临时对象必须由调用者指定并获批的写入根创建，禁止未经授权直接暴露系统临时目录。
 2. 再做剪贴板与消息/输入/确认对话框，明确文本长度、STA/主 UI 线程调度、取消语义，并由 host 再检查权限。
 3. 再做精确 EXE 启动/等待/查询与 HTTP(S)/JSON；设置超时、响应大小上限、Stop 取消、重定向重新授权和不继承敏感代理凭据。
 4. 建立本地插件目录/ZIP manifest、稳定 ID、版本和 API 兼容、文件清单/hash、权限与脚本声明取交集、启停/卸载及错误隔离；不加载任意 DLL，不在主 UI 执行插件 Lua。
-5. 完成以上 API 后再统一更新 registry/API version、中文函数手册、IDE 提示/命令面板和契约测试。小精灵包构建与 Launcher 也必须校验/审阅插件和权限清单。
+5. 每批功能完成后同步 registry/API version、中文函数手册、IDE 提示/命令面板和契约测试；小精灵包构建与 Launcher 必须沿用同一 host Grant 校验策略，sidecar 逐次审阅仍需后续实现。
 6. Windows CI 覆盖授权和撤销、越界/链接路径、取消、超时、重定向、插件兼容和损坏包拒绝；桌面交互仍只记录在 M14 集中验收。
+
 
 - 增加有边界的文件/目录、剪贴板、对话框、进程、HTTP(S)/JSON 等常用 API。
 - 插件 manifest、权限提示、版本兼容、启停/卸载、错误隔离和文档注册。
