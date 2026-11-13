@@ -211,23 +211,27 @@ internal sealed class RunInstanceRuntimeCoordinator : IDisposable
 
     public void PauseSelected()
     {
-        Entry? entry;
+        RunInstanceSnapshot? snapshot = null;
         lock (_sync)
-            entry = GetSelectedEntryLocked();
-        if (entry is null || !_model.TryPause(entry.InstanceId, out var snapshot))
-            return;
-        entry.Runner.Pause();
+        {
+            var entry = GetSelectedEntryLocked();
+            if (entry is null || !_model.TryPause(entry.InstanceId, out snapshot))
+                return;
+            entry.Runner.Pause();
+        }
         StateChanged?.Invoke(snapshot);
     }
 
     public void ResumeSelected()
     {
-        Entry? entry;
+        RunInstanceSnapshot? snapshot = null;
         lock (_sync)
-            entry = GetSelectedEntryLocked();
-        if (entry is null || !_model.TryResume(entry.InstanceId, out var snapshot))
-            return;
-        entry.Runner.Resume();
+        {
+            var entry = GetSelectedEntryLocked();
+            if (entry is null || !_model.TryResume(entry.InstanceId, out snapshot))
+                return;
+            entry.Runner.Resume();
+        }
         StateChanged?.Invoke(snapshot);
     }
 
@@ -236,26 +240,28 @@ internal sealed class RunInstanceRuntimeCoordinator : IDisposable
 
     public void StopSelected()
     {
-        Entry? entry;
+        RunInstanceStopResult? stop = null;
         lock (_sync)
-            entry = GetSelectedEntryLocked();
-        if (entry is null)
-            return;
+        {
+            var entry = GetSelectedEntryLocked();
+            if (entry is null)
+                return;
 
-        var stop = _model.RequestStop(entry.InstanceId);
-        if (!stop.Changed)
-            return;
+            stop = _model.RequestStop(entry.InstanceId);
+            if (!stop.Changed)
+                return;
 
+            if (stop.WasQueued)
+            {
+                entry.Runner.Dispose();
+                entry.Completion.TrySetResult();
+            }
+            else
+            {
+                entry.Runner.Stop();
+            }
+        }
         StateChanged?.Invoke(stop.Snapshot);
-        if (stop.WasQueued)
-        {
-            entry.Runner.Dispose();
-            entry.Completion.TrySetResult();
-        }
-        else
-        {
-            entry.Runner.Stop();
-        }
     }
 
     public async Task StopSelectedAsync()
@@ -348,14 +354,22 @@ internal sealed class RunInstanceRuntimeCoordinator : IDisposable
         };
         runner.WorkerReady += () =>
         {
-            if (_model.TryMarkRunning(entry.InstanceId, out var snapshot))
+            RunInstanceSnapshot? snapshot = null;
+            lock (_sync)
+            {
+                if (_model.TryMarkRunning(entry.InstanceId, out var current))
+                    snapshot = current;
+            }
+            if (snapshot is not null)
                 StateChanged?.Invoke(snapshot);
         };
         runner.WorkerForceTerminating += () =>
         {
             try
             {
-                var snapshot = _model.MarkForceTerminating(entry.InstanceId);
+                RunInstanceSnapshot snapshot;
+                lock (_sync)
+                    snapshot = _model.MarkForceTerminating(entry.InstanceId);
                 StateChanged?.Invoke(snapshot);
             }
             catch (Exception ex)
@@ -411,29 +425,30 @@ internal sealed class RunInstanceRuntimeCoordinator : IDisposable
             try { entry.Runner.Dispose(); }
             catch (Exception ex) { PublishLog(entry.InstanceId, "实例释放资源失败：" + ex.Message); }
 
-            RunInstanceOutcome outcome;
+            Entry? promoted = null;
+            RunInstanceCompletion? completed = null;
             try
             {
-                var current = _model.GetSnapshot(entry.InstanceId);
-                outcome = current.Outcome != RunInstanceOutcome.None
-                    ? current.Outcome
-                    : failure is null ? RunInstanceOutcome.Succeeded : RunInstanceOutcome.Failed;
-                var cleanup = entry.Runner.LastCleanupSucceeded
-                    ? RunInstanceCleanupStatus.Succeeded
-                    : RunInstanceCleanupStatus.Failed;
-                var completed = _model.Complete(entry.InstanceId, outcome, cleanup);
-                StateChanged?.Invoke(completed.Completed);
-                entry.Completion.TrySetResult();
-                if (completed.Promoted is not null)
+                lock (_sync)
                 {
-                    Entry? promoted;
-                    lock (_sync)
+                    var current = _model.GetSnapshot(entry.InstanceId);
+                    var outcome = current.Outcome != RunInstanceOutcome.None
+                        ? current.Outcome
+                        : failure is null ? RunInstanceOutcome.Succeeded : RunInstanceOutcome.Failed;
+                    var cleanup = entry.Runner.LastCleanupSucceeded
+                        ? RunInstanceCleanupStatus.Succeeded
+                        : RunInstanceCleanupStatus.Failed;
+                    completed = _model.Complete(entry.InstanceId, outcome, cleanup);
+                    if (completed.Promoted is not null)
                         _entries.TryGetValue(completed.Promoted.InstanceId, out promoted);
-                    if (promoted is not null)
-                    {
-                        PublishLog(promoted.InstanceId, "FIFO 队列轮到本实例，开始 Worker 启动。");
-                        _ = StartEntryAsync(promoted);
-                    }
+                    entry.Completion.TrySetResult();
+                }
+
+                StateChanged?.Invoke(completed.Completed);
+                if (promoted is not null)
+                {
+                    PublishLog(promoted.InstanceId, "FIFO 队列轮到本实例，开始 Worker 启动。");
+                    _ = StartEntryAsync(promoted);
                 }
             }
             catch (Exception ex)
@@ -446,19 +461,23 @@ internal sealed class RunInstanceRuntimeCoordinator : IDisposable
 
     private void StopEntry(Entry entry)
     {
-        var stop = _model.RequestStop(entry.InstanceId);
-        if (!stop.Changed)
-            return;
+        RunInstanceStopResult stop;
+        lock (_sync)
+        {
+            stop = _model.RequestStop(entry.InstanceId);
+            if (!stop.Changed)
+                return;
+            if (stop.WasQueued)
+            {
+                entry.Runner.Dispose();
+                entry.Completion.TrySetResult();
+            }
+            else
+            {
+                entry.Runner.Stop();
+            }
+        }
         StateChanged?.Invoke(stop.Snapshot);
-        if (stop.WasQueued)
-        {
-            entry.Runner.Dispose();
-            entry.Completion.TrySetResult();
-        }
-        else
-        {
-            entry.Runner.Stop();
-        }
     }
 
     private RunInstanceSnapshot? SelectedSnapshot()
@@ -504,6 +523,28 @@ internal sealed class RunInstanceRuntimeCoordinator : IDisposable
             .FirstOrDefault();
         _selected = latest?.InstanceId ?? _selected;
     }
+
+    private static ScriptPermissionGrant CloneGrant(ScriptPermissionGrant grant) =>
+        new(
+            grant.FileReadRoots.ToArray(),
+            grant.FileWriteRoots.ToArray(),
+            grant.ClipboardRead,
+            grant.ClipboardWrite,
+            grant.Dialogs.ToArray(),
+            grant.ProcessExecutables.ToArray(),
+            grant.HttpHosts.ToArray(),
+            grant.HttpMethods.ToArray(),
+            grant.AllowInsecureHttp);
+
+    private static PluginWorkerRuntimeOptions? ClonePluginRuntimeOptions(PluginWorkerRuntimeOptions? options) =>
+        options is null ? null : new PluginWorkerRuntimeOptions
+        {
+            PackageRootPath = options.PackageRootPath,
+            EntryRelativePath = options.EntryRelativePath,
+            EntrySha256 = options.EntrySha256,
+            ModulesRootRelativePath = options.ModulesRootRelativePath,
+            ModuleHashes = new Dictionary<string, string>(options.ModuleHashes, StringComparer.OrdinalIgnoreCase)
+        };
 
     private void PublishLog(RunInstanceId instanceId, string message)
     {
