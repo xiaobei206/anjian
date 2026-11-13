@@ -907,8 +907,8 @@ internal sealed class RunInstanceRuntimeCoordinator : IDisposable
         switch (element.ValueKind)
         {
             case JsonValueKind.String:
-                if (element.GetString() is { Length: > 0 } value)
-                    yield return value;
+                if (element.GetString() is { Length: > 0 } stringValue)
+                    yield return stringValue;
                 yield return element.GetRawText();
                 break;
             case JsonValueKind.Number:
@@ -918,13 +918,13 @@ internal sealed class RunInstanceRuntimeCoordinator : IDisposable
                 break;
             case JsonValueKind.Array:
                 foreach (var item in element.EnumerateArray())
-                    foreach (var value in EnumerateSensitiveScalars(item))
-                        yield return value;
+                    foreach (var scalar in EnumerateSensitiveScalars(item))
+                        yield return scalar;
                 break;
             case JsonValueKind.Object:
                 foreach (var property in element.EnumerateObject())
-                    foreach (var value in EnumerateSensitiveScalars(property.Value))
-                        yield return value;
+                    foreach (var scalar in EnumerateSensitiveScalars(property.Value))
+                        yield return scalar;
                 break;
         }
     }

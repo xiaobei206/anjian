@@ -254,7 +254,7 @@ internal sealed class RunInstanceManagerForm : Form
                     status.RuntimeTimeout is null ? "关闭" : status.RuntimeTimeout.Value.ToString(),
                     status.LastDiagnostic ?? "");
                 _instances.Rows[index].Tag = status.InstanceId;
-                _instances.Rows[index].ToolTipText = status.LastDiagnostic ?? "";
+                _instances.Rows[index].Cells["Diagnostic"].ToolTipText = status.LastDiagnostic ?? "";
                 if (preserve == status.InstanceId)
                     _instances.Rows[index].Selected = true;
             }
