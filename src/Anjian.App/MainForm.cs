@@ -72,6 +72,7 @@ internal sealed class MainForm : Form
     private bool _suppressTabSelection;
     private VisualDebugOverlayForm? _visualDebugOverlay;
     private Button? _visualDebugButton;
+    private RunInstanceManagerForm? _runInstanceManager;
 
     private sealed class ScriptTab(ScriptEntry entry, TabPage page, LuaEditorControl editor)
     {
@@ -100,7 +101,12 @@ internal sealed class MainForm : Form
         _playback.SetUiOwner(this);
         RefreshPluginApiRegistry();
 
-        _playback.StateChanged += _ => Ui(SetIdle);
+        _playback.StateChanged += _ => Ui(() =>
+        {
+            SetIdle();
+            UpdateInstanceStatus();
+            _runInstanceManager?.RefreshFromCoordinator();
+        });
         _playback.Log += message => Ui(() =>
         {
             AppendLog(message);
@@ -180,6 +186,7 @@ internal sealed class MainForm : Form
         _playButton.Text = "▶ 播放";
         _playButton.Click += async (_, _) => await StartPlaybackAsync();
         toolbar.Controls.Add(_playButton);
+        toolbar.Controls.Add(MakeButton("运行实例", (_, _) => OpenRunInstanceManager()));
         toolbar.Controls.Add(MakeButton("定时任务", (_, _) => OpenScheduledTasks()));
 
         _pauseButton.Text = "暂停";
@@ -1263,6 +1270,10 @@ internal sealed class MainForm : Form
                 if (!TryCollectScriptParameters(scriptPath, out var parameters))
                 {
                     AppendLog($"定时任务“{occurrence.Task.Name}”参数表单已取消，本次触发不执行。");
+                    _playback.RecordGlobalLog(
+                        $"定时任务“{occurrence.Task.Name}”参数输入已取消或校验未通过；本次未创建实例。",
+                        RunInstanceLogLevel.Warning,
+                        "PARAMETER.CANCELLED_OR_INVALID");
                     completion.TrySetResult(null);
                     return;
                 }
@@ -1271,6 +1282,10 @@ internal sealed class MainForm : Form
                 if (!ScriptPermissionService.TryReview(this, scriptPath, out var permissions))
                 {
                     AppendLog($"定时任务“{occurrence.Task.Name}”权限审阅未获批准，本次触发不执行。");
+                    _playback.RecordGlobalLog(
+                        $"定时任务“{occurrence.Task.Name}”权限审阅被取消或未批准；本次未创建实例。",
+                        RunInstanceLogLevel.Warning,
+                        "PERMISSION.REJECTED");
                     completion.TrySetResult(null);
                     return;
                 }
@@ -1354,7 +1369,14 @@ internal sealed class MainForm : Form
         }
         if (!_playback.CanAccept || _current is null || !SaveCurrent()) return;
         var scriptPath = _current.FullPath;
-        if (!TryCollectScriptParameters(scriptPath, out var launchParameters)) return;
+        if (!TryCollectScriptParameters(scriptPath, out var launchParameters))
+        {
+            _playback.RecordGlobalLog(
+                "参数输入取消或启动前校验未通过；本次未创建运行实例。",
+                RunInstanceLogLevel.Warning,
+                "PARAMETER.CANCELLED_OR_INVALID");
+            return;
+        }
         var options = new PlaybackOptions
         {
             RepeatCount = (int)_repeatCount.Value,
@@ -1370,7 +1392,14 @@ internal sealed class MainForm : Form
             MessageBox.Show(this, "脚本内容为空。");
             return;
         }
-        if (!ScriptPermissionService.TryReview(this, scriptPath, out var launchPermissions)) return;
+        if (!ScriptPermissionService.TryReview(this, scriptPath, out var launchPermissions))
+        {
+            _playback.RecordGlobalLog(
+                "权限审阅被取消或未批准；本次未创建运行实例。",
+                RunInstanceLogLevel.Warning,
+                "PERMISSION.REJECTED");
+            return;
+        }
 
         SaveSettings();
         _playButton.Enabled = _playback.CanAccept;
@@ -1402,6 +1431,24 @@ internal sealed class MainForm : Form
         {
             SetIdle();
         }
+    }
+
+    private void OpenRunInstanceManager()
+    {
+        if (_runInstanceManager is null || _runInstanceManager.IsDisposed)
+        {
+            var manager = new RunInstanceManagerForm(_playback);
+            _runInstanceManager = manager;
+            manager.FormClosed += (_, _) =>
+            {
+                if (ReferenceEquals(_runInstanceManager, manager))
+                    _runInstanceManager = null;
+            };
+        }
+
+        _runInstanceManager.Show(this);
+        _runInstanceManager.BringToFront();
+        _runInstanceManager.RefreshFromCoordinator();
     }
 
     private void TogglePause()
@@ -1472,7 +1519,7 @@ internal sealed class MainForm : Form
             "全局键鼠输入因实例清理失败而锁定，其他实例暂时不能继续注入输入。\n\n" +
             "请先人工检查目标桌面，确认没有仍被按住的键或鼠标按钮，必要时手动释放。\n\n" +
             "故障原因：" + reason + "\n\n" +
-            "确认已检查并恢复物理键鼠状态后，才解除锁定。",
+            "确认已检查并恢复物理键鼠状态后，才解除锁定。此操作不会把失败实例的 CleanupStatus 改为成功。",
             "人工恢复键鼠输入",
             MessageBoxButtons.YesNo,
             MessageBoxIcon.Warning);
@@ -1987,6 +2034,11 @@ internal sealed class MainForm : Form
 
         SaveSettings();
         SaveCurrent();
+        if (_runInstanceManager is not null)
+        {
+            _runInstanceManager.Close();
+            _runInstanceManager = null;
+        }
         _playback.VisualDebugEnabled = false;
         _visualDebugOverlay?.Close();
         _visualDebugOverlay?.Dispose();

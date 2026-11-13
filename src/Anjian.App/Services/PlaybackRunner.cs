@@ -73,6 +73,9 @@ internal sealed class PlaybackRunner : IDisposable
     public event Action? WorkerReady;
     public event Action? WorkerForceTerminating;
     public bool LastCleanupSucceeded { get; private set; } = true;
+    public string? LastWorkerAttemptId { get; private set; }
+    public int? LastWorkerProcessId { get; private set; }
+    public int? LastWorkerExitCode { get; private set; }
     public bool IsWorkerAlive => _worker is { HasExited: false };
     public int? WorkerProcessId => _worker is { HasExited: false } process ? process.Id : null;
     public RunInstanceId InstanceId => _instanceId;
@@ -228,6 +231,8 @@ internal sealed class PlaybackRunner : IDisposable
         start.ArgumentList.Add(scriptPath);
         var worker = Process.Start(start) ?? throw new InvalidOperationException("无法启动脚本执行进程。");
         _worker = worker;
+        LastWorkerProcessId = worker.Id;
+        LastWorkerExitCode = null;
         var workerExitTask = worker.WaitForExitAsync();
 
         var handshake = new WorkerHandshake
@@ -237,6 +242,7 @@ internal sealed class PlaybackRunner : IDisposable
             SessionNonce = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant()
         };
         _workerAttemptId = handshake.WorkerAttemptId;
+        LastWorkerAttemptId = handshake.WorkerAttemptId;
         _sessionNonce = handshake.SessionNonce;
         _workerReadyReceived = false;
         StreamReader? reader = null;
@@ -390,6 +396,13 @@ internal sealed class PlaybackRunner : IDisposable
                     }
                 }
             }
+
+            if (worker.HasExited)
+            {
+                try { LastWorkerExitCode = worker.ExitCode; }
+                catch (InvalidOperationException) { LastWorkerExitCode = null; }
+            }
+            LastWorkerProcessId ??= worker.Id;
 
             try { writer?.Dispose(); }
             catch (IOException) { /* The Worker may close the pipe immediately after its final response. */ }

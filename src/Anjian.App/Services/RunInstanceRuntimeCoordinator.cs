@@ -9,6 +9,19 @@ using Anjian.Core.Runtime;
 
 namespace Anjian.App.Services;
 
+internal sealed record RunInstanceRuntimeStatus(
+    RunInstanceId InstanceId,
+    string ScriptPath,
+    DateTimeOffset CreatedAtUtc,
+    RunInstanceSnapshot Snapshot,
+    int CurrentIteration,
+    int TotalIterations,
+    string? WorkerAttemptId,
+    int? WorkerProcessId,
+    int? WorkerExitCode,
+    TimeSpan? RuntimeTimeout,
+    string? LastDiagnostic);
+
 internal sealed class RunInstanceRuntimeCoordinator : IDisposable
 {
     private sealed class Entry(
@@ -38,6 +51,10 @@ internal sealed class RunInstanceRuntimeCoordinator : IDisposable
         public SpriteWorkerRuntimeOptions? SpriteRuntimeOptions { get; } = spriteRuntimeOptions;
         public PluginWorkerRuntimeOptions? PluginRuntimeOptions { get; } = pluginRuntimeOptions;
         public bool Started { get; set; }
+        public int CurrentIteration { get; set; }
+        public int TotalIterations { get; set; }
+        public string? LastDiagnostic { get; set; }
+        public IReadOnlyList<string> SensitiveValues { get; set; } = [];
     }
 
     private readonly object _sync = new();
@@ -45,6 +62,7 @@ internal sealed class RunInstanceRuntimeCoordinator : IDisposable
     private readonly InputArbiter _inputArbiter = new();
     private readonly TimeProvider _timeProvider;
     private readonly RunInstanceTimeoutTracker _timeoutTracker;
+    private readonly RunInstanceLogStore _logStore = new();
     private readonly Dictionary<RunInstanceId, Entry> _entries = [];
     private RunInstanceId? _selected;
     private bool _shuttingDown;
@@ -61,6 +79,7 @@ internal sealed class RunInstanceRuntimeCoordinator : IDisposable
 
     public event Action<string>? Log;
     public event Action<RunInstanceId, string>? InstanceLog;
+    public event Action<RunInstanceLogEntry>? StructuredLogAdded;
     public event Action<RunInstanceSnapshot>? StateChanged;
     public event Action<int, int>? IterationChanged;
     public event Action<LuaDebugSnapshot>? DebugPaused;
@@ -211,6 +230,8 @@ internal sealed class RunInstanceRuntimeCoordinator : IDisposable
                 spriteRuntimeOptions,
                 ClonePluginRuntimeOptions(pluginRuntimeOptions),
                 runtimeTimeout);
+            entry.SensitiveValues = GetSensitiveParameterValues(fullPath, entry.Parameters);
+            entry.TotalIterations = options.RepeatCount;
             _entries.Add(entry.InstanceId, entry);
             _selected = entry.InstanceId;
             WireRunner(entry);
@@ -366,11 +387,119 @@ internal sealed class RunInstanceRuntimeCoordinator : IDisposable
 
     public IReadOnlyList<RunInstanceDescriptor> GetInstances() => _model.GetInstances();
 
+    public IReadOnlyList<RunInstanceRuntimeStatus> GetInstanceStatuses()
+    {
+        lock (_sync)
+        {
+            return _model.GetInstances()
+                .Select(descriptor =>
+                {
+                    if (!_entries.TryGetValue(descriptor.InstanceId, out var entry))
+                        return new RunInstanceRuntimeStatus(
+                            descriptor.InstanceId, descriptor.ScriptPath, descriptor.CreatedAtUtc,
+                            descriptor.Snapshot, 0, 0, null, null, null, null, null);
+
+                    var snapshot = descriptor.Snapshot;
+                    var diagnostic = entry.LastDiagnostic;
+                    if (snapshot.CleanupStatus == RunInstanceCleanupStatus.Failed)
+                        diagnostic = "实例清理失败：全局键鼠状态仍需人工核验；该实例的 CleanupStatus 保持 Failed。";
+                    else if (snapshot.TerminationMode == RunInstanceTerminationMode.Forced)
+                        diagnostic ??= "Worker 被强制终止，建议检查目标应用与该实例的执行日志。";
+                    else if (snapshot.Outcome == RunInstanceOutcome.TimedOut)
+                        diagnostic ??= "实例达到配置的运行超时。";
+                    else if (snapshot.Outcome == RunInstanceOutcome.Failed)
+                        diagnostic ??= "实例失败；请查看该实例日志。";
+
+                    return new RunInstanceRuntimeStatus(
+                        entry.InstanceId,
+                        entry.ScriptPath,
+                        descriptor.CreatedAtUtc,
+                        snapshot,
+                        entry.CurrentIteration,
+                        entry.TotalIterations,
+                        entry.Runner.LastWorkerAttemptId,
+                        entry.Runner.LastWorkerProcessId,
+                        entry.Runner.LastWorkerExitCode,
+                        entry.RuntimeTimeout,
+                        diagnostic);
+                })
+                .OrderByDescending(status => status.CreatedAtUtc)
+                .ToArray();
+        }
+    }
+
+    public IReadOnlyList<RunInstanceLogEntry> GetLogs(
+        RunInstanceId? instanceId = null,
+        RunInstanceLogLevel? level = null,
+        string? text = null,
+        int limit = 1_000,
+        bool includeGlobal = true) =>
+        _logStore.Query(instanceId, level, text, limit, includeGlobal);
+
+    public void RecordGlobalLog(
+        string message,
+        RunInstanceLogLevel level = RunInstanceLogLevel.Information,
+        string eventCode = "APP.EVENT")
+    {
+        var safeMessage = RunInstanceLogSanitizer.Sanitize(message);
+        var entry = new RunInstanceLogEntry(
+            _timeProvider.GetUtcNow(), level, eventCode, null, null, null, safeMessage);
+        _logStore.Add(entry);
+        StructuredLogAdded?.Invoke(entry);
+        Log?.Invoke(safeMessage);
+    }
+
+    public bool PauseInstance(RunInstanceId instanceId)
+    {
+        ArgumentNullException.ThrowIfNull(instanceId);
+        RunInstanceSnapshot snapshot;
+        lock (_sync)
+        {
+            if (!_entries.TryGetValue(instanceId, out var entry) ||
+                !_model.TryPause(instanceId, out snapshot))
+                return false;
+            entry.Runner.Pause();
+        }
+        StateChanged?.Invoke(snapshot);
+        return true;
+    }
+
+    public bool ResumeInstance(RunInstanceId instanceId)
+    {
+        ArgumentNullException.ThrowIfNull(instanceId);
+        RunInstanceSnapshot snapshot;
+        lock (_sync)
+        {
+            if (!_entries.TryGetValue(instanceId, out var entry) ||
+                !_model.TryResume(instanceId, out snapshot))
+                return false;
+            entry.Runner.Resume();
+        }
+        StateChanged?.Invoke(snapshot);
+        return true;
+    }
+
+    public async Task StopInstanceAsync(RunInstanceId instanceId)
+    {
+        ArgumentNullException.ThrowIfNull(instanceId);
+        Entry? entry;
+        lock (_sync)
+            _entries.TryGetValue(instanceId, out entry);
+        if (entry is null)
+            return;
+
+        StopEntry(entry);
+        await entry.Completion.Task.ConfigureAwait(true);
+    }
+
     public bool TryRecoverInputAfterManualAcknowledgement()
     {
         var recovered = _inputArbiter.TryRecoverAfterManualAcknowledgement();
         if (recovered)
-            Log?.Invoke("用户已确认键鼠状态恢复，全局输入仲裁解除故障锁定。");
+            RecordGlobalLog(
+                "用户明确确认已人工核验物理键鼠状态；全局 InputArbiter 锁定已解除。此前 CleanupStatus=Failed 的实例记录保持不变。",
+                RunInstanceLogLevel.Warning,
+                "INPUT.RECOVERY_CONFIRMED");
         return recovered;
     }
 
@@ -380,6 +509,14 @@ internal sealed class RunInstanceRuntimeCoordinator : IDisposable
         runner.Log += message => PublishLog(entry.InstanceId, message);
         runner.IterationChanged += (current, total) =>
         {
+            RunInstanceSnapshot snapshot;
+            lock (_sync)
+            {
+                entry.CurrentIteration = current;
+                entry.TotalIterations = total;
+                snapshot = _model.GetSnapshot(entry.InstanceId);
+            }
+            StateChanged?.Invoke(snapshot);
             if (SelectedInstanceId == entry.InstanceId)
                 IterationChanged?.Invoke(current, total);
         };
@@ -424,6 +561,7 @@ internal sealed class RunInstanceRuntimeCoordinator : IDisposable
                 RunInstanceSnapshot snapshot;
                 lock (_sync)
                     snapshot = _model.MarkForceTerminating(entry.InstanceId);
+                PublishLog(entry.InstanceId, "Worker 超过正常退出宽限，已强制终止；请检查目标应用与该实例诊断。");
                 StateChanged?.Invoke(snapshot);
             }
             catch (Exception ex)
@@ -553,6 +691,8 @@ internal sealed class RunInstanceRuntimeCoordinator : IDisposable
                     entry.Completion.TrySetResult();
                 }
 
+                if (completed.Completed.CleanupStatus == RunInstanceCleanupStatus.Failed)
+                    PublishLog(entry.InstanceId, "严重：实例输入清理失败；全局 InputArbiter 已锁定，必须人工检查物理键鼠状态。此前清理失败记录不会因人工恢复而改写。");
                 StateChanged?.Invoke(completed.Completed);
                 if (promoted is not null)
                 {
@@ -659,8 +799,128 @@ internal sealed class RunInstanceRuntimeCoordinator : IDisposable
 
     private void PublishLog(RunInstanceId instanceId, string message)
     {
-        InstanceLog?.Invoke(instanceId, message);
-        Log?.Invoke($"[{instanceId.Value[..8]}] {message}");
+        Entry? entry;
+        lock (_sync)
+            _entries.TryGetValue(instanceId, out entry);
+
+        var safeMessage = RunInstanceLogSanitizer.Sanitize(message, entry?.SensitiveValues);
+        var (level, eventCode) = ClassifyLog(safeMessage);
+        var structured = new RunInstanceLogEntry(
+            _timeProvider.GetUtcNow(),
+            level,
+            eventCode,
+            instanceId,
+            entry?.Runner.LastWorkerAttemptId,
+            entry is { CurrentIteration: > 0 } ? entry.CurrentIteration : null,
+            safeMessage);
+        _logStore.Add(structured);
+
+        if ((level is RunInstanceLogLevel.Warning or RunInstanceLogLevel.Error) && entry is not null)
+        {
+            lock (_sync)
+                if (_entries.TryGetValue(instanceId, out var current))
+                    current.LastDiagnostic = safeMessage;
+        }
+
+        StructuredLogAdded?.Invoke(structured);
+        InstanceLog?.Invoke(instanceId, safeMessage);
+        Log?.Invoke($"[{instanceId.Value[..8]}] {safeMessage}");
+    }
+
+    private static (RunInstanceLogLevel Level, string EventCode) ClassifyLog(string message)
+    {
+        if (message.Contains("清理失败", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("未能全部释放", StringComparison.OrdinalIgnoreCase))
+            return (RunInstanceLogLevel.Error, "INPUT.CLEANUP_FAILED");
+        if (message.Contains("强制终止", StringComparison.OrdinalIgnoreCase))
+            return (RunInstanceLogLevel.Warning, "WORKER.FORCED");
+        if (message.Contains("运行超时", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("达到运行超时", StringComparison.OrdinalIgnoreCase))
+            return (RunInstanceLogLevel.Warning, "RUN.TIMEOUT");
+        if (message.Contains("意外退出", StringComparison.OrdinalIgnoreCase) ||
+            (message.Contains("Worker", StringComparison.OrdinalIgnoreCase) &&
+             message.Contains("退出代码", StringComparison.OrdinalIgnoreCase)))
+            return (RunInstanceLogLevel.Error, "WORKER.CRASH");
+        if (message.Contains("拒绝", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("未获批准", StringComparison.OrdinalIgnoreCase))
+            return (RunInstanceLogLevel.Warning, "PERMISSION.REJECTED");
+        if (message.Contains("失败", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("异常", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("错误", StringComparison.OrdinalIgnoreCase))
+            return (RunInstanceLogLevel.Error, "RUN.ERROR");
+        if (message.Contains("停止", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("取消", StringComparison.OrdinalIgnoreCase))
+            return (RunInstanceLogLevel.Warning, "RUN.STOP");
+        if (message.Contains("完成", StringComparison.OrdinalIgnoreCase))
+            return (RunInstanceLogLevel.Information, "RUN.COMPLETED");
+        if (message.Contains("队列", StringComparison.OrdinalIgnoreCase))
+            return (RunInstanceLogLevel.Information, "RUN.QUEUED");
+        return (RunInstanceLogLevel.Information, "SCRIPT.MESSAGE");
+    }
+
+    private static IReadOnlyList<string> GetSensitiveParameterValues(
+        string scriptPath,
+        IReadOnlyDictionary<string, JsonElement> parameters)
+    {
+        if (parameters.Count == 0)
+            return [];
+
+        var schemaPath = ScriptParameterService.SchemaPath(scriptPath);
+        if (!File.Exists(schemaPath))
+            return [];
+
+        try
+        {
+            var schema = ScriptParameterService.LoadSchema(schemaPath);
+            var sensitiveNames = schema.Parameters
+                .Where(parameter => parameter.Sensitive)
+                .Select(parameter => parameter.Name)
+                .ToHashSet(StringComparer.Ordinal);
+            return parameters
+                .Where(parameter => sensitiveNames.Contains(parameter.Key))
+                .SelectMany(parameter => EnumerateSensitiveScalars(parameter.Value))
+                .Where(value => !string.IsNullOrEmpty(value))
+                .Distinct(StringComparer.Ordinal)
+                .Take(256)
+                .ToArray();
+        }
+        catch
+        {
+            // If a schema exists but cannot be validated, prefer over-redaction to leaking a secret.
+            return parameters.Values
+                .SelectMany(EnumerateSensitiveScalars)
+                .Where(value => !string.IsNullOrEmpty(value))
+                .Distinct(StringComparer.Ordinal)
+                .Take(256)
+                .ToArray();
+        }
+    }
+
+    private static IEnumerable<string> EnumerateSensitiveScalars(JsonElement element)
+    {
+        switch (element.ValueKind)
+        {
+            case JsonValueKind.String:
+                if (element.GetString() is { Length: > 0 } value)
+                    yield return value;
+                yield return element.GetRawText();
+                break;
+            case JsonValueKind.Number:
+            case JsonValueKind.True:
+            case JsonValueKind.False:
+                yield return element.GetRawText();
+                break;
+            case JsonValueKind.Array:
+                foreach (var item in element.EnumerateArray())
+                    foreach (var value in EnumerateSensitiveScalars(item))
+                        yield return value;
+                break;
+            case JsonValueKind.Object:
+                foreach (var property in element.EnumerateObject())
+                    foreach (var value in EnumerateSensitiveScalars(property.Value))
+                        yield return value;
+                break;
+        }
     }
 
     private static IReadOnlyDictionary<string, JsonElement> CloneParameters(
