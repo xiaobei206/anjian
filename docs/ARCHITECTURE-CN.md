@@ -230,7 +230,14 @@ preview.4 当前采用低级鼠标/键盘 Hook，已纳入 Windows CI 编译与�
 
 同一份机器可读定义必须服务于运行时注册、IDE、命令面板和函数手册。若某函数只存在于规划文档而没有运行时绑定，状态必须为“目标设计”，不得生成可用 API 提示。
 
-### 12.3 边界与依赖
+### 12.3 M12-12 插件 API registry extension view
+
+- 内置 lua-api-registry.json 是只读基线；M12-12 在运行时读取本机插件 catalog 中已安装、启用且通过 API 兼容及文件 SHA-256 完整性检查的 contributions，并通过 LuaApiRegistry.WithPluginContributions 形成内存视图。内置 registry 的版本保持 1.2 / 103，插件元数据不写回 JSON，也不混入随应用编译的静态 FUNCTION-REFERENCE-CN.md。
+- 合并视图被编辑器补全、签名提示、API 命令面板与本机动态参考文档生成器共用。停用/卸载/损坏插件从后续视图移除；启用前检查所有已启用插件间的名称冲突，失败不保存 catalog。
+- 纯 Lua helper 在普通脚本专用 Worker 内惰性加载到每个插件独立环境，仅访问受限基础函数和 math/string/table/utf8 副本。模块 loader 每次重新核验 catalog、manifest、closed file/hash list；导出参数/返回类型由桥接包装逐次验证。helper 无宿主 automation global、IPC 或扩展 Grant 的入口。此设计约束公开能力但不等同 OS 沙箱。
+- 插件 Worker 和小精灵 Worker 不注入普通用户启用插件的贡献计划；贡献 API 不改变当前权限 sidecar 三方交集模型。M14 仍需验证真实 WinForms 命令面板、插件管理、DPI/多显示器与交互。
+
+### 12.4 边界与依赖
 
 - Core 定义稳定 DTO 与接口；Windows、Lua、图像、打包与 UI 依赖通过适配层连接。
 - 不将 Win32 HWND、原生图像对象或 Lua state 泄露给 UI 以外的通用业务模型。

@@ -48,6 +48,7 @@ manifest JSON 最大 256 KiB，UTF-8。
 - entry 必须指向包内已列入 files 的 Lua 文件。主入口和模块都只在独立 Worker 的 Lua 5.4 state 中运行，绝不在主 UI 中执行。
 - modulesRoot 为包内可选的模块目录，目录下仅可 require manifest 已登记、hash 已匹配的 Lua 文件；模块名采用点分名映射到相对路径。未登记或运行前被篡改的模块拒绝加载。
 - permissions 使用现有脚本权限 schema v1 的相同字段和含义。文件读写根目录与相对 processExecutables 路径以包根目录解析；processExecutables 也可列出精确、完全限定的绝对路径。相对路径拒绝点段/越界，绝对路径仍需脚本 sidecar 请求并经用户逐次批准；不支持通配符。HTTP 主机/方法仍遵守现有精确白名单政策。它只是插件的上限声明，不是授权。
+- 可选 contributions 字段可声明受限纯 Lua helper 的稳定 ID、公开名称、签名、参数/返回/错误契约、示例和模块导出；具体 schema、命名冲突、隔离与生命周期见 [插件 Lua API 贡献契约](PLUGIN-API-CONTRIBUTIONS-CN.md)。贡献只能引用 modulesRoot 下已登记并由 SHA-256 固定的 Lua 模块，不请求额外宿主权限。
 - files 需覆盖每个内容文件，路径大小写不敏感去重、使用相对正斜线分隔、不能含盘符/UNC、冒号、空段、点段、父目录段、控制字符或根外路径。每项为 64 位十六进制 SHA-256 字符串。manifest 本身不包含在此列表。
 
 ## 文件边界与资源上限
@@ -73,7 +74,7 @@ manifest JSON 最大 256 KiB，UTF-8。
 - 每条 catalog 记录使用 pluginId + version + enabled；启停通过原子写入本地 catalog。损坏或未来 schema 的 catalog 不会被静默覆盖。
 - 同一 pluginId/version 已安装时，如果现有内容与 hash 有效则保持幂等；如果目标目录存在但内容不符则失败，不自动覆盖。升级安装到新版本目录；切换版本需明确启用对应版本。
 - 禁用后可保留文件但不得运行；卸载只能对已禁用项执行。加载、模块 require、脚本运行或 Stop 失败仅影响该 Worker/插件，不应使主 UI 退出。
-- 当前阶段仅交付本地 Lua entry/module 插件与安装/启停/卸载/Worker 运行入口。第三方 API 动态注册、IDE 命令面板和 M12-11 小精灵权限 sidecar 收集另按路线图任务实现。
+- M12-12 在 main 开发版增加可选 contributions schema v1，允许启用插件贡献纯 Lua helper；其 API metadata 合入内存 registry extension view，供 IDE 补全/签名、API 命令面板与本机动态参考生成器使用。内置 registry 与静态函数手册仍保持 1.2 / 103，不更改已发布 preview.4。
 
 
 ## 信任与安全边界

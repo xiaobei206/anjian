@@ -259,3 +259,15 @@
 - 入口没有 sidecar 时合法但权限为空；有 sidecar 时其内容只建立 request。仅有用户本次逐项批准后，现有 `ScriptPermissionPolicy.CreateGrant` 才能产生非空 Grant。请求清单、manifest/hash 都不能代替用户同意；拒绝时不启动 Worker，审批不持久化/跨入口共享。
 - Worker bridge 和 host IPC 维持双层检查，不修改 Lua API registry。manifest 已绑定的 sidecar 若损坏、丢失、hash 或绑定不一致均 fail-closed；manifest 未绑定 sidecar 的入口合法，但只能使用空 Grant。
 - Core 测试覆盖多入口绑定、清单闭合/篡改；发布包 smoke 要验证 sidecar 请求不会在缺少显式 Grant 时自动生效。SHA-256 不是数字签名；CI smoke 不代替 M14 Windows 10/11 审批窗体实机验收。
+
+## ADR-032：插件 Lua API 以受限纯函数贡献并合入 registry extension view
+
+- 状态：ACCEPTED（M12-12 的代码实现与 Windows CI 状态以最新 handoff/路线图为准；真实桌面验收留 M14）。
+- 插件可在 Anjian.Plugin.json 的可选 contributions 节点中声明稳定 ID、公开 Lua 名称、签名、参数/返回/错误/暂停/取消契约、示例，以及指向 hash-pinned modulesRoot Lua 模块的导出。贡献 schema 固定为 schemaVersion=1；未知字段、未来 schema、缺失字段、重复 ID 和非法类型均拒绝。
+- 第一阶段仅支持纯 Lua helper，不允许新增宿主 IPC 或权限请求。模块调用时惰性加载到独立受限环境，仅开放安全基础函数和 math/string/table/utf8 标准库副本；不能访问 MoveTo、文件、剪贴板、对话框、进程、HTTP、窗口、图像或 OCR 宿主 API。helper 与调用脚本共用 Worker 的指令检查点，Stop 继续使用现有 Worker 终止边界。
+- LuaApiRegistry.WithPluginContributions 形成运行期内存 registry extension view；静态内置 registry 不被插件改写，API 版本保持 1.2 / 103 个内置函数。IDE 补全/签名、命令面板、调用计划与可选本地动态参考文档均使用同一合并视图；静态 FUNCTION-REFERENCE-CN.md 仍代表内置 registry。
+- 公开名称和内置 API/Lua 标准名/宿主全局名/其他启用插件函数名按大小写不敏感冲突检查。启用前验证完整启用集合，冲突时不保存 catalog。仅已安装、启用、兼容且文件闭合清单与 SHA-256 验证通过的插件可以贡献 API；每次普通脚本 Worker 启动时重验 catalog、manifest 与模块内容 hash。
+- 参数只允许必填 string/number/integer/boolean；返回值只允许 string/number/integer/boolean/table/nil；参数数量与类型、返回类型在调用时检查。函数必须声明文档、示例、错误和执行语义；纯 Lua helper 的副作用声明必须为空。
+- 安全边界：不加载任意 DLL/native code、不自动联网、不在主 UI 执行第三方 Lua、不通过贡献路径扩展脚本 Grant。SHA-256 不是数字签名，Worker 也不是 OS 级沙箱；插件 Lua 异常只中止当前脚本 Worker 执行。
+- 验收覆盖 schema/未知与未来字段、内置和插件间冲突、启用失败原子性、停用/损坏/hash 篡改、实际 NLua 调用、类型/arity、隔离、IDE/API registry 一致性、Windows build/test/package smoke。真实 Windows 10/11 管理 UI、命令面板、DPI、多屏与完整用户交互留 M14。
+

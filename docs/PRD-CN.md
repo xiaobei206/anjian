@@ -167,7 +167,7 @@
 
 ### 2.12 插件与扩展命令
 
-插件目录/ZIP 的 schema v1、版本兼容、闭合文件列表、SHA-256 与三方权限交集由本地插件包格式规格 [PLUGIN-MANIFEST-CN.md](PLUGIN-MANIFEST-CN.md) 冻结。M12-10 已在 main 开发版实现本地校验、安装、启停/卸载和独立 Worker 运行。M12-11 已为小精灵入口加入可选 `<entry.lua>.permissions.json` 收集、manifest/hash 绑定与运行前逐次审阅；侧车声明仅是请求，无侧车时保持空 Grant，绑定/哈希异常会拒绝启动。格式见 [小精灵权限 sidecar 规格](SPRITE-PERMISSIONS-CN.md)。第三方动态注册 Lua API/命令面板仍是后续工作；真实 Windows 桌面交互统一留 M14。
+插件目录/ZIP 的 schema v1、版本兼容、闭合文件列表、SHA-256 与三方权限交集由本地插件包格式规格 [PLUGIN-MANIFEST-CN.md](PLUGIN-MANIFEST-CN.md) 冻结。M12-10 已在 main 开发版实现本地校验、安装、启停/卸载和独立 Worker 运行；M12-11 已为小精灵入口加入可选权限 sidecar 收集、manifest/hash 绑定与运行前逐次审阅。M12-12 在 main 开发版增加 optional contributions schema v1，只允许声明由 hash-pinned Lua 模块实现的纯 Lua helper。启用插件的贡献 metadata 进入内存 registry extension view，供编辑器补全/签名、API 命令面板与本机动态参考生成器共享；内置 registry 保持 1.2 / 103，当前已发布 v0.1.0-preview.4 不变。契约见 [插件 Lua API 贡献契约](PLUGIN-API-CONTRIBUTIONS-CN.md)。Windows 桌面交互统一留 M14。
 
 
 - 提供正式的本地插件/命令包机制，可导入、启用、停用、升级和卸载。
