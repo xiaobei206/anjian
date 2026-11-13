@@ -185,13 +185,13 @@ internal sealed class RunInstanceRuntimeCoordinator : IDisposable
                 admission.InstanceId,
                 runner,
                 completion,
-                options,
+                options with { },
                 fullPath,
                 debugOptions,
                 CloneParameters(parameters),
-                permissions ?? ScriptPermissionGrant.Empty,
+                CloneGrant(permissions ?? ScriptPermissionGrant.Empty),
                 spriteRuntimeOptions,
-                pluginRuntimeOptions);
+                ClonePluginRuntimeOptions(pluginRuntimeOptions));
             _entries.Add(entry.InstanceId, entry);
             _selected = entry.InstanceId;
             WireRunner(entry);
@@ -277,43 +277,38 @@ internal sealed class RunInstanceRuntimeCoordinator : IDisposable
 
     public async Task StopAllAsync()
     {
-        Entry[] entries;
+        var notifications = new List<RunInstanceSnapshot>();
+        Task[] waits;
         lock (_sync)
         {
             _shuttingDown = true;
-            entries = _entries.Values.ToArray();
-        }
-
-        var waits = new List<Task>();
-        foreach (var entry in entries)
-        {
-            var state = _model.GetSnapshot(entry.InstanceId);
-            if (RunInstanceLifecycle.IsTerminal(state))
-                continue;
-
-            var stop = _model.RequestStop(entry.InstanceId);
-            if (stop.Changed)
+            foreach (var entry in _entries.Values)
             {
-                StateChanged?.Invoke(stop.Snapshot);
-                if (stop.WasQueued)
+                var state = _model.GetSnapshot(entry.InstanceId);
+                if (RunInstanceLifecycle.IsTerminal(state))
+                    continue;
+
+                var stop = _model.RequestStop(entry.InstanceId);
+                if (stop.Changed)
                 {
-                    entry.Runner.Dispose();
-                    entry.Completion.TrySetResult();
-                }
-                else
-                {
-                    entry.Runner.Stop();
-                    waits.Add(entry.Completion.Task);
+                    notifications.Add(stop.Snapshot);
+                    if (stop.WasQueued)
+                    {
+                        entry.Runner.Dispose();
+                        entry.Completion.TrySetResult();
+                    }
+                    else
+                    {
+                        entry.Runner.Stop();
+                    }
                 }
             }
-            else if (!entry.Completion.Task.IsCompleted)
-            {
-                waits.Add(entry.Completion.Task);
-            }
+
+            waits = _entries.Values.Select(entry => entry.Completion.Task).ToArray();
         }
 
-        lock (_sync)
-            waits = _entries.Values.Select(entry => entry.Completion.Task).ToList();
+        foreach (var snapshot in notifications)
+            StateChanged?.Invoke(snapshot);
 
         await Task.WhenAll(waits).ConfigureAwait(true);
     }
