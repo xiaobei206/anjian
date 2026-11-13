@@ -517,3 +517,32 @@ M4 基础调试器已在 main 实现并通过 Windows CI。具体实现提交与
 8. Windows Actions Build/Test/API handbook/self-contained package smoke 必须全绿；桌面文件对话框/真实权限体验仍 M14 实机验收。
 
 M12-02 验收前不做剪贴板、对话框、进程、HTTP 或插件加载。完成后 handoff 再指定下一个唯一子任务。不得改 VERSION、创建 tag/Release，不做 FIX 版本名。
+
+
+---
+
+# 2026-11-13 会话交接：M12-02 首批文件 API 已进 main，后续补齐仍属同一任务
+
+## 本轮完成
+- 执行前核对 main HEAD：初始 75d50b8514539795c0cf9082be7a3a714b2f8890；读取 AGENTS.md、README.md、本 handoff 和 ROADMAP-CN.md，唯一任务按原要求为 M12-02。
+- 代码提交：ffd09bc（host 文件 IPC dispatcher）、186695d（目录/链接测试修正与硬链接拒绝）、41c64e8（首批 Worker Lua API / registry）、fcaa675（桥接 JSON 序列化修复）、e020f2a（生成手册一致性和 API version 测试）、fdfa70d（修正 API count 测试为 89）。
+- 当前首批 API 版本：registry 0.8，共 89 项；新增 8 个文件 API：ReadTextFile、WriteTextFile、AppendTextFile、FileExists、DirectoryExists、ListFiles、ListDirectories、CreateDirectory。函数手册生成区已同步，IDE 自动补全/签名由同一 registry 提供。
+- Worker API 对路径先解析并检查本次 Grant；PlaybackRunner 对每条 file/directory IPC 再检查本轮 Grant；unknown command fail closed。小精灵复用 PlaybackRunner，缺少授权时 Grant 为空。首批 API 不包含 copy/move/rename/temp。
+- Windows 适配器采用逐级 OPEN_REPARSE_POINT 目录句柄、目录操作期间不共享删除、最终文件 no-follow handle、reparse/symlink 和多硬链接文件拒绝；文本 4 MiB、目录枚举 1000 项、严格 UTF-8、同目录 temp+flush+replace。
+- CI 历史完整记录见 docs/DEVELOPMENT-LOG-CN.md。最终 Windows run [241](https://github.com/xiaobei206/anjian/actions/runs/43381018127) SUCCESS：0 warnings/0 errors、134/134 tests、API handbook、self-contained publish、package Sprite/Worker smoke、ZIP/SHA256、artifact upload 全 PASS；artifact ID 14016840736，SHA-256 db2b6ac754543d9ca821434bb3f3edc98b4735e58359ebe843a1c25d9a692534。
+- M12-02 整体仍为 PARTIAL：复制、移动、重命名、受控临时文件/目录尚未实现；剪贴板/对话框、进程、HTTP、插件均未开放。Windows 桌面权限 UI / 真实交互 NOT RUN，留 M14。未修改 VERSION/AssemblyVersion/FileVersion；无 tag/Release，preview.4 不变。
+- 本会话未本地执行 dotnet Restore/Build/Test；测试来源为 Windows Actions。不要把 run 241 CI 通过写为真实 WinForms/桌面验收通过。
+
+## 下一会话唯一任务：M12-02B — 文件复制/移动/重命名与受控临时路径
+
+严格按以下唯一范围推进，不要进入 M12-07（剪贴板/对话框）：
+1. 开始先核对 main 最新 HEAD，并读取 AGENTS.md、README.md、本节 handoff、ROADMAP-CN.md；再复查 ScriptFileSystem.cs、ScriptFileSystemHostDispatcher、WorkerLuaApi.Files.cs、PlaybackRunner.DispatchAsync 和当前 8 个 API 的测试。
+2. 补齐文件操作：优先 CopyFile(source, destination, overwrite?)、MoveFile(source, destination, overwrite?)、RenameFile(path, newName, overwrite?)；再实现受控临时文件/目录创建 API。函数名/参数应先按现有注册表命名规则确定，避免模糊 system temp 暴露。
+3. 源文件路径必须同时通过本次 Grant 的读取根校验；目标目录/文件必须通过写入根校验。Rename/Move 也要同时核对源和目标授权，不能因源可写就允许移出批准根。覆盖目标前按 no-follow 方式检查并拒绝 reparse point、符号链接、多硬链接目标。
+4. 临时文件/目录必须由调用者提供一个已获批的写入根/父目录，使用安全随机名称与 CreateNew/单级创建；返回完整路径。不得因为调用临时 API 而自动批准系统 TEMP 或扩大权限根。
+5. Copy 使用目标目录同目录临时文件，设定并测试最大字节数、flush/提交前取消、目标覆盖语义；移动在同卷优先使用安全 rename，跨卷必须先完成受限复制并验证目标后再删除源，删除失败时返回清晰错误并保留可恢复状态；重命名只允许同一已批准父目录，不跟随链接。必须明确目录复制是否本轮不支持，首轮可以只支持普通文件。
+6. 对每个新增操作都要在 Worker bridge 和主进程 dispatcher 双重检查；unknown/forged IPC fail-closed；暂停通过 PlaybackRunner checkpoint，Stop cancellation token 贯穿复制循环和提交边界。
+7. 增加测试：source-read/destination-write 各自授权、目标越界、同名兄弟目录、覆盖开关、同卷/跨卷失败路径、已存在链接/硬链接拒绝、临时名碰撞与目录穿越、大小上限、复制中取消、目标原子提交和未知 IPC 拒绝。Windows Actions 的 Build/Test/API handbook/self-contained package smoke 全绿后再更新矩阵与 handoff。
+8. 完成这批 API 后把 registry 从 0.8 递增为 0.9，自动重生成 FUNCTION-REFERENCE 并验证 IDE 仍读取同一注册表。只改 main，小步提交；不创建分支/PR、不改产品 VERSION、不建 tag/Release。
+
+验收完成后，本任务再交给下一 M12 子任务；在此之前禁止启动剪贴板、对话框、进程、HTTP 或插件功能。

@@ -365,9 +365,16 @@ preview.4 当前采用低级鼠标/键盘 Hook，已纳入 Windows CI 编译与�
 - 请求清单不是授权。每次普通播放/调试前由 WinForms ScriptPermissionReviewForm 展示请求并逐项默认拒绝；用户确认后的选择由 CreateGrant 验证必须是请求集合的子集。取消审阅不启动 Worker，不保存永久同意。
 - PlaybackRunner 在 worker-ready 握手载荷中传入 Grant；WorkerProgram 将其注入 WorkerLuaApi。每轮完成后 Runner 清空引用，未提供授权的模式使用空 Grant。
 
-### 17.2 当前安全边界与未实现项
-- 当前已完成的是请求解析、批准子集校验、播放/调试前审阅以及 Worker 构造注入。**还没有新增文件、剪贴板、对话框、进程或 HTTP API**；WorkerLuaApi 目前只持有 Grant，未用它执行扩展操作。主进程 PlaybackRunner.DispatchAsync 的逐条 IPC 权限二次校验尚待 M12-02，完成之前不得注册这些 API。
-- Core 的文件根检查使用 Path.GetRelativePath 进行词法边界判断，不是符号链接或 TOCTOU 防护。未来 Windows 文件适配器必须拒绝路径链上的 reparse point，并在最终打开时避免检查与使用之间的竞态；不得将本 Core 策略描述为文件沙箱。
-- 权限 UI 当前只接入主程序普通播放/调试；M11 小精灵 SpriteLauncherForm 尚未加载权限 sidecar，也没有权限审阅流程。插件 ZIP/目录 manifest、来源政策、版本兼容、启停/卸载和隔离加载尚未实现。
-- 此权限机制不是恶意 Lua 的 OS 级沙箱。Lua 本身仍通过受限 Worker/公开 API 工作；只有在主机对每一项实际 OS 操作再次校验之后，才可启用相应扩展 API。
-- Windows Actions run [234](https://github.com/xiaobei206/anjian/actions/runs/43377155430) 对 M12-01 代码 HEAD 2a69776374abb9b472aa4db3b6bc5dd32c0f6a92 全 PASS；真实 WinForms 权限审阅体验 NOT RUN，仍属于 M14 桌面验收。
+### 17.2 权限与 IPC 运行边界
+- 主程序普通播放/调试在启动前取得本次 Grant，并将其写入 worker-ready 握手载荷；WorkerProgram 注入 WorkerLuaApi。SpriteLauncherForm 复用 PlaybackRunner 的相同 IPC dispatcher；当前小精灵没有 sidecar 审阅，RunAsync 未提供 Grant 时使用 ScriptPermissionGrant.Empty，默认拒绝。
+- 对文件类命令，Worker bridge 在发送前执行 Grant 检查；PlaybackRunner.DispatchAsync 对每个 file/directory IPC 再次从当前运行 _launchPermissions 检查。命令不在文件白名单时不会进入文件 dispatcher；文件 dispatcher 对未知命令默认拒绝。Worker 伪造 IpcMessage 不会绕过 host 检查。
+- 权限仍不是恶意 Lua 的 OS 级沙箱：Lua 只能调用受注册表约束的桥接函数，但同用户本地进程、内核驱动或其他进程能力不在这层文件 API 的完全隔离承诺内。不得宣传为容器或沙箱。
+- 剪贴板、对话框、进程、HTTP 与插件 API 尚未开放；权限 sidecar 在小精灵包内的收集/逐次审阅尚未实现。权限窗体和真实桌面交互继续留 M14。
+
+### 17.3 文件系统首批适配器与 Lua API（M12-02 部分完成）
+- ScriptFileSystem.ResolvePath 把相对路径以脚本所在目录为基准解析为完整路径；拒绝 Windows 设备/扩展设备路径、盘符相对路径、NTFS 备用数据流和超长路径。最终授权由 ScriptPermissionGrant 的文件读取/写入根执行 Path.GetRelativePath 边界判断。
+- Windows 适配器对路径链中每一级已存在目录使用 CreateFileW + FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT，以句柄属性拒绝 reparse point。目录句柄不共享删除，在操作期间锁住祖先路径，避免目录链被重命名替换；最终文件使用 FILE_FLAG_OPEN_REPARSE_POINT 打开后检查文件属性和 NumberOfLinks，拒绝符号链接/reparse point 与多硬链接文件，并保留最终句柄执行读写。
+- 已注册 8 个 API：ReadTextFile、WriteTextFile、AppendTextFile、FileExists、DirectoryExists、ListFiles、ListDirectories、CreateDirectory。文本严格 UTF-8（无 BOM 写入），读写/追加总上限 4 MiB；枚举直接子级、不递归、最多检查 1000 个项目；创建目录只建一级且要求父目录存在；写入使用同目录唯一临时文件、flush-to-disk 后 File.Move(overwrite:true) 替换，取消在提交前再次检查。
+- WorkerLuaApi.Files.cs 负责 Worker Grant 检查与 IPC 参数/返回值转换；ScriptFileSystemHostDispatcher 在主进程以本轮 Grant 再检查一次，独立反序列化 IPC 请求；PlaybackRunner 只将上述明确白名单命令送入 dispatcher。文件/目录 API 无审批即拒绝。
+- 本批未覆盖复制、移动、重命名、临时文件/目录 API；追加不是事务性原子替换；路径适配器只在 Windows 10/11 工作。大小/项目上限是安全边界，不是可配置项。M12-02 仍为 PARTIAL。
+- Windows Actions run [241](https://github.com/xiaobei206/anjian/actions/runs/43381018127)：Release Build 0 warnings / 0 errors、134/134 Core tests、API handbook check、自包含 win-x64 publish 与包内 Sprite/Worker smoke 全 PASS；权限 UI 实机体验 NOT RUN（M14）。

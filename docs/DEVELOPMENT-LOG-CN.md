@@ -694,3 +694,29 @@ M4 基础调试器与 M5 可视化录制/动作列表均已完成 Windows CI 验
 - Run 234（最终 M12-01 代码 HEAD 2a69776374abb9b472aa4db3b6bc5dd32c0f6a92）SUCCESS：Restore PASS；Release Build 0 warnings / 0 errors；Core tests 122/122 PASS；API handbook check PASS；self-contained win-x64 publish、真实包/Worker smoke、ZIP/SHA256 和 artifact upload PASS。artifact ID 14014463955，87,176,294 bytes，archive SHA-256 c17f159787d8129031e97e364e991bec9a6ea3a72b9b612567867acd1d93d770。
 - 本机没有 .NET SDK，本地 Restore/Build/Test NOT RUN；Windows Actions 为本轮构建/测试来源。WinForms 权限审阅真实交互和 M1–M13 桌面项目仍 NOT RUN，统一延期 M14。
 - 未修改 VERSION、AssemblyVersion、FileVersion；未创建 tag/Release；v0.1.0-preview.4 官方发布资产不变。
+
+
+## 2026-11-13 — M12-02 首批受控文件/目录 API（部分完成）
+
+### 实现提交
+- ffd09bc：新增 Windows ScriptFileSystem 与主进程 ScriptFileSystemHostDispatcher；PlaybackRunner 将文件/目录 IPC 路由到 dispatcher，并使用本轮 _launchPermissions 和脚本目录；新增 host/Core 文件测试。
+- 186695d：修复链接与目录列表测试断言；加入硬链接数检查（NumberOfLinks > 1 拒绝访问），目录枚举上限按实际遍历项计数。
+- 41c64e8：向 WorkerProgram 传入入口脚本目录；实现首批 8 个 Worker 文件 API；API registry 从 0.7/81 升至 0.8/89，更新函数手册和契约测试。
+- fcaa675：修复文件 IPC bridge 引用不可见 JSON options 的编译错误，改用 bridge 自己的 JSON 序列化。
+- e020f2a：按 Catalog 的实际生成规则（包括可变参数标记）重建函数手册生成区，修正 API 版本测试断言。
+- fdfa70d：修正旧注册表契约测试中遗留的 API 数量 81，更新为 89。
+
+### 实际实现与边界
+- 首批 API：ReadTextFile、WriteTextFile、AppendTextFile、FileExists、DirectoryExists、ListFiles、ListDirectories、CreateDirectory。Worker 调用前校验 Grant，主进程对每个文件 IPC 独立重查；未知命令 fail-closed。
+- 相对路径以脚本目录为基准；拒绝设备路径、盘符相对路径和 ADS。Windows 逐级以 OPEN_REPARSE_POINT 句柄验证目录链、拒绝 reparse/symlink；最终文件以 no-follow 句柄检查，并拒绝多硬链接普通文件。文本严格 UTF-8，4 MiB；目录枚举最多检查 1000 项且不递归；创建目录只允许一级；写入同目录临时文件、flush 后替换。
+- 小精灵通过同一个 PlaybackRunner/dispatcher；目前没有 sidecar 时无 Grant，故为空授权。小精灵逐次权限 UI 和 sidecar 打包/审阅尚未完成。
+- 没有开放剪贴板、对话框、进程、HTTP 或插件加载。复制/移动/重命名/受控临时路径仍待 M12-02B。当前能力不是完整 OS 级沙箱；Windows 桌面实机权限体验留 M14。
+
+### Windows CI 失败与最终结果
+- Run 236（HEAD ffd09bc）：Build 0 warnings/0 errors；129/131 tests，2 项失败均为测试预期断言问题，后经修正。
+- Run 237（HEAD 186695d）：SUCCESS，Build 0 warnings/0 errors、132/132 tests、API handbook、自包含 win-x64、包内 Worker smoke、ZIP/SHA256、artifact upload 全 PASS；artifact ID 14015698410。
+- Run 238（HEAD 41c64e8）：Build 因 bridge 误用不可见 WindowApiJson 失败；由 fcaa675 修复。
+- Run 239（HEAD fcaa675）：Build 0 warnings/0 errors；132/134 tests，失败项是函数手册 generated region 漏掉 variadic 标记和测试仍断言旧 API version 0.7；由 e020f2a 修复。
+- Run 240（HEAD e020f2a）：Build 0 warnings/0 errors；133/134 tests，剩余失败是旧断言 API 数量 81；由 fdfa70d 修复。
+- Run [241](https://github.com/xiaobei206/anjian/actions/runs/43381018127)（最终首批 API HEAD fdfa70d）：SUCCESS，Restore PASS；Release Build 0 warnings / 0 errors；134/134 Core tests；API handbook check；self-contained win-x64 publish；package Sprite/Worker smoke；ZIP/SHA256；artifact upload 全 PASS。Artifact ID 14016840736，87,187,479 bytes，SHA-256 db2b6ac754543d9ca821434bb3f3edc98b4735e58359ebe843a1c25d9a692534。
+- 本会话未在本地执行 dotnet Restore/Build/Test；自动化证据来自 Windows GitHub Actions。Run 241 全绿不代表 WinForms 权限审阅或桌面操作已经实机验收。没有改 VERSION/AssemblyVersion/FileVersion，没有创建 tag/Release，preview.4 发布资产不变。

@@ -363,9 +363,9 @@ M1–M13 的桌面实测不再作为进入下一开发阶段的前置条件，�
 | M12-01 | 权限 sidecar schema | v1 解析、256 KiB 上限、未知版本/无效 JSON 拒绝、路径和主机规范化 | PASS（Windows CI run 232/233/234；Core 权限策略测试包含 schema/大小/IDN） |
 | M12-02 | 默认拒绝与批准子集 | 缺少批准即空 Grant；批准不能超过请求；剪贴板/对话框默认拒绝 | PASS（Windows CI run 232/233/234；122/122 Core tests） |
 | M12-03 | 播放/调试前权限审阅 | sidecar 请求逐项显示；默认不勾选；确认批准本次子集；取消不启动 Worker | 代码已接入主程序播放/调试；Build PASS（run 233/234）；WinForms 实际交互 NOT RUN（M14） |
-| M12-04 | Worker 授权传递 | worker-ready 将 Grant 序列化并注入 WorkerLuaApi；无审批使用 Empty | 代码接线完成且 Build/API check/包内 Worker smoke PASS（run 234）；尚无实际扩展 OS 命令可执行，不能据此宣称权限端到端完成 |
-| M12-05 | 主进程 IPC 二次检查 | 对每一种 OS 操作验证 Grant，伪造 IPC 也不能越权 | NOT IMPLEMENTED；M12-02 后续首要任务 |
-| M12-06 | 文件/目录 API | 读取/写入/枚举/复制/移动/创建/临时路径；越界、链接、大小、取消、原子性 | NOT IMPLEMENTED |
+| M12-04 | Worker 授权传递 | worker-ready 将 Grant 序列化并注入 WorkerLuaApi；无审批使用 Empty | PASS（run 241：文件 API 实际使用本次 Grant；小精灵未提供权限对象时为空 Grant；Sprite/Worker 包内 smoke PASS） |
+| M12-05 | 主进程 IPC 二次检查 | 文件类 IPC 每次在 PlaybackRunner 再检查 Grant；未知/伪造 IPC 默认拒绝 | PASS（ScriptFileSystemTests 覆盖空 Grant 拒绝、只读 Grant 拒绝写入、伪造/未知命令拒绝；Windows CI run 241） |
+| M12-06 | 文件/目录 API | 文本读/写/追加、存在性、列文件/目录、单级创建；路径越界、reparse/symlink/hardlink、大小、取消和替换行为 | PARTIAL（8 个 API 已注册；复制/移动/重命名/临时文件/目录仍待 M12-02B；Windows CI run 241 134/134 tests） |
 | M12-07 | 剪贴板/对话框 API | 读写剪贴板；消息/输入/确认对话框；主线程调度和取消 | NOT IMPLEMENTED |
 | M12-08 | 进程 API | 精确 EXE 白名单、启动/等待/查询/退出状态、超时与取消；不开放任意 Shell | NOT IMPLEMENTED |
 | M12-09 | HTTP/JSON API | 精确主机/方法；HTTPS 默认；可选明文 HTTP 单独审批；重定向重新授权、超时/响应上限/取消 | NOT IMPLEMENTED |
@@ -373,10 +373,21 @@ M1–M13 的桌面实测不再作为进入下一开发阶段的前置条件，�
 | M12-11 | 小精灵权限 | 包构建/manifest 收集 permissions sidecar；Launcher 复用逐次权限审阅 | NOT IMPLEMENTED |
 | M12-12 | Windows 桌面审阅 | Windows 10/11 普通权限、取消/批准、错误提示、DPI/多屏 | NOT RUN（统一延期 M14） |
 
-### M12-01 Windows CI 结果（2026-11-13）
+### M12-01 / M12-02 Windows CI 结果（2026-11-13）
 - Run 231（代码 HEAD e1940930e49e2821006f95a3cd8eb756035b9bfa）首次 Build 失败：新增测试文件漏写 using Xunit;，产生 Fact/FactAttribute CS0246；随后由提交 41474018a5dbf047f0782cb9f95046e1f890adf7 修复。
 - Run 232（HEAD 41474018a5dbf047f0782cb9f95046e1f890adf7）SUCCESS：Build 0 warnings / 0 errors、122/122 Core tests、API handbook check、自包含发布、小精灵/Worker smoke、ZIP/SHA256 和 artifact upload 全 PASS。
 - Run 233（HEAD f378a6007e2f8401f298e75dc95ed96126934a1d）SUCCESS：同样 122/122 tests、Build 0 warnings / 0 errors、API check、self-contained publish、package/Worker smoke、ZIP/SHA256 与 artifact upload 全 PASS。Artifact ID 14015360734，87,176,291 bytes，digest 892ea51f7c6646df498e59c9c60b7c05f6d90bdbc79cd944fa5eab4b6f591cfd。
 - Run 234（最终 M12-01 代码 HEAD 2a69776374abb9b472aa4db3b6bc5dd32c0f6a92）SUCCESS：Restore、Release Build 0 warnings / 0 errors、122/122 Core tests、API handbook check、self-contained win-x64 publish、实际包/Worker smoke、ZIP/SHA256 和 artifact upload 全 PASS。Artifact ID 14014463955，87,176,294 bytes，archive digest c17f159787d8129031e97e364e991bec9a6ea3a72b9b612567867acd1d93d770。
 - 本地环境没有 .NET SDK，本地 Restore/Build/Test 均 NOT RUN；自动化证据来自 GitHub Actions Windows runner。上述 CI 均不替代 M12 权限窗体的 Windows 10/11 实机验收。
 - 本轮未增加公开 Lua API；registry 保持 0.7 / 81 项，FUNCTION-REFERENCE 和 IDE API 提示无须生成新条目。未改 VERSION / AssemblyVersion / FileVersion，未创建 tag / Release；v0.1.0-preview.4 保持不变。
+
+
+### M12-02 首批文件 API 验证补充（2026-11-13）
+- Run 236（HEAD ffd09bc453d9ffa6d522b3905ab2ba523cc2879）Build 0 warnings / 0 errors；131 项中 129 项通过，2 项是测试预期断言问题（异常派生类型和目录枚举预期），随后修正。
+- Run 237（HEAD 186695d1446e6895fe40dad168b050fcf5caa136）SUCCESS：Build 0 warnings / 0 errors、132/132 tests、API handbook、self-contained win-x64、包内 Worker smoke、ZIP/SHA256 与 artifact upload 全 PASS；artifact ID 14015698410。
+- Run 238（HEAD 41c64e8c8af092b9a53dac3adf6c38d992e7d084）Build 失败：文件 API bridge 引用了不可见的 WindowApiJson；改为独立 JsonSerializer 序列化。
+- Run 239（HEAD fcaa6759ead710de8ec9d9cc2f78b09911438a4d）Build 0 warnings / 0 errors；132/134 tests 通过，失败项是函数手册 generated region 漏掉 variadic 标记和测试仍断言 0.7。生成区严格按 Catalog 规则重生成并修正版本断言。
+- Run 240（HEAD e020f2aeb6165d5ccbd2714f1b3850ad88e0a249）Build 0 warnings / 0 errors；133/134 tests 通过，剩余项是旧测试硬编码 API 数量 81；修正为 89。
+- Run 241（最终首批 API 代码 HEAD fdfa70db62870502d2d4a8211cc7d525effef3dc）SUCCESS：Restore、Release Build 0 warnings / 0 errors、134/134 Core tests、API handbook check、自包含 win-x64 publish、包内 Sprite/Worker smoke、ZIP/SHA256 和 artifact upload 全 PASS。Artifact ID 14016840736，87,187,479 bytes，SHA-256 db2b6ac754543d9ca821434bb3f3edc98b4735e58359ebe843a1c25d9a692534。
+- 本会话未运行本地 dotnet Restore/Build/Test；可复核的构建与测试证据来自 Windows GitHub Actions。M12 权限窗体的 Windows 10/11 实机交互、真实用户授权与小精灵 sidecar 审阅仍 NOT RUN，属于 M14/后续 M12 项目。
+- 未改 VERSION、AssemblyVersion、FileVersion；未创建 tag/Release；v0.1.0-preview.4 发布资产不变。

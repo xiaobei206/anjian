@@ -168,3 +168,13 @@
 - 网络：HTTPS 默认允许；HTTP 只有独立明确批准才允许。主机和方法分别做精确 allowlist；不支持通配符、重定向到未批准域名或继承外部代理凭据。请求必须有超时与 Stop cancellation token。
 - 插件：M12 首版采用本地 ZIP/目录包和 manifest，不执行插件 DLL、不在 UI 进程执行第三方代码。插件 Lua entry/module 只能在独立 Worker 加载；manifest API 版本不兼容或文件清单/hash 不完整则拒绝启用。插件声明的权限与脚本声明取交集，用户批准取更小子集。
 - 权限 UI 与 OS 桌面体验留 M14 实机验收；CI 只验证策略和 IPC/资源适配，不把 CI 结果写成实机 PASS。
+
+
+## ADR-025：首批文件 API 使用双层 Grant 校验与 Windows no-follow 句柄
+- 状态：ACCEPTED（M12-02 首批 API；后续文件操作沿用此边界）。
+- 授权：WorkerLuaApi 在构造时持有本次 ScriptPermissionGrant 与当前脚本目录；每个文件桥接函数先规范化路径并检查读取/写入根，再通过 Worker IPC 请求主机执行。PlaybackRunner 从当前运行载荷持有的 Grant 对每条文件 IPC 再检查，不能信任 Worker 传来的权限声明、路径类别或命令名。缺少 Grant 一律 ScriptPermissionGrant.Empty，未知命令拒绝。
+- 路径语义：相对路径以入口脚本目录为基准；绝对路径只有处于对应批准根中才可使用；拒绝扩展设备路径、盘符相对路径、NTFS ADS 和超长路径。路径边界使用 Path.GetRelativePath，不做字符串前缀判断。
+- Windows 句柄防护：祖先目录逐级以 OPEN_REPARSE_POINT 打开，确认目录属性且不共享删除；最终文件同样以 OPEN_REPARSE_POINT 打开并在句柄上检查 reparse point 与硬链接数。操作期间保留目录/文件句柄，缩小路径替换竞态。目录枚举仅一层，且逐项验证；符号链接/reparse point 与多硬链接普通文件不返回。
+- 首批 API：ReadTextFile / WriteTextFile / AppendTextFile / FileExists / DirectoryExists / ListFiles / ListDirectories / CreateDirectory。严格 UTF-8，4 MiB 文本上限，1000 项枚举上限，单级目录创建。WriteTextFile 使用同目录临时文件、flush 和覆盖替换；AppendTextFile 直接追加，不承诺事务原子性。Stop token 在 IPC/枚举/读写边界检查；写入在原子替换前检查取消。
+- 限制：这是受控文件 API，不是恶意同用户进程的完整 OS 沙箱；当前未覆盖复制/移动/重命名/临时目录与文件，也未接入小精灵 sidecar 审阅（缺失授权时仍为空 Grant）。这些项目进入 M12-02B，不应通过放宽 Grant 先行开放。
+- 验证：Windows Actions run 237 验证主机文件安全适配，run 241 验证 API 0.8/89 项的 Build、134/134 tests、手册一致性、自包含包和 Sprite/Worker smoke；Windows 桌面权限审阅仍由 M14 实机执行。
