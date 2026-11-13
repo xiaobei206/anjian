@@ -72,9 +72,9 @@ internal sealed class ScriptParameterDesignerForm : Form
             foreach (DataGridViewRow row in _grid.Rows)
             {
                 if (row.IsNewRow) continue;
-                var name = Text(row, "Name");
+                var name = CellText(row, "Name");
                 if (string.IsNullOrWhiteSpace(name)) continue;
-                var defaultText = Text(row, "DefaultValue");
+                var defaultText = CellText(row, "DefaultValue");
                 JsonElement? defaultValue = null;
                 if (!string.IsNullOrWhiteSpace(defaultText))
                 {
@@ -83,11 +83,11 @@ internal sealed class ScriptParameterDesignerForm : Form
                 }
                 schema.Parameters.Add(new ScriptParameterDefinition
                 {
-                    Id = Text(row, "Id"), Name = name, Label = Text(row, "Label"),
-                    Type = Text(row, "Type"), Required = Bool(row, "Required"), DefaultValue = defaultValue,
+                    Id = CellText(row, "Id"), Name = name, Label = CellText(row, "Label"),
+                    Type = CellText(row, "Type"), Required = Bool(row, "Required"), DefaultValue = defaultValue,
                     Minimum = Number(row, "Minimum"), Maximum = Number(row, "Maximum"),
-                    Options = Text(row, "Options").Split('|', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).ToList(),
-                    Description = Text(row, "Description"), Pattern = NullIfEmpty(Text(row, "Pattern")),
+                    Options = CellText(row, "Options").Split('|', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).ToList(),
+                    Description = CellText(row, "Description"), Pattern = NullIfEmpty(CellText(row, "Pattern")),
                     MustExist = Bool(row, "MustExist"), Sensitive = Bool(row, "Sensitive"),
                     Order = (int)(Number(row, "Order") ?? schema.Parameters.Count)
                 });
@@ -103,10 +103,10 @@ internal sealed class ScriptParameterDesignerForm : Form
         }
     }
 
-    private static string Text(DataGridViewRow row, string name) => Convert.ToString(row.Cells[name].Value) ?? "";
+    private static string CellText(DataGridViewRow row, string name) => Convert.ToString(row.Cells[name].Value) ?? "";
     private static bool Bool(DataGridViewRow row, string name) => row.Cells[name].Value is bool b && b;
     private static double? Number(DataGridViewRow row, string name) =>
-        double.TryParse(Text(row, name), System.Globalization.NumberStyles.Float,
+        double.TryParse(CellText(row, name), System.Globalization.NumberStyles.Float,
             System.Globalization.CultureInfo.InvariantCulture, out var value) ? value : null;
     private static string? NullIfEmpty(string value) => string.IsNullOrWhiteSpace(value) ? null : value;
 }

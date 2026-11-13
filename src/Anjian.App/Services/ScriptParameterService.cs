@@ -13,7 +13,7 @@ internal static class ScriptParameterService
         WriteIndented = true
     };
 
-    public static string SchemaPath(string scriptPath) => Path.ChangeExtension(Path.GetFullPath(scriptPath), ".params.json");
+    public static string SchemaPath(string scriptPath) => Path.ChangeExtension(Path.GetFullPath(scriptPath), ".params.json") ?? throw new InvalidOperationException("无法生成参数定义路径。");
 
     public static string ConfigurationPath(string scriptPath)
     {
@@ -61,8 +61,13 @@ internal static class ScriptParameterService
         if (loaded.Warning is not null)
             MessageBox.Show(loaded.Warning, "参数配置", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         var validation = ScriptParameterValidator.ValidateValues(schema, loaded.Configuration.Values);
-        return validation.IsValid
-            ? validation.Values
-            : new Dictionary<string, JsonElement>(StringComparer.Ordinal);
+        if (!validation.IsValid)
+        {
+            MessageBox.Show("已保存参数与当前定义不匹配，将使用定义中的默认值。\n" +
+                string.Join(Environment.NewLine, validation.Issues.Select(x => $"{x.Label}：{x.Message}")),
+                "参数配置", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return new Dictionary<string, JsonElement>(StringComparer.Ordinal);
+        }
+        return validation.Values;
     }
 }
