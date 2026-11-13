@@ -1,6 +1,6 @@
 # 技术架构与模块边界
 
-- 版本：Architecture 0.5（追加 M8 图像资源清单、视觉调试覆盖层与颜色工具）
+- 版本：Architecture 0.6（追加 M8 图像视觉模块与 M9 OCR Worker/模型管理）
 - 目标框架：net10.0-windows
 - 平台：Windows x64
 - 状态：preview.4 实际实现已确认；后续模块化架构仍按路线图渐进演进。
@@ -270,3 +270,27 @@ preview.4 当前采用低级鼠标/键盘 Hook，已纳入 Windows CI 编译与�
 ### 11.4 RGB 与颜色块算法
 - RGB 颜色统一为 0xRRGGBB；十六进制接受 RRGGBB、#RRGGBB、0xRRGGBB。通道差为绝对值；ColorDifference 返回 R/G/B 差、MaxChannel、Manhattan 与 Euclidean。
 - FindColorBlocks 使用八邻域连通分量；step 是采样网格步长，pixelCount 是命中采样点数，矩形和中心按采样坐标计算。单次最多 4,000,000 个采样点、返回最多 100 块，支持取消。阈值 tolerance 按 RGB 每通道最大差判断。
+
+
+## 14. M9 OCR 文本识别模块（main 开发版；桌面验收延期）
+
+### 14.1 分层与依赖
+- `Anjian.Core.Ocr` 定义引擎无关 DTO（全文、行文本、置信度、矩形、多边形、识别语言、源图像尺寸、耗时）和 `IOcrRecognitionService` 接口；Core 不引用第三方 OCR SDK、ONNX Runtime 或模型文件。
+- `Anjian.App.Services.PaddleOcrRecognitionService` 是 PaddleOcrNet 适配层，只在 WinForms App/Worker 侧引用第三方包。精确依赖固定为 PaddleOcrNet 2.4.0；默认 CPU 推理。
+- 主 UI 的 OCR 模型管理窗只负责展示缓存状态与用户显式下载/补齐模型；模型缓存放在 `%LOCALAPPDATA%\\Anjian2026\\Ocr\\Models`。下载使用上游模型清单和 SHA-256 校验。
+- 每轮 Lua Worker 创建识别适配器，采用 `Download.Offline=true` 严格离线策略。识别路径先检查语言模型文件是否存在；缺失、损坏或不支持的模型明确报错并提示打开模型管理器，不在执行脚本时自动联网下载。
+
+### 14.2 图像 IPC 与坐标
+- Lua Worker 只持有 M8 图像资源随机 ID；主进程根据 ID 从本轮 `WindowsImageService` 读取尺寸/坐标元数据，并把受限 PNG 编码以 Base64 响应 `image-export-png` IPC。Worker 不接触 GDI Bitmap、HWND 或窗口 UI 对象。
+- 单次 OCR 输入最多 16,000,000 像素，PNG IPC 编码最多 64 MiB；超限时要求调用方先 CropImage 缩小区域。引擎还通过 `MaxImagePixels` 限制解码像素，防止异常大图输入。
+- OCR 框坐标以图像局部零基像素表示；当图像来自带 screen origin 的截图，结果额外返回虚拟桌面物理像素 `screenX/screenY`，保留负坐标。磁盘加载图片只返回局部坐标，不伪造 screen 坐标。
+
+### 14.3 API 与生命周期
+- API registry 0.7 新增 `OCR`、`FindText`、`WaitText`；自动生成函数参考手册并作为编辑器补全/签名提示的数据源。
+- `OCR` 返回全文与 1 起始行数组，每行含 confidence、矩形和 polygon；`FindText` 支持 contains/exact、不区分大小写；`WaitText` 通过主进程截图 IPC 循环检测，每次截图前请求 checkpoint，遵循 Pause；F12 Stop 终止独立 Worker。
+- WaitText 每轮释放临时截图 ID；即使脚本异常/Stop，PlaybackRunner 仍会清理当前轮全部图像资源。OCR 进程结束时释放模型 session。
+- 当前版本仅公开简体中文 `ch`、英语 `en`、日语 `japan`；缺少对应模型时显式报错。OCR 单次识别的推理阶段不承诺线程内中断，统一 Stop 边界是终止 Worker 进程。
+
+### 14.4 验证边界
+- Core 的 API 契约测试使用假 OCR 服务，不加载真实模型；它验证 Lua 表结构、屏幕原点换算、置信度过滤、匹配模式和 WaitText 资源释放。
+- Windows CI 负责 NuGet Restore、Windows x64 发布和自动测试；真实语言识别质量、模型下载、离线运行、DPI/多屏与 OCR 性能仍需要最终 Windows 桌面集中验收。CI 不等同于用户桌面验收。

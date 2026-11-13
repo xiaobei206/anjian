@@ -132,3 +132,24 @@
 ## 8. 外部信息更新规则
 
 SDK、NuGet、Windows API、许可证和支持周期可能变化。实施前再次查看上游与官方页面。不要把聊天中旧版本号当作事实，也不要仅依赖搜索摘要。
+
+
+## 9. OCR 引擎与离线模型 PoC（任务 TV-05 / M9 首轮）
+
+### 候选与决定
+- 固定包：`PaddleOcrNet 2.4.0`，NuGet：<https://www.nuget.org/packages/PaddleOcrNet/2.4.0>；对应上游源码：<https://github.com/FarhanLodi/PaddleOcrNet/tree/v2.4.0>。
+- NuGet 包公开支持 .NET 10；包许可证为 MIT。PaddleOCR 模型文件使用上游模型清单，相关模型许可证须随下载的语言模型核对并在最终发布包附带第三方许可清单。
+- 该适配器只放在 Anjian.App，不把 PaddleOcrNet/ONNX Runtime 类型带入 Anjian.Core。默认 CPU，不额外要求 GPU Execution Provider。
+
+### 离线与模型安全
+- 缓存目录：`%LOCALAPPDATA%\\Anjian2026\\Ocr\\Models`。
+- 通过 `PaddleOcrModels.GetModelFileNames` 计算所选语言所需文件；模型管理器使用 `DownloadAsync` 显式下载和上游 SHA-256 校验；使用 `ModelDownloadReport.EnsureSuccess()` 检查结果。
+- Worker 端 `Offline=true`，运行期缺模型只报错，不触发 NuGet/模型联网。网络访问仅在用户明确点击“OCR 模型”管理器中的下载按钮时发生。
+- 首轮语言：`ch`、`en`、`japan`。模型安装和识别路径共用同一 cache path / file manifest。
+- 输入保护：PNG IPC <=64 MiB、16,000,000 像素；引擎 MaxImagePixels 同值；更大的截图先 CropImage。模型完整性/离线行为仍需桌面实测。
+
+### 已经实现与待验证
+- 已实现 Core OCR DTO/interface、三项 Lua API、Worker 适配器、显式语言模型管理窗和截图 PNG IPC；Core tests 使用 fake engine，不等价于真实模型精度测试。
+- Windows Actions CI 尚待当前 M9 提交验证：NuGet Restore、win-x64 native assets、Build、测试、API 手册一致性与 self-contained publish。
+- 桌面集中验收（在 M14 完成后）：模型下载/哈希、完全断网识别、中文/英语/日语文字准确率、错误/空白/旋转/高分辨率图片、边界框/多屏负坐标、WaitText pause/stop、CPU/内存与长时稳定性。
+- 由于上游项目规模较小，维持适配层和锁定版本；如果 Restore、Windows native assets、许可证审查或实测质量不达标，应替换引擎而不改变公开 OCR DTO/API 语义。

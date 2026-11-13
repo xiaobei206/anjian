@@ -3,7 +3,7 @@
 > 这是当前运行时 API 契约与完整目标 API 设计的技术规格。当前函数与目标函数的状态以 [中文函数/参数参考手册](FUNCTION-REFERENCE-CN.md) 和 [完整功能矩阵](FEATURE-MATRIX-CN.md) 为准。
 
 - Lua 版本：5.4
-- API 版本：0.6（M8 图像资源与 RGB/颜色块扩展；仅 main 开发版，尚未发布到 preview.4）
+- API 版本：0.7（M9 OCR 文本识别扩展；仅 main 开发版，尚未发布到 preview.4）
 - 命令风格：全局英文函数名 + 标准 Lua 函数调用语法
 - 时间单位：毫秒
 - 坐标单位：虚拟桌面物理像素
@@ -208,10 +208,10 @@ WindowUnbind(binding)
 
 ## 8. API 注册与兼容
 
-- 唯一机器可读来源：`src/Anjian.Core/Api/lua-api-registry.json`，登记 74 个当前公开函数的稳定 ID、分类、签名、参数 schema、默认值/范围、返回值/错误、暂停/取消、坐标/权限、示例、实现状态和版本。
+- 唯一机器可读来源：`src/Anjian.Core/Api/lua-api-registry.json`，登记 81 个当前公开函数的稳定 ID、分类、签名、参数 schema、默认值/范围、返回值/错误、暂停/取消、坐标/权限、示例、实现状态和版本。
 - `Anjian.Core.Api.LuaApiRuntime` 从该注册表生成 Lua 全局包装；内部 `__...` 桥接绑定在包装闭包建立后隐藏。
 - `docs/FUNCTION-REFERENCE-CN.md` 第 2 节由 `tools/Anjian.ApiDocsGenerator` 生成；使用 `--write` 更新，`--check` 验证是否漂移。
-- 注册表只包含真实当前实现。M6 窗口/坐标、M7 UIA 与 M8 核心图像函数已进入 main；OCR 及尚未完成的资源预览/视觉调试能力仍属于剩余工作，不会被伪装成可调用 API。
+- 注册表只包含真实当前实现。M6 窗口/坐标、M7 UIA、M8 图像资源/视觉调试与 M9 OCR 首轮 API 已进入 main；尚未完成的 M10+ 功能仍属于后续阶段，不会被伪装成可调用 API。
 - 后续 IDE 补全/参数提示/命令面板应读取 `LuaApiRegistry.Load().Categories` 与 `.Apis`，禁止另建静态函数清单。
 
 - API 注册中心维护命令标识、中文名、分类、参数 schema、默认值、返回值、示例、最低 API 版本和弃用状态。
@@ -242,7 +242,7 @@ WindowUnbind(binding)
 - CaptureScreen 捕获 Windows 虚拟桌面的可见合成画面；GetImageSize 返回尺寸与 hasScreenCoordinates、screenOriginX、screenOriginY。
 - CaptureWindow 与 CaptureClient 只接受可见、未最小化的窗口。底层是屏幕区域捕获；窗口被覆盖的部分不能保证得到目标窗口真实后台内容，硬件加速/受保护表面可能不可读。
 - 不绕过 UIPI、UAC、安全桌面或其他访问控制。截图 API 返回结果不代表通用后台输入受到支持。
-- 模板预览/命名/版本校验 UI、视觉调试 overlay、颜色差值/颜色块工具仍为 M8 剩余工作；OCR 不属于本阶段。
+- 模板预览/命名/版本校验 UI、视觉调试 overlay、颜色差值/颜色块工具仍为 M8 剩余工作；OCR 已在 M9 以本地离线 API 接入 main，详见第 10 节；仍未发布到 preview.4。
 
 
 ## 8. M8 RGB、颜色块与图像资源扩展（API 0.6）
@@ -259,3 +259,31 @@ ColorDifference 的三类差值分别为：最大单通道绝对差、三个通�
 FindColorBlocks 的 step 是采样网格步长，pixelCount 指命中采样点数量，并非原始连续像素面积；块以八邻域（含对角）相连。单次最多扫描 4,000,000 个采样点，最多返回 100 个块；minPixels 和 maxResults 均有范围校验，停止可取消扫描。返回项含局部 x/y/width/height/centerX/centerY、pixelCount，截图还含 screen 绝对坐标。
 
 脚本图像模板 UI 使用与 Lua Worker 相同的相对路径基准：相对 LoadImage 路径以脚本所在目录解析；资源管理器复制的 .assets/... 路径可以直接传入 LoadImage。资源 ID 仍只在当前脚本运行轮次内有效。
+
+
+## 10. M9 OCR 文字识别 API（API 0.7；main 开发版）
+
+本节 API 已登记在唯一注册表 `src/Anjian.Core/Api/lua-api-registry.json`，当前公开 API 总数 81。函数手册中的完整参数表由注册表自动生成。本功能仅存在于 main 开发版，不在 v0.1.0-preview.4 中。
+
+### 10.1 OCR(imageId, language?, minConfidence?)
+- `language`：`ch`（简体中文，默认）、`en`、`japan`；当前首轮只开放这三种语言。
+- `minConfidence`：0–1，低于阈值的文本行会被过滤。
+- 返回 table：`text`、`lineCount`、`lines`、`languages`、`detectedLanguages`、`width`、`height`、`durationMs`、`hasScreenCoordinates`、`screenOriginX/Y`。每个 line 含 1 起始 index、text、confidence、x/y/width/height、polygon；截图来源另含 screenX/screenY。
+- 坐标：x/y/width/height 与 polygon 是图像局部零基像素；screenX/screenY 是虚拟桌面绝对物理像素。加载磁盘图片没有 screen 坐标，不返回 screenX/screenY。
+
+### 10.2 FindText(imageId, text, language?, minConfidence?, matchMode?)
+- `matchMode`：`contains`（默认）或 `exact`；不区分大小写，按 OCR 阅读顺序返回第一个满足置信度阈值的行。
+- 未命中返回 nil；命中结构与 OCR 单行相同。空文本、无效模式、语言或置信度会抛出明确 Lua 错误。
+
+### 10.3 WaitText(text, timeoutMs?, intervalMs?, language?, minConfidence?, matchMode?)
+- 默认 timeout 10000ms、interval 300ms、语言 ch、置信度 0、模式 contains；timeout 范围 0–600000ms，interval 10–5000ms。
+- 反复截取当前可见虚拟桌面并 OCR；命中返回单行结果，超时返回 nil。timeout=0 仍执行一次检测。
+- 每轮截图前检查暂停；Stop 终止独立 Worker。临时截图在 finally 路径释放。
+- 桌面截图使用可见合成像素；不保证获得遮挡窗口后台内容，不绕过 UIPI/UAC/安全桌面。
+
+### 10.4 模型与离线行为
+- 在主窗口工具栏点击“OCR 模型”，选择简体中文/英语/日语并明确下载所需模型包。
+- 下载目录：`%LOCALAPPDATA%\\Anjian2026\\Ocr\\Models`。下载由上游模型清单进行 SHA-256 校验。
+- 脚本识别默认严格离线。未安装所选语言模型时明确报错并提示下载；不会自动联网或静默下载。
+- 每张 OCR 图像最多 16,000,000 像素，PNG IPC 编码最多 64 MiB；过大的图像先调用 CropImage。
+- 当前接口的真实识别质量、模型耗时、断网行为和 Windows 多屏坐标均需在 M14 结束后的 Windows 10/11 集中桌面验收中完成。

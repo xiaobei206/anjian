@@ -11,20 +11,30 @@
 | 阶段 | 状态 | 交付目标 |
 |---|---|---|
 | M0 完整产品范围冻结 | DONE（文档已提交） | 完整 PRD、功能矩阵、函数手册初版、后续开发阶段与验收门槛统一 |
-| M1 preview.4 实机基线与可靠性 | IN_PROGRESS | 实际 Windows 10/11 验收窗口/托盘/热键/Hook，进行长时运行、多显示器和 DPI 验证 |
+| M1 preview.4 实机基线与可靠性 | DONE（代码/CI；Windows 桌面验收延期至 M14 后集中执行） | preview.4 基础窗口/托盘/热键/Hook 代码已交付；实机长时运行、多显示器与 DPI 仍 NOT RUN，统一延后验收 |
 | M2 单一 API 注册表与文档生成 | DONE（Windows CI PASS，2026-11-13） | 建立机器可读 API 注册描述；以同一来源生成手册和后续 IDE 提示 |
 | M3 完整 Lua IDE 基础 | DONE（Windows CI PASS，2026-11-13；桌面手工验收待执行） | 高亮、行号、补全、参数提示、诊断、查找/替换、多标签、错误行导航 |
 | M4 调试器 | DONE（基础能力 Windows CI PASS；桌面实机验收 NOT RUN） | 文件/行号断点、单步、运行到光标、变量快照、调用栈 |
 | M5 可视化录制/动作列表 | DONE（Windows CI PASS；桌面手工验收 NOT RUN） | 结构化原始事件/动作、虚拟化动作编辑器、参数/延时/分组/注释/启用状态、Lua 区块同步保护、sidecar 和单步试运行 |
 | M6 坐标系统与窗口自动化 | DONE（按本 handoff 的 API/Win32 范围；最终 Windows CI PASS；桌面验收 NOT RUN） | screen/window/client/anchor/ratio、双向坐标转换、安全窗口引用/枚举/属性/操作/等待 |
 | M7 控件与前后台能力适配 | DONE（Windows CI PASS；桌面验收 NOT RUN） | UI Automation Control View/Pattern；worker 隔离与可停止性；按能力报告语义后台控件操作、受限前台输入和明确 unsupported 边界；run 43350412493：64/64 tests、0 warning/error、API check、win-x64 publish、ZIP/SHA256、artifact upload 均 PASS |
-| M8 截图、图色与模板资源 | IN_PROGRESS（Windows Actions run [43358188770](https://github.com/xiaobei206/anjian/actions/runs/43358188770) SUCCESS；85/85 tests、0 warnings/errors；本轮无 Windows 桌面访问，M8-01..M8-18 全部 NOT RUN） | 截图/图像资源生命周期、脚本级 PNG manifest/assets 管理、相对路径与依赖检查、RGB/hex/颜色差值/八邻域颜色块、透明模板匹配、视觉调试点击穿透 overlay；必须在真实 Windows 10/11 桌面完成 M8-01..M8-18，CI 不替代实机验收 |
-| M9 OCR 与文本识别 | TODO | 本地 OCR、语言/字库配置、文字区域/置信度与等待文本 |
+| M8 截图、图色与模板资源 | DONE（实现/Windows CI；桌面验收延期至 M14 后） | 图像资源 UI、manifest/assets、相对路径/依赖、RGB/hex/颜色块、透明模板、视觉调试 overlay 已进入 main 并通过 Windows CI；M8-01..M8-18 仍 NOT RUN，集中验收 |
+| M9 OCR 与文本识别 | IN_PROGRESS（首轮代码/API 已进入 main；Windows CI 待验证；桌面验收延期至 M14 后） | 本地 OCR 引擎、显式语言模型管理、离线推理、行级文本/置信度/矩形/多边形、FindText 与 WaitText |
 | M10 参数、配置与脚本自定义 UI | TODO | 参数声明、类型/默认值/范围/选项、校验、持久化和通用表单 |
 | M11 小精灵打包器 | TODO | 独立包/EXE 入口、独立参数界面、图标、依赖收集、运行控制、清单与校验 |
 | M12 内置扩展 API 与插件系统 | TODO | 文件、剪贴板、对话框、进程、HTTP/JSON，插件 manifest/权限/API 版本 |
 | M13 多实例与定时任务 | TODO | 独立运行实例、任务状态、定时、超时、失败策略与隔离 |
 | M14 1.0 稳定化与发布 | TODO | 自动与手工验收、依赖许可、离线帮助、性能/长时测试和正式稳定版发布 |
+
+## 统一 Windows 桌面实机验收策略（用户决定，2026-11-13）
+
+用户明确决定先完成 M9–M14 全部功能开发，整体开发结束后再集中进行 Windows 10/11 实机验收。自本决策起：
+
+- M1–M13 的桌面手工验收不再作为进入下一开发阶段的前置条件；按阶段保留测试清单和状态，未执行一律 NOT RUN。
+- M8-01..M8-18 仍全部 NOT RUN；代码/CI 完成不等于桌面通过，M8 不得因延期验收改写为实机 PASS。
+- M9 及后续阶段照常实现 Core/API/Windows App、自动化测试、CI、文档和自包含构建；需要真实桌面才能判断的项目统一收集至 M14 后集中执行。
+- M14 正式 1.0.0 Release 仍必须等待这轮集中验收。任何 FAIL 需修复并重新构建/测试；未测试项目继续公开标记，不得以 CI 结果替代。
+- 最终集中测试需记录 Windows 10/11 OS build、DPI、屏幕拓扑、硬件、步骤、结果和日志；测试范围覆盖 M1–M13 的全部桌面验收行。
 
 ## M1 — preview.4 实机基线与可靠性
 
@@ -170,11 +180,11 @@ Windows CI 最终结果：run 43295924472 SUCCESS；37/37 tests、Release Build 
 - 本阶段未更新 VERSION / preview 版本，未创建 Release。
 
 
-## M8 — 截图、图色与模板资源（核心 API/CI DONE；完整阶段 IN_PROGRESS）
+## M8 — 截图、图色与模板资源（实现/Windows CI DONE；桌面验收集中延期）
 
 ### 已交付的 main 核心能力（尚未包含在 preview.4 Release）
 - Anjian.Core.Imaging 提供 PixelImage 与独立可测试的 ImageSearchEngine；Windows 端使用 GDI+ CopyFromScreen 捕获当前可见桌面合成画面。没有新增第三方图像识别依赖。
-- API registry 从 0.4 升至 0.5；公开函数从 54 项增至 74 项（新增 20 个截图、像素/颜色、资源管理、模板匹配与等待函数）。Lua worker IPC、运行时包装和中文函数手册同步更新。
+- API registry 从 0.4 经 M8 升至 0.6；公开函数共 78 项（M8 新增截图、像素/颜色、资源管理、模板匹配、RGB/hex、颜色块函数）。Lua worker IPC、运行时包装和中文函数手册同步更新。
 - 支持虚拟桌面、可见窗口外框、客户区和 screen/window/client/anchor/ratio 坐标空间的矩形捕获；屏幕图像保留负坐标/屏幕原点元数据。
 - 图像资源由每轮脚本运行持有，最多 128 个资源/轮、256 MiB 缓存/轮、单图最多 32,000,000 像素；支持 PNG 保存、加载、裁剪、读取像素、显式释放以及轮次结束清理。
 - 支持 RGB 颜色比较/单点找色/多点找色/区域计数、每通道容差、区域与 step；模板找图支持透明通配像素、相似度阈值、灰度模式、0.25–4 倍最近邻缩放、多结果（最多 1000 个）与非重叠结果筛选。
@@ -244,3 +254,20 @@ M7 实现/CI 已完成不代表 M7-01..M7-10 Windows 桌面验收通过；这些
 - 每次发布文件名带产品名与版本；release、变更日志、构建报告和 SHA256 必须对应同一版本。
 - PRD / 功能矩阵定义完整范围，ROADMAP 定义实施顺序，handoff 定义下一会话唯一任务。
 - 优先直接在 main 小步提交并保持易回滚；写入前核对最新 HEAD。
+
+
+## M9 — OCR 与文本识别（IN_PROGRESS；桌面验收统一延期）
+
+### 首轮已进入 main 的实现
+- API registry 从 0.6 升至 0.7，当前公开 API 81 项；新增 `OCR`、`FindText`、`WaitText`，由单一注册表驱动 Lua runtime、编辑器补全/签名和函数手册。
+- Core 新增引擎中立 `IOcrRecognitionService` 与文本/行/多边形 DTO；Core 不引用第三方 OCR 或 ONNX 包。
+- Windows App 新增 PaddleOcrNet 2.4.0 适配层，CPU 模式；OCR 模型管理窗显式下载 ch/en/japan 模型，并把缓存写入用户 LocalAppData。
+- Worker 识别严格 `Offline=true`，模型缺失只报错，不在脚本执行期间自动联网。模型管理下载使用上游 SHA-256 校验报告。
+- OCR 输入最多 16 MP / PNG IPC 64 MiB；WaitText 通过主进程截图 IPC，在每次截图前走 checkpoint、支持 Pause；Stop 终止独立 Worker，截图资源在 finally 中释放。
+- 返回逐行全文、confidence、图像局部矩形/多边形；截图另返回 screenX/screenY 并保留虚拟桌面负坐标。
+
+### M9 后续开发/自动化验收
+- 当前 Core API 测试覆盖 Lua 表结构、文本匹配模式、置信度过滤、屏幕坐标映射、WaitText checkpoint 和截图释放。
+- Windows CI 需要验证 PaddleOcrNet 2.4.0 NuGet restore、win-x64 运行时资产、0 warnings/errors、全部 Core tests、API 手册生成、self-contained publish、ZIP/SHA256。
+- M9 桌面验收行 M9-01..M9-08 保持 NOT RUN，随 M1–M8 一并推迟至 M14 后的集中验收；重点为模型下载/哈希、断网识别、三种语言、文本边界框、超大/损坏图片、WaitText Pause/Stop 和多显示器负坐标。
+- 上游包规模较小，保留 Core/App 适配边界；若 CI、许可或实际质量不达标，替换 App adapter，不改变稳定 Lua DTO/API 契约。

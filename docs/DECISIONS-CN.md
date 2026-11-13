@@ -123,3 +123,12 @@
 - Stop 通过终止 worker 来中断可能挂起的同步 UIA/COM provider 调用；主进程的 UI 不等待该 COM 调用结束，并继续执行统一输入释放。所有 binding 与 AutomationElement 缓存随 worker 生命周期结束。
 - UIA 的 Value/Selection/Toggle/Invoke 被定义为标准控件语义操作，不能称作通用后台键鼠输入。通用后台鼠标、键盘和文本注入在未经过具体技术验证之前明确返回 unsupported；不伪造 PostMessage 输入、不绕过 UIPI/UAC/安全桌面。
 - 影响：新增控件 API 时必须声明实际 Pattern、支持状态、错误/限制，并加入能力探测和 worker 停止测试。CI PASS 不视为 Windows 桌面验收完成。
+
+
+## ADR-021：OCR 使用可替换的本地引擎适配层
+- 状态：ACCEPTED（M9 首轮实现；真实 Windows 质量与性能验收延期）
+- 决策：Core 只定义 `IOcrRecognitionService` 和引擎无关结果 DTO；Windows App 使用锁定的 PaddleOcrNet 2.4.0 适配器，默认 CPU 推理。公开 Lua API 只消费统一的 OCR 结果模型，不暴露第三方类型。
+- 离线策略：Worker 的 `PaddleOcrServiceOptions.Download.Offline` 固定为 true；执行脚本时不得隐式下载模型。用户只能通过主 UI 的“OCR 模型”管理器明确选择语言并下载模型；缓存位于 `%LOCALAPPDATA%\\Anjian2026\\Ocr\\Models`。下载过程由上游模型清单校验 SHA-256。
+- 语言首轮范围：简体中文 `ch`、英语 `en`、日语 `japan`。识别输出使用统一 DTO，包含全文、逐行置信度、局部矩形、多边形、语言、源图像尺寸和耗时；截图结果另附 screen 绝对坐标。
+- 停止/隔离：OCR 推理只能发生在独立 Lua Worker；Stop 通过终止 Worker 打断阻塞的原生推理，主 UI 不等待 OCR 引擎。WaitText 在每轮截图前经 checkpoint 支持暂停，临时截图在 finally 路径释放。
+- 影响与保留意见：PaddleOcrNet 2.4.0 的上游规模较小，因此只能通过适配层依赖；不得将 Paddle 类型泄漏至 Core。若未来替换引擎，只需重写 App adapter 和模型管理 UI，不改变 Lua/DTO 契约。发布前仍需核对包许可证、所有传递依赖的许可和 win-x64 native assets，并在真实 Windows 10/11 测试精度、速度、内存和断网行为。
