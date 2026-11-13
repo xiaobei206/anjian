@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.IO.Pipes;
 using System.Text;
 using System.Text.Json;
+using System.Security.Cryptography;
 using Anjian.Core;
 using Anjian.Core.Editor;
 using Anjian.Core.Imaging;
@@ -10,12 +11,15 @@ using Anjian.Core.Permissions;
 using Anjian.Core.Api;
 using Anjian.Core.Plugins;
 using Anjian.Core.Windows;
+using Anjian.Core.Runtime;
 
 namespace Anjian.App.Services;
 
 internal sealed class PlaybackRunner : IDisposable
 {
-    private readonly WindowsInputController _input = new();
+    private readonly RunInstanceId _instanceId;
+    private readonly InputArbiter _inputArbiter;
+    private readonly WindowsInputController _input;
     private readonly WindowsWindowManager _windows = new();
     private readonly WindowsImageService _images;
     private readonly ExecutionGate _gate = new();
@@ -32,9 +36,15 @@ internal sealed class PlaybackRunner : IDisposable
     private string _launchScriptDirectory = string.Empty;
     private ClipboardDialogHost? _clipboardDialogHost;
     private TaskCompletionSource<LuaDebugCommand>? _debugCommandSource;
+    private string? _workerAttemptId;
+    private string? _sessionNonce;
+    private bool _workerReadyReceived;
 
-    public PlaybackRunner()
+    public PlaybackRunner(RunInstanceId instanceId, InputArbiter inputArbiter)
     {
+        _instanceId = instanceId ?? throw new ArgumentNullException(nameof(instanceId));
+        _inputArbiter = inputArbiter ?? throw new ArgumentNullException(nameof(inputArbiter));
+        _input = new WindowsInputController(_inputArbiter, _instanceId);
         _images = new WindowsImageService(_windows);
         _images.VisualDebugUpdated += value => VisualDebugUpdated?.Invoke(value);
     }
@@ -45,6 +55,11 @@ internal sealed class PlaybackRunner : IDisposable
     public event Action<int, int>? IterationChanged;
     public event Action<LuaDebugSnapshot>? DebugPaused;
     public event Action? DebugSessionCompleted;
+    public event Action? WorkerReady;
+    public event Action? WorkerForceTerminating;
+    public bool LastCleanupSucceeded { get; private set; } = true;
+    public bool IsWorkerAlive => _worker is { HasExited: false };
+    public RunInstanceId InstanceId => _instanceId;
     public bool IsRunning => _runCts is not null;
     public bool IsPaused => _gate.IsPaused;
     public bool IsDebugging => _runCts is not null && _debugLaunchOptions is not null;
@@ -145,7 +160,9 @@ internal sealed class PlaybackRunner : IDisposable
         {
             KillWorker();
             _processSession.ClearHandles();
-            _input.ReleaseAll();
+            LastCleanupSucceeded = await _input.ReleaseAllAsync().ConfigureAwait(false);
+            if (!LastCleanupSucceeded)
+                Log?.Invoke("严重：实例输入清理失败，全局输入仲裁器已锁定；恢复前不会允许其他实例注入键鼠。");
             Volatile.Read(ref _debugCommandSource)?.TrySetCanceled();
             _debugLaunchOptions = null;
             _launchParameters = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
@@ -162,10 +179,10 @@ internal sealed class PlaybackRunner : IDisposable
 
     public void Stop()
     {
+        // Let the Worker observe a closed/cancelled pipe and clean up cooperatively first.
+        // RunOneAsync applies ADR-033's 2-second grace period before killing its process tree.
         _runCts?.Cancel();
         Volatile.Read(ref _debugCommandSource)?.TrySetCanceled();
-        KillWorker();
-        _input.ReleaseAll();
     }
 
     private async Task RunOneAsync(
@@ -177,7 +194,7 @@ internal sealed class PlaybackRunner : IDisposable
         _images.ScriptDirectory = Path.GetDirectoryName(Path.GetFullPath(scriptPath))!;
         var pipeName = "Anjian2026_" + Guid.NewGuid().ToString("N");
         await using var server = new NamedPipeServerStream(pipeName, PipeDirection.InOut, 1,
-            PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
+            PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
         var executable = Environment.ProcessPath ?? throw new InvalidOperationException("无法定位当前程序路径。");
         var start = new ProcessStartInfo(executable) { UseShellExecute = false, CreateNoWindow = true };
         start.ArgumentList.Add("--worker");
@@ -186,41 +203,151 @@ internal sealed class PlaybackRunner : IDisposable
         var worker = Process.Start(start) ?? throw new InvalidOperationException("无法启动脚本执行进程。");
         _worker = worker;
 
+        var handshake = new WorkerHandshake
+        {
+            InstanceId = _instanceId.Value,
+            WorkerAttemptId = Guid.NewGuid().ToString("N"),
+            SessionNonce = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant()
+        };
+        _workerAttemptId = handshake.WorkerAttemptId;
+        _sessionNonce = handshake.SessionNonce;
+        _workerReadyReceived = false;
+
         try
         {
-            await server.WaitForConnectionAsync(token).ConfigureAwait(false);
+            using (var startupCts = CancellationTokenSource.CreateLinkedTokenSource(token))
+            {
+                startupCts.CancelAfter(RunInstanceLimits.WorkerStartupTimeoutMilliseconds);
+                try
+                {
+                    await server.WaitForConnectionAsync(startupCts.Token).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) when (!token.IsCancellationRequested)
+                {
+                    throw new TimeoutException(
+                        $"Worker 在 {RunInstanceLimits.WorkerStartupTimeoutMilliseconds} ms 内未建立 IPC 连接。");
+                }
+            }
+
             using var reader = new StreamReader(server, new UTF8Encoding(false), false, 4096, leaveOpen: true);
-            using var writer = new StreamWriter(server, new UTF8Encoding(false), 4096, leaveOpen: true) { AutoFlush = true };
+            using var writer = new StreamWriter(server, new UTF8Encoding(false), 4096, leaveOpen: true)
+            {
+                AutoFlush = true
+            };
+            await writer.WriteLineAsync(JsonSerializer.Serialize(handshake)).ConfigureAwait(false);
+
             while (!token.IsCancellationRequested)
             {
                 var line = await reader.ReadLineAsync(token).ConfigureAwait(false);
-                if (line is null) break;
-                var message = JsonSerializer.Deserialize<IpcMessage>(line) ?? throw new InvalidDataException("收到空的执行请求。");
+                if (line is null)
+                    break;
+
+                var message = JsonSerializer.Deserialize<IpcMessage>(line)
+                    ?? throw new InvalidDataException("收到空的执行请求。");
+                ValidateWorkerMessage(message, handshake);
+                if (!_workerReadyReceived && message.Type != "worker-ready")
+                    throw new InvalidDataException("Worker 尚未完成身份握手便发送了执行命令。");
+                if (_workerReadyReceived && message.Type == "worker-ready")
+                    throw new InvalidDataException("Worker 重复发送了启动握手。");
+
                 try
                 {
                     var payload = await DispatchAsync(message, debugOptions, token).ConfigureAwait(false);
-                    await writer.WriteLineAsync(JsonSerializer.Serialize(new { ok = true, payload })).ConfigureAwait(false);
+                    if (message.Type == "worker-ready")
+                    {
+                        _workerReadyReceived = true;
+                        WorkerReady?.Invoke();
+                    }
+
+                    await writer.WriteLineAsync(JsonSerializer.Serialize(new
+                    {
+                        ok = true,
+                        payload,
+                        instanceId = handshake.InstanceId,
+                        workerAttemptId = handshake.WorkerAttemptId,
+                        sessionNonce = handshake.SessionNonce
+                    })).ConfigureAwait(false);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
                     Log?.Invoke("命令执行失败：" + ex.Message);
-                    await writer.WriteLineAsync(JsonSerializer.Serialize(new { ok = false, error = ex.Message })).ConfigureAwait(false);
+                    await writer.WriteLineAsync(JsonSerializer.Serialize(new
+                    {
+                        ok = false,
+                        error = ex.Message,
+                        instanceId = handshake.InstanceId,
+                        workerAttemptId = handshake.WorkerAttemptId,
+                        sessionNonce = handshake.SessionNonce
+                    })).ConfigureAwait(false);
                 }
             }
 
             await worker.WaitForExitAsync(token).ConfigureAwait(false);
             if (worker.ExitCode != 0 && !token.IsCancellationRequested)
-                throw new InvalidOperationException($"脚本执行失败（退出代码 {worker.ExitCode}），请检查运行日志。");
+                throw new InvalidOperationException(
+                    $"脚本执行失败（退出代码 {worker.ExitCode}），请检查运行日志。");
         }
         finally
         {
-            if (!worker.HasExited && token.IsCancellationRequested)
-                KillWorker();
+            if (!worker.HasExited)
+            {
+                try { server.Dispose(); } catch { }
+                try
+                {
+                    await worker.WaitForExitAsync().WaitAsync(
+                        TimeSpan.FromMilliseconds(RunInstanceLimits.WorkerCancellationGracePeriodMilliseconds))
+                        .ConfigureAwait(false);
+                }
+                catch (TimeoutException)
+                {
+                    WorkerForceTerminating?.Invoke();
+                    KillWorker();
+                    try { await worker.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(2)).ConfigureAwait(false); }
+                    catch { }
+                }
+                catch
+                {
+                    if (!worker.HasExited)
+                    {
+                        WorkerForceTerminating?.Invoke();
+                        KillWorker();
+                    }
+                }
+            }
+
             worker.Dispose();
             _worker = null;
-            _input.ReleaseAll();
+            _workerAttemptId = null;
+            _sessionNonce = null;
+            var cleaned = await _input.ReleaseAllAsync().ConfigureAwait(false);
+            LastCleanupSucceeded &= cleaned;
+            if (!cleaned)
+                Log?.Invoke("严重：Worker 结束后键鼠输入未能全部释放；全局输入已锁定。");
             _images.Clear();
             _windows.ClearReferences();
+        }
+    }
+
+    private static void ValidateWorkerMessage(IpcMessage message, WorkerHandshake expected)
+    {
+        if (!string.Equals(message.InstanceId, expected.InstanceId, StringComparison.Ordinal) ||
+            !string.Equals(message.WorkerAttemptId, expected.WorkerAttemptId, StringComparison.Ordinal) ||
+            !FixedNonceEquals(message.SessionNonce, expected.SessionNonce))
+            throw new InvalidDataException("拒绝不属于当前 Worker pipe/session 的 IPC 消息。");
+    }
+
+    private static bool FixedNonceEquals(string? actual, string expected)
+    {
+        if (actual is null || actual.Length != expected.Length)
+            return false;
+        try
+        {
+            return CryptographicOperations.FixedTimeEquals(
+                Convert.FromHexString(actual), Convert.FromHexString(expected));
+        }
+        catch (FormatException)
+        {
+            return false;
         }
     }
 
@@ -238,7 +365,10 @@ internal sealed class PlaybackRunner : IDisposable
                 OcrModelDirectory = _spriteRuntimeOptions?.OcrModelDirectory,
                 PluginRuntime = _pluginRuntimeOptions,
                 PluginApiContributions = _pluginApiContributions.ToList(),
-                Permissions = _launchPermissions
+                Permissions = _launchPermissions,
+                InstanceId = _instanceId.Value,
+                WorkerAttemptId = _workerAttemptId ?? throw new InvalidOperationException("Worker attempt 尚未分配。"),
+                SessionNonce = _sessionNonce ?? throw new InvalidOperationException("Worker 会话 nonce 尚未分配。")
             });
 
         if (message.Type == "debug-break")
@@ -261,31 +391,31 @@ internal sealed class PlaybackRunner : IDisposable
                 await _gate.WaitUntilRunnableAsync(token).ConfigureAwait(false);
                 break;
             case "move":
-                _input.MoveTo(checked((int)message.X), checked((int)message.Y));
+                await _input.MoveToAsync(checked((int)message.X), checked((int)message.Y), token).ConfigureAwait(false);
                 break;
             case "click":
                 await _input.ClickAsync(message.Name ?? "left", message.Milliseconds, token).ConfigureAwait(false);
                 break;
             case "mouse-down":
-                _input.MouseDown(message.Name ?? "left");
+                await _input.MouseDownAsync(message.Name ?? "left", token).ConfigureAwait(false);
                 break;
             case "mouse-up":
-                _input.MouseUp(message.Name ?? "left");
+                await _input.MouseUpAsync(message.Name ?? "left").ConfigureAwait(false);
                 break;
             case "wheel":
-                _input.MouseWheel(message.Milliseconds);
+                await _input.MouseWheelAsync(message.Milliseconds, token).ConfigureAwait(false);
                 break;
             case "key-press":
                 await _input.KeyPressAsync(message.Name ?? "ENTER", message.Milliseconds, token).ConfigureAwait(false);
                 break;
             case "key-down":
-                _input.KeyDown(message.Name ?? "ENTER");
+                await _input.KeyDownAsync(message.Name ?? "ENTER", token).ConfigureAwait(false);
                 break;
             case "key-up":
-                _input.KeyUp(message.Name ?? "ENTER");
+                await _input.KeyUpAsync(message.Name ?? "ENTER").ConfigureAwait(false);
                 break;
             case "type-text":
-                _input.TypeText(message.Text ?? "", token);
+                await _input.TypeTextAsync(message.Text ?? "", token).ConfigureAwait(false);
                 break;
             case "delay":
                 await _gate.DelayAsync(message.Milliseconds, token).ConfigureAwait(false);
@@ -599,7 +729,7 @@ internal sealed class PlaybackRunner : IDisposable
                     throw new ArgumentOutOfRangeException(nameof(request), "move/click 坐标必须位于目标客户区（屏幕物理像素）。");
                 if (!_windows.IsForeground(request.WindowId))
                     throw new InvalidOperationException("目标窗口失去前台状态，拒绝输入。");
-                _input.MoveTo(request.X, request.Y);
+                await _input.MoveToAsync(request.X, request.Y, token).ConfigureAwait(false);
                 if (action == "click")
                 {
                     var button = request.Name.Trim().ToLowerInvariant();
@@ -621,7 +751,7 @@ internal sealed class PlaybackRunner : IDisposable
                     throw new ArgumentOutOfRangeException(nameof(request), "单次文本最多 100000 个字符。");
                 if (!info.Focused || !_windows.IsForeground(request.WindowId))
                     throw new InvalidOperationException("目标窗口必须是前台窗口且窗口内有键盘焦点；不会自动转移焦点。");
-                _input.TypeText(request.Value, token);
+                await _input.TypeTextAsync(request.Value, token).ConfigureAwait(false);
                 break;
             default:
                 throw new ArgumentException("action 必须是 move/click/key-press/text。", nameof(request));
