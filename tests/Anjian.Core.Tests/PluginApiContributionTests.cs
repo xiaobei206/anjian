@@ -64,7 +64,7 @@ public sealed class PluginApiContributionTests : IDisposable
         var second = Install("com.example.second", "PluginCollision");
         _store.Enable(first.PluginId, first.Version);
         Assert.Throws<InvalidDataException>(() => _store.Enable(second.PluginId, second.Version));
-        Assert.False(Assert.Single(_store.ListInstalled().Where(item => item.PluginId == second.PluginId)).Enabled);
+        Assert.False(Assert.Single(_store.ListInstalled(), item => item.PluginId == second.PluginId).Enabled);
         Assert.Single(_store.GetEnabledApiContributionPlans());
     }
 
