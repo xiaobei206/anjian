@@ -327,6 +327,8 @@ M1–M13 的桌面实测不再作为进入下一开发阶段的前置条件，�
 
 
 
-### M10 自动化测试补充（2026-11-13）
-- Windows CI run 43367065279 对 M10 实现通过 100/100 Core tests、Build 0 warnings/errors、API handbook check 与 win-x64 publish。自动化覆盖数值、相对文件/目录路径、正则、可选空值、必填空值和未来配置版本保护。
-- 这些是 Core 自动化测试，不是 M10-01..M10-10 的桌面验收。全部桌面项目仍 NOT RUN，统一延期至 M14 后。
+### M10 自动化测试最终结果（2026-11-13）
+- 对最终 M10 代码 HEAD `a923f1e02dce73629514da39bb10925b1271fc15` 的 Windows Actions run [43368224862](https://github.com/xiaobei206/anjian/actions/runs/43368224862) SUCCESS：Restore PASS；Release Build 0 warnings / 0 errors；Core Tests **102 passed / 0 failed / 0 skipped**；API handbook `--check` PASS；self-contained win-x64 publish、ZIP/SHA256 和 artifact upload 全 PASS。
+- 新增自动化覆盖脚本目录相对路径在配置中保持可移植、运行时解析绝对路径、非法路径和 Lua 保留字拒绝、`pairs(Args)` 遍历返回值递归只读；schema 未来版本防覆盖与既有路径/正则/数值/空值测试也已保留。
+- 临时 artifact ID `14010789337`，87,099,638 bytes；artifact archive SHA-256 `324ed884d9938548d2d35b94cd372a4bc46bf081f7abd1c77e17b28d1acf1323`，保留至 2026-12-13。该 artifact 不是 Release。
+- 自动化测试不等于桌面验收；M10-01..M10-10 以及 M1–M13 所有未执行的 Windows 10/11 手工项目仍保持 NOT RUN，统一延期至 M14 后。

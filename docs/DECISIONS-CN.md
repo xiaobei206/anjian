@@ -138,9 +138,9 @@
 - 状态：ACCEPTED（M10 实施基线）
 - 参数定义：每个脚本使用同目录 sidecar `<script>.params.json`，schemaVersion 固定为 1。元数据包含稳定参数 ID、机器名、中文标签、类型、必填、默认值、数值边界、选项、说明、验证规则、排序与敏感标记。读取参数定义绝不执行用户 Lua。
 - 运行配置：用户值单独存放在用户数据目录的配置文件中，使用脚本规范化路径的 SHA-256 派生 ID，不写回脚本目录。参数定义与运行值分离，默认值和用户值均经同一 validator 验证。
-- 类型：text、integer、number、boolean、select、multiSelect、filePath、directoryPath、hotkey、color。JSON 保留真实类型；路径只验证语法/存在性规则，不自动打开文件；热键使用规范化字符串，颜色使用 #RRGGBB 或 #AARRGGBB。
+- 类型：text、integer、number、boolean、select、multiSelect、filePath、directoryPath、hotkey、color。JSON 保留真实类型；文件/目录路径只校验语法/可选存在性，不自动打开；相对路径以脚本所在目录为基准，用户配置保留原始相对值，Worker 接收规范化绝对路径；热键使用规范化字符串，颜色使用 #RRGGBB 或 #AARRGGBB。参数机器名必须是非 Lua 保留字的唯一 Lua 标识符。
 - 启动事务：先读取 schema 和用户配置，验证 schema/version、字段 ID/名称唯一性、类型、选项、范围、必填和每个值；任何错误都在创建 Worker 之前返回字段级错误。未知未来 schemaVersion 必须只读拒绝，不能自动备份后覆盖原文件。
-- IPC：启动握手以独立结构化 JSON 载荷传入已验证参数；Worker 将值转换为 Lua 原生 string/number/boolean/table。禁止将用户值拼接到 Lua 源码。Lua 全局只读入口 `Args` 通过代理拒绝顶层写入；值表在 Worker 内构建，用户输入不被当作代码执行。
-- 持久化：配置写入同目录临时文件、flush、原子替换；替换前保留上一份有效备份。损坏配置可恢复有效备份或使用默认值并给出明确状态；导入 JSON 必须经过同一 validator。导出时默认对敏感参数进行提示/脱敏，显式导出才允许包含敏感值。
+- IPC：启动握手以独立结构化 JSON 载荷传入已验证参数；Worker 将值转换为 Lua 原生 string/number/boolean/table。禁止将用户值拼接到 Lua 源码。Lua 全局只读入口 `Args` 通过代理拒绝顶层/嵌套写入，`pairs` 迭代也递归返回代理值；Lua `rawset` / `debug` 可绕过代理，因此它只防止常规误写，不构成恶意脚本沙箱。
+- 持久化：配置写入同目录临时文件、flush、原子替换；替换前保留上一份有效备份。设计器保存现有 sidecar 前必须成功读取/验证其 schemaVersion，未知未来版本或损坏定义不得被静默覆盖。损坏配置可恢复有效备份或使用默认值并给出明确状态；导入 JSON 必须经过同一 validator。导出时默认对敏感参数进行提示/脱敏，显式导出才允许包含敏感值。
 - UI：从 schema 生成参数对话框；开发者通过“参数设计器”新增/编辑/删除/排序定义。表单控件和 validator 共用类型定义；取消参数对话框不启动 Worker。打包器 M11 复用同一 schema/validator。
 - 测试：Core 单元测试覆盖每种类型、边界/必填/选项、多选、路径/热键/颜色、序列化往返、未知 schema、损坏备份恢复、原子替换故障、注入类型与恶意字符串。Windows CI 不代替 WinForms 实机验收；M10 桌面项延后 M14。

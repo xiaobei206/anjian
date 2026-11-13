@@ -628,3 +628,28 @@ M4 基础调试器与 M5 可视化录制/动作列表均已完成 Windows CI 验
 - run [43366381240](https://github.com/xiaobei206/anjian/actions/runs/43366381240) 对 M10 代码基线通过：Restore PASS、Release Build 0 warnings/0 errors、98/98 Core tests、API handbook check、自包含 win-x64 发布、ZIP/SHA256 和 artifact upload 全 PASS；artifact ID 14011010562，87,098,604 bytes，digest `7d5f988b7cdaabd3f0c3db2fe3f9b8c1ecb2fb205ee9963ca3614c745dc12b17`。
 - 随后增加数值/相对路径/正则与可选空值测试，并修复默认/已保存/导入的相对路径必须以脚本目录为基准的问题；最新 run [43367065279](https://github.com/xiaobei206/anjian/actions/runs/43367065279) SUCCESS：100/100 Core tests、Build 0 warnings/0 errors、API handbook check、自包含发布、ZIP/SHA256 与 artifact upload 全 PASS。artifact ID 14011171617，87,098,770 bytes，SHA-256 `e13317464a78e9c8c01559faf9a9bd1e7d1b08d94097d5ef11dcb510dbb406b9`。本地环境没有 .NET SDK，本地 Build/Test NOT RUN。
 - M10-01..M10-10 的 Windows 桌面验收仍 NOT RUN，延期至 M14 后；未修改 VERSION、未创建 Release。
+
+
+## 2026-11-13 — M10 参数系统边界加固与最终 Windows CI
+
+### 代码审查发现与修复
+- 发现 Lua 只读代理的 `pairs(Args)` 原先直接返回内部原始值，脚本可通过遍历拿到嵌套 table 后修改内容。迭代器现在对每个返回值递归包装只读代理；新增 Lua 回归测试验证遍历后尝试修改失败且原值仍为 42。
+- 明确文件/目录路径的双重语义：用户配置继续保存用户填写的相对路径，保证工程可移动；校验和运行时解析统一以脚本目录为基准，播放/调试送入 Worker 的参数值在启动前规范化为绝对路径。增加 Core 测试验证持久值与运行值不同但各自正确。
+- 路径语法错误现在在 validator 阶段返回字段问题；参数机器名拒绝 Lua 保留字，避免 `Args.end` 等不可解析访问；schema validator 对 null 参数项和非有限最小/最大值增加保护。
+- 参数设计器保存既有 `.params.json` 前先重新加载并验证；无法解析的旧定义或未来 schemaVersion 不会被静默备份/覆盖。原子写入补充 WriteThrough 与 flush。
+- 复核播放和调试入口：两者共用 MainForm 的参数收集/验证；取消、缺 schema 或校验错误均在调用 `PlaybackRunner.RunAsync` 前返回。Worker 在 worker-ready 握手接收独立 JSON typed values，先注入 Lua `Args` 再执行脚本。应用常规启动日志不自动记录参数值；脚本主动打印敏感内容仍可能进入日志。Sensitive UI 遮蔽不是加密，配置文件仍为明文 JSON。
+- 未新增公开 Lua API，registry 维持 0.7 / 81 项，函数参考手册无须变更。
+
+### 本轮代码提交（全部直接提交 main）
+- `026aa726a6cd935a0c71a98b505a1eb6e5b0d376` — validator 路径/保留字/运行时路径解析。
+- `8722822fa9d8aaede8abd0d57d32a95e68873434` — `pairs(Args)` 递归只读代理。
+- `938548b43c41dc2f89601113deef5de4bcd2db27` — 播放/调试参数传入 Worker 前路径规范化。
+- `3bf90eab244026652e41deb8ae43256e73da942c` — 未来/损坏 schema 防静默覆盖与写入 flush。
+- `ac661c3ea19aa0a3c2228291518e964d0be6a711` — 相对路径与非法值 Core 回归测试。
+- `a923f1e02dce73629514da39bb10925b1271fc15` — Lua pairs 深层只读回归测试；最终代码 HEAD。
+
+### 最终 Windows Actions 证据
+- run [43368224862](https://github.com/xiaobei206/anjian/actions/runs/43368224862)（run #218，Windows build and test）针对最终代码 HEAD `a923f1e02dce73629514da39bb10925b1271fc15`：Restore PASS；Release Build PASS，0 warnings / 0 errors；Core Tests **102 passed / 0 failed / 0 skipped**；API handbook `--check` PASS；self-contained win-x64 publish PASS；ZIP/SHA256 与 artifact upload PASS。GitHub Release 相关步骤 SKIPPED。
+- 临时 artifact `Anjian2026-preview-win-x64`，ID `14010789337`，87,099,638 bytes，archive digest `sha256:324ed884d9938548d2d35b94cd372a4bc46bf081f7abd1c77e17b28d1acf1323`，有效至 2026-12-13；这不是正式 Release。日志另有 GitHub Actions Node.js 20 弃用提示，非项目编译 warning。
+- 本地执行环境为 Debian/Linux 且无 .NET SDK；本地 Restore/Build/Test 均 NOT RUN。最终自动化结果来自 Windows Actions。
+- M10-01..M10-10 真实 WinForms/UI/运行时桌面验收仍 NOT RUN，按用户决定延期至 M14 集中执行。没有修改 VERSION、AssemblyVersion、FileVersion；没有创建 tag 或 Release；v0.1.0-preview.4 官方资产不变。

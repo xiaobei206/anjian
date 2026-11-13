@@ -393,25 +393,58 @@ M4 基础调试器已在 main 实现并通过 Windows CI。具体实现提交与
 4. 运行 Windows CI；记录真实 Restore/Build/Test/API docs/self-contained package/SHA 结果；不发布新版本。
 
 
-# 最新交接状态：M10 首轮实现已进入 main（更新于 2026-11-13）
+# 最新交接状态：M10 实现与自动化收尾完成（更新于 2026-11-13）
 
-## 当前 HEAD / CI
-- 当前 main HEAD 在更新本文档前为 `45454f4ec7397544d878b5371b9c07dedd90d504`，包含两项额外 Core validator tests。
-- 代码基线 commit `64c981382b2cc9dfec4b0a87084a6e8f3c8860c3` 的 Windows Actions run [43366381240](https://github.com/xiaobei206/anjian/actions/runs/43366381240) SUCCESS：Restore、Build 0 warnings/errors、98/98 tests、API handbook check、self-contained win-x64 publish、ZIP/SHA256、artifact upload 全 PASS。artifact ID 14011010562，87,098,604 bytes，digest `7d5f988b7cdaabd3f0c3db2fe3f9b8c1ecb2fb205ee9963ca3614c745dc12b17`。
-- 当前 M10 代码 commit `4a27c95d23f12ef9c1d43320708b852a79a053f8` 修复脚本目录相对路径上下文；run [43367065279](https://github.com/xiaobei206/anjian/actions/runs/43367065279) SUCCESS：100/100 Core tests、Build 0 warnings/errors、API handbook check、自包含发布、ZIP/SHA256 与 artifact upload 全 PASS。artifact ID 14011171617，87,098,770 bytes，SHA-256 `e13317464a78e9c8c01559faf9a9bd1e7d1b08d94097d5ef11dcb510dbb406b9`。后续文档同步提交只改文档；其新触发 CI 结果须按最新 HEAD 重新核对。
-- M1–M13 Windows 桌面验收统一延期 M14 后，所有未执行项保持 NOT RUN；M14 发布必须等待用户集中验收和缺陷修复。
+## 当前 main / 代码与 Windows CI 证据
+- 本轮开始时已核对 `main` HEAD：`3fffccd12d0d046ba1c1cada037e832f27a4c23a`；本轮实现最终代码 HEAD：`a923f1e02dce73629514da39bb10925b1271fc15`。
+- 本轮六个代码/测试小提交均直接进入 `main`；未创建长期分支或 PR。
+- 最终 Windows Actions run [43368224862](https://github.com/xiaobei206/anjian/actions/runs/43368224862)（run #218）针对最终代码 HEAD SUCCESS：Restore PASS；Release Build 0 warnings / 0 errors；Core Tests 102 passed / 0 failed / 0 skipped；API handbook `--check` PASS；self-contained win-x64 publish、ZIP/SHA256 与 artifact upload 全 PASS。GitHub Release 步骤 SKIPPED。
+- 临时 artifact：`Anjian2026-preview-win-x64`，ID `14010789337`，87,099,638 bytes，archive SHA-256 `324ed884d9938548d2d35b94cd372a4bc46bf081f7abd1c77e17b28d1acf1323`，有效至 2026-12-13。此 artifact 不是 Release。
+- GitHub Actions 日志含 Node.js 20 弃用提示；项目 Release Build 为 0 warnings / 0 errors。运行环境本地 Debian/Linux 无 .NET SDK，本地 Restore/Build/Test 均 NOT RUN。
+- M10-01..M10-10 的真实 WinForms/DPI/交互/运行时桌面验收全部仍为 NOT RUN；M1–M13 桌面验收统一延期至 M14 后。v0.1.0-preview.4 不变，没有创建 tag 或 Release。
 
-## M10 已实现首轮范围
-- Core schema / validator / configuration store / Lua parameter injector 已进入 main。
-- App 参数定义设计器、schema 驱动运行表单、恢复默认、JSON 导入导出、文件/目录选择和 Sensitive 遮蔽已进入 main。
-- PlaybackRunner 启动握手传入 JSON typed values；Worker 注入原生 Lua `Args`，常规赋值会报只读错误；不是安全沙箱。敏感配置本地 JSON 明文保存，不写普通运行日志。
-- Sidecar 使用 `<script>.params.json`，schemaVersion=1；用户值在 LocalAppData 独立保存。没有新增公开 Lua API，registry 仍为 0.7 / 81 项。
-- M10-01..M10-10 桌面验收全部 NOT RUN。
+## M10 已完成的实现与自动化边界
+- sidecar `<script>.params.json` schema v1 与独立 LocalAppData 用户配置；10 种类型和 Core 统一 validator、原子保存/备份/损坏恢复、JSON 导入导出、默认值和敏感输入处理。
+- 相对文件/目录路径保留在配置中；存在性验证和运行时解析以脚本所在目录为基准，进入 Worker 的 Lua 参数路径为绝对路径。
+- 参数名拒绝 Lua 保留字；非法路径、null schema 项和非有限范围被拒绝；设计器不会静默覆盖损坏或未来版本 schema。
+- 播放与调试共用同一启动前参数收集/验证流程。用户取消、schema 无效或值校验失败均在 Worker 创建前结束；Worker 通过独立 JSON 握手接收 typed values，注入 `Args` 后再执行脚本。
+- `Args` 常规顶层/嵌套写入和 `pairs(Args)` 遍历拿到的嵌套值写入均被递归代理拒绝；Lua `rawset` / `debug` 能绕过，故不是恶意脚本安全沙箱。
+- Sensitive 遮蔽和导出确认不是加密；LocalAppData 用户配置仍为明文 JSON。应用普通日志不自动输出参数 payload，但脚本主动打印/抛出敏感内容仍可能把内容写入日志。
+- 未新增公开 Lua API；registry 仍为 0.7 / 81 项，函数参考手册不需更新。
 
-## 下一会话唯一任务：验证当前 HEAD 的 CI，然后继续完成 M10
-1. 先核对 main 最新 HEAD，并读取 AGENTS、README、handoff、ROADMAP、PRD 2.9/2.13、F20/F26、ARCHITECTURE、DECISIONS、registry 和 Worker IPC。
-2. 检查 run 43366600434；若失败，按真实 job log 修复。目标是 100/100 Core tests、0 warnings/errors、API handbook check、self-contained win-x64/ZIP/SHA256/artifact 全 PASS。
-3. 补齐 M10 自动化边界：路径/正则/数值/多选/空值/敏感参数与配置恢复；检查参数默认值路径相对脚本目录的语义、损坏/未来 schema 的保护和导入/导出行为。修正后重新跑完整 CI。
-4. 复核 UI/Worker 启动顺序：schema 读取不执行 Lua；校验失败或用户取消绝不启动 Worker；播放与调试收到相同 typed Args；普通日志不得输出参数值。100/100 Core tests 与 Windows CI 已 PASS，但仍需对剩余 edge cases 做代码审查/测试。
-5. M10 的真实 WinForms DPI/交互和运行时验收仍延期 M14；不要把桌面 NOT RUN 标为 PASS。M10 尚未全部完成前，不进入 M11。
-6. 不修改 VERSION、不创建 Release，不创建长期分支/PR；在本轮完成后更新 log/handoff/roadmap/feature matrix，再提交 main。
+## 本轮代码提交链
+- `026aa726a6cd935a0c71a98b505a1eb6e5b0d376` — validator 路径/保留字/运行时路径解析。
+- `8722822fa9d8aaede8abd0d57d32a95e68873434` — `pairs(Args)` 递归只读代理。
+- `938548b43c41dc2f89601113deef5de4bcd2db27` — Worker 启动参数路径规范化。
+- `3bf90eab244026652e41deb8ae43256e73da942c` — 未来/损坏 schema 防静默覆盖与写入 flush。
+- `ac661c3ea19aa0a3c2228291518e964d0be6a711` — Core 相对路径和非法值回归测试。
+- `a923f1e02dce73629514da39bb10925b1271fc15` — Lua pairs 深层只读回归测试（最终代码 HEAD）。
+
+## 下一会话唯一任务：M11 — 小精灵独立打包器与发布包
+
+### 开始前
+1. 重新核对 `main` 最新 HEAD，读取 `AGENTS.md`、`README.md`、本 handoff、`docs/ROADMAP-CN.md`、PRD 2.13、FEATURE-MATRIX F24/F25/F26、ARCHITECTURE、DECISIONS、API registry、现有脚本/图像/OCR 资源布局和 Worker 启动入口。
+2. 以已冻结的 PRD 2.13 为完整范围；不得把“压缩 Lua 文件”或“复制普通主程序”称为小精灵，也不得把无法安全单文件化的文件夹包伪装成单 EXE。
+3. 继续直接在 `main` 小步提交；不创建长期分支/PR，不修改版本号、不创建 Release，除非后续明确要求发布。
+
+### M11 唯一实施范围
+- 支持选择一个或多个入口脚本，递归/显式收集工程依赖、模块、图片模板、OCR 字库/模型（遵循显式资源策略）、参数定义和必需运行资源。
+- 生成可独立运行的发布包：至少提供便携文件夹包和带清晰启动入口的 EXE/启动器包；输出清单必须真实列出伴随文件，不宣传技术上并非真正单文件的包。
+- 每个小精灵可配置产品名、版本、图标、说明、作者/版权和可选 About 页面；输出 package manifest、文件清单、逐文件 SHA-256、最低 API/运行时版本和构建日志。
+- 运行时提供按参数 schema 自动生成的参数 UI，直接复用 M10 Core schema/validator，不得再造第二套参数语义；保留默认值、范围、必填、敏感项和相对路径规则。
+- 提供启动、暂停/继续、停止、状态/错误提示和可配置日志模式；支持循环次数、轮间隔、启动热键、自动启动、单实例策略、失败重试和退出清理。
+- 打包前验证入口、schema、API 版本、依赖、资源路径与 hash；缺失/损坏资源在执行脚本前报清晰错误。
+- 用户配置与包文件分离；升级不得静默覆盖用户值，schema 变化需备份/迁移/失败回滚。更新检查可关闭，不把云服务作为运行依赖。
+- 新增公开 Lua API 才更新 API registry、函数手册、编辑器提示和契约测试；M11 不得改变 M10 既有参数语义。
+
+### M11 自动化验收
+- 一个/多个入口脚本能生成 portable folder 与 EXE/launcher 包；在干净 Windows x64 环境不依赖 IDE/开发配置运行。
+- 递归依赖/图片/OCR/模块/参数定义收集准确；缺少、路径穿越、损坏或 hash 不匹配的资源在启动前被拦截。
+- manifest 中名称/版本/入口/API 最低版本/文件列表/逐文件 SHA-256 与实际包内容一致。
+- M10 全部参数类型、验证、配置隔离和敏感字段规则在小精灵界面保持一致；用户数据升级不被覆盖。
+- 暂停/继续/停止、循环、热键、单实例、失败策略和退出释放行为有 Core/集成测试；Windows CI 的 Restore/Build/Test/self-contained package/SHA256/artifact 全 PASS。
+- 桌面 UI/DPI/显示和真实输入验收继续按策略延期 M14；未执行项目必须保持 NOT RUN。
+
+### 本会话之后的状态
+- M10 实现与自动化已收尾，**下一会话只做 M11**；不回头要求先跑 M10/M8 桌面实测。
+- M11 完成前不提前启动 M12；M14 正式 1.0.0 仍等待 M1–M13 集中桌面验收和缺陷修复。

@@ -311,8 +311,9 @@ preview.4 当前采用低级鼠标/键盘 Hook，已纳入 Windows CI 编译与�
 ### 15.3 启动、Worker 与只读入口
 - 主进程在启动前解析 schema/config、迁移兼容版本、验证所有值；错误按参数 ID/标签返回，绝不创建 Worker。
 - Worker 启动握手后接收独立 JSON 参数对象；将 JSON 原生类型转换为 Lua string/number/boolean/table，不把用户字符串拼接成 Lua 源码。脚本通过只读 `Args` 表访问参数。
-- `Args` 顶层写入应抛出明确错误；嵌套表也必须递归只读或提供深复制只读视图，避免脚本修改值后污染同轮其他消费者。
-- 敏感参数只在必要 UI 显示，普通运行日志不得记录参数值；导入/导出、异常消息与测试快照同样执行脱敏。
+- `filePath` / `directoryPath` 的配置值保留用户输入的相对路径以便迁移；存在性校验和运行时解析都以脚本所在目录为基准，送入 Worker 的 Lua 参数为规范化绝对路径。
+- `Args` 顶层和嵌套表赋值均由代理拒绝；`pairs(Args)` 迭代器也递归包装返回值，避免通过遍历拿到内部原始表。Lua `rawset` / `debug` 标准库仍可绕过代理，因此它不是恶意脚本安全沙箱。
+- Sensitive 只做表单遮蔽、导出确认与应用常规日志不自动输出参数值；本地用户配置仍为明文 JSON。脚本本身若主动打印敏感值，应用无法替脚本隐藏。
 
 ### 15.4 持久化和恢复
 - 配置写入采用同目录临时文件、flush 和原子替换；保留上一份有效备份。损坏时先尝试恢复备份，失败后可用默认值但须明确告知用户；未知未来 schema 不得写回/覆盖。
@@ -323,9 +324,9 @@ preview.4 当前采用低级鼠标/键盘 Hook，已纳入 Windows CI 编译与�
 ### 15.5 当前 main 实现映射（M10 首轮）
 - `src/Anjian.Core/Parameters/ScriptParameterSchema.cs`：schema DTO 和单一类型验证器。
 - `src/Anjian.Core/Parameters/ParameterConfigurationStore.cs`：1 MiB 上限、原子替换、上一份有效备份、损坏恢复和未来版本拒绝。
-- `src/Anjian.Core/Parameters/LuaParameterInjector.cs`：递归构建 Lua 表，常规赋值经 proxy 抛错；Lua 标准库中的 `rawset`/debug 能力意味着这不是恶意脚本沙箱。
+- `src/Anjian.Core/Parameters/LuaParameterInjector.cs`：递归构建 Lua 表；顶层/嵌套赋值和通过 `pairs` 迭代取得的嵌套表均由 proxy 拒绝写入；Lua `rawset`/debug 仍意味着这不是恶意脚本沙箱。
 - `src/Anjian.App/Services/ScriptParameterService.cs`：sidecar `<script>.params.json` 与 LocalAppData 用户配置路径解析。
 - `src/Anjian.App/Controls/ScriptParameterDesignerForm.cs`：参数定义表格编辑、类型选择、JSON 默认值、范围、选项、正则、敏感标记和排序。
 - `src/Anjian.App/Controls/ScriptParameterDialog.cs`：由 schema 生成的运行表单、文件/目录选择、恢复默认、JSON 导入/导出和敏感值导出确认。
-- `PlaybackRunner` 的 worker-ready 握手将已验证参数作为独立 JSON payload 传递；`WorkerProgram` 注入 `Args`。MainForm 在播放和调试前先收集参数。
+- `PlaybackRunner` 的 worker-ready 握手将已验证参数作为独立 JSON payload 传递；`WorkerProgram` 注入 `Args`。MainForm 在播放和调试前统一收集、验证参数，并把路径值按脚本目录规范化为绝对路径。
 - 配置文件为本地 JSON 明文；Sensitive 只做 UI 遮蔽、导出提醒和日志不记录，不提供静态加密。
