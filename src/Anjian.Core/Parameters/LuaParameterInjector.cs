@@ -18,8 +18,17 @@ public static class LuaParameterInjector
                 __metatable = false
             })
         end
-        Args = readonly(source)
+        local argsProxy = readonly(source)
         __anjian_args_internal = nil
+        setmetatable(_G, {
+            __index = function(_, key)
+                if key == "Args" then return argsProxy end
+            end,
+            __newindex = function(target, key, value)
+                if key == "Args" then error("Args 参数表是只读的", 2) end
+                rawset(target, key, value)
+            end
+        })
         """;
 
     public static void Inject(Lua lua, IReadOnlyDictionary<string, JsonElement> values)

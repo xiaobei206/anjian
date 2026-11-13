@@ -27,7 +27,8 @@ public sealed class LuaParameterInjectorTests
             local nestedValue = Args.nested.value
             local ok1 = pcall(function() Args.count = 99 end)
             local ok2 = pcall(function() Args.nested.value = 0 end)
-            return before, type(Args.enabled), stringValue, arrayValue, nestedValue, ok1, ok2
+            local ok3 = pcall(function() Args = {} end)
+            return before, type(Args.enabled), stringValue, arrayValue, nestedValue, ok1, ok2, ok3
             """);
         Assert.Equal(7, Convert.ToInt64(result[0]));
         Assert.Equal("boolean", result[1]?.ToString());
@@ -36,6 +37,7 @@ public sealed class LuaParameterInjectorTests
         Assert.Equal(42, Convert.ToInt32(result[4]));
         Assert.False(Convert.ToBoolean(result[5]));
         Assert.False(Convert.ToBoolean(result[6]));
+        Assert.False(Convert.ToBoolean(result[7]));
     }
 
     private static JsonElement Json(string json)
