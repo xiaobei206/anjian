@@ -84,12 +84,13 @@ internal sealed class PluginLuaModuleLoader
             end
 
             local originalOs = os
-            os = {
-                clock = originalOs.clock,
-                date = originalOs.date,
-                difftime = originalOs.difftime,
-                time = originalOs.time
-            }
+            os = {}
+            if type(originalOs) == "table" then
+                os.clock = originalOs.clock
+                os.date = originalOs.date
+                os.difftime = originalOs.difftime
+                os.time = originalOs.time
+            end
             io = nil
             debug = nil
             dofile = nil
