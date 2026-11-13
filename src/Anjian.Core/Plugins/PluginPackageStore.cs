@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using Anjian.Core.Permissions;
+using Anjian.Core.Api;
 
 namespace Anjian.Core.Plugins;
 
@@ -131,9 +132,50 @@ public sealed class PluginPackageStore
                 if (candidate.PluginId.Equals(pluginId, StringComparison.Ordinal))
                     catalog.Plugins[i] = candidate with { Enabled = candidate.Version.Equals(version, StringComparison.Ordinal) };
             }
+            ValidateEnabledApiContributions(catalog);
             SaveCatalog(catalog);
         }
     }
+
+    public IReadOnlyList<PluginApiRuntimePlan> GetEnabledApiContributionPlans()
+    {
+        lock (_sync)
+            return BuildEnabledApiContributionPlans(ReadCatalog());
+    }
+
+    private IReadOnlyList<PluginApiRuntimePlan> BuildEnabledApiContributionPlans(PluginCatalogDocument catalog)
+    {
+        var plans = new List<PluginApiRuntimePlan>();
+        foreach (var entry in catalog.Plugins.Where(item => item.Enabled))
+        {
+            var inspection = PluginPackageValidator.Inspect(
+                GetPackageDirectorySafe(entry.PluginId, entry.Version), _currentApiVersion);
+            if (inspection.Manifest.Contributions is not { Functions.Count: > 0 } contributions)
+                continue;
+            var modulesRoot = inspection.Manifest.ModulesRoot
+                ?? throw new InvalidDataException("插件 API contributions 缺少 modulesRoot。");
+            var prefix = modulesRoot + "/";
+            var moduleHashes = inspection.FileHashes
+                .Where(pair => pair.Key.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) &&
+                    Path.GetExtension(pair.Key).Equals(".lua", StringComparison.OrdinalIgnoreCase))
+                .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.OrdinalIgnoreCase);
+            plans.Add(new PluginApiRuntimePlan
+            {
+                PluginId = inspection.Manifest.PluginId,
+                Version = inspection.Manifest.Version,
+                PackageRoot = inspection.PackageRoot,
+                ModulesRootRelativePath = modulesRoot,
+                ModuleHashes = moduleHashes,
+                Functions = contributions.Functions
+            });
+        }
+
+        _ = LuaApiRegistry.Load().WithPluginContributions(plans);
+        return plans;
+    }
+
+    private void ValidateEnabledApiContributions(PluginCatalogDocument catalog) =>
+        _ = BuildEnabledApiContributionPlans(catalog);
 
     public void Disable(string pluginId, string version)
     {
@@ -465,7 +507,9 @@ public sealed class PluginPackageStore
             return false;
         var leftPermissions = JsonSerializer.Serialize(left.Permissions, PluginPackageValidator.JsonOptions);
         var rightPermissions = JsonSerializer.Serialize(right.Permissions, PluginPackageValidator.JsonOptions);
-        if (leftPermissions != rightPermissions || left.Files.Count != right.Files.Count)
+        var leftContributions = JsonSerializer.Serialize(left.Contributions, PluginPackageValidator.JsonOptions);
+        var rightContributions = JsonSerializer.Serialize(right.Contributions, PluginPackageValidator.JsonOptions);
+        if (leftContributions != rightContributions || leftPermissions != rightPermissions || left.Files.Count != right.Files.Count)
             return false;
         var rightHashes = right.Files.ToDictionary(x => x.Path, x => x.Sha256, StringComparer.OrdinalIgnoreCase);
         return left.Files.All(x => rightHashes.TryGetValue(x.Path, out var hash) &&
