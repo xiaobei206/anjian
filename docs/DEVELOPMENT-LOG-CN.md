@@ -946,3 +946,11 @@ M13-04 已结束；唯一下一任务为 M14：集中执行 Windows 10/11 桌面
 - 文档 HEAD `e5d1b9b22f028ad5fb4a8c938c35d1d7f1a1f55d` 对应 Actions [43518513568](https://github.com/xiaobei206/anjian/actions/runs/43518513568) SUCCESS；228/228 Core tests、Build 0 warnings/errors、package smoke 4/4、API check、win-x64 publish、ZIP/SHA 和 artifact upload 全 PASS。Artifact ID `14082790280`，87,373,820 bytes，digest `sha256:3f3382057cd78c44557562cbca4ca7e1666b08de60512c850986f170b81573fa`。
 - 修正文档过滤器描述后的文档 HEAD `a2edd7fdc6176c7963a815d1939a522ef7c84262` 对应 Actions [43518664871](https://github.com/xiaobei206/anjian/actions/runs/43518664871) SUCCESS；228/228 Core tests、Build 0 warnings/errors、API check、self-contained publish、package smoke 4/4、ZIP/SHA 和 artifact upload 全 PASS。Artifact ID `14081447842`，87,373,913 bytes，digest `sha256:a702a44769706fd06dbbc197aa3f34f83cd6fe1dc9f550930326359239e34897`。
 - 上述均为临时 Actions artifacts，不是 Releases；这两次文档提交没有改应用代码或版本。最终真实 `main` 仍需在本轮最新提交后重新核对。
+
+## 2026-11-13 — M14 桌面实机验收环境核查（BLOCKED；不计为完成）
+
+- 开始前复核 main HEAD 为 `3fc67c4e5d60163ad686be397389028b36947d4b`（`docs: record M13-04 documentation CI evidence`）。按 handoff 指定进入 M14，未开发新功能、未修改应用代码。
+- 实际环境：Linux x86_64 / kernel 6.18.57；`dotnet` 命令不存在，故本地 Restore/Build/Test 均 NOT RUN。当前会话无交互 Windows 10/11 桌面及物理键鼠通道，M14 所有真实键鼠、WinForms、DPI/多屏、权限弹窗、日志文件对话框、托盘/退出与 2 小时稳定性项目保持 NOT RUN。
+- 最近一次可核实的 Windows Actions 全流程为 [43518664871](https://github.com/xiaobei206/anjian/actions/runs/43518664871)，提交 HEAD `a2edd7fdc6176c7963a815d1939a522ef7c84262`，应用代码基线 `6d9513bec5de35ed8f20f656d8520217d949733a`；228/228 Core tests、Build 0 warnings/errors、API handbook、self-contained win-x64、package smoke 4/4、ZIP/SHA 与 artifact upload PASS。其后 `3fc67c4...` 为文档提交；本工具未能核实该 exact HEAD 的独立 Actions run，所以不把前一 run 冒称为 3fc 的 CI 结果。
+- 更新文档提交：ROADMAP `3173d09335f3fafb9f659e7810152368028f262c`；FEATURE-MATRIX `ff9f186b0696a349823258572f216f78bc79e7dc`；ACCEPTANCE `f53383633da71d2c59d0f3a60ffeb6e28d0c2f42`；SESSION-HANDOFF `e295b33d2aa2bdf2d1808334ad6db13454e383e1`。本日志提交是本轮文档提交链的最后一笔，最终 SHA 以本次 GitHub API 返回值为准。
+- 下一步：必须在真实 Windows 10/11 x64 设备运行开发包、完成 `docs/ACCEPTANCE-TEST-CN.md` M14 清单，附 OS build、DPI/拓扑、脚本、逐项结果、日志与截图。当前状态是环境阻塞，不是产品测试 PASS/FAIL；不修改 VERSION，不创建 tag/Release。
