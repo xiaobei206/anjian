@@ -19,6 +19,7 @@ internal sealed class PlaybackRunner : IDisposable
 {
     private readonly RunInstanceId _instanceId;
     private readonly InputArbiter _inputArbiter;
+    private readonly bool _ownsInputArbiter;
     private readonly WindowsInputController _input;
     private readonly WindowsWindowManager _windows = new();
     private readonly WindowsImageService _images;
@@ -40,10 +41,21 @@ internal sealed class PlaybackRunner : IDisposable
     private string? _sessionNonce;
     private bool _workerReadyReceived;
 
+    public PlaybackRunner()
+        : this(RunInstanceId.Create(), new InputArbiter(), ownsInputArbiter: true)
+    {
+    }
+
     public PlaybackRunner(RunInstanceId instanceId, InputArbiter inputArbiter)
+        : this(instanceId, inputArbiter, ownsInputArbiter: false)
+    {
+    }
+
+    private PlaybackRunner(RunInstanceId instanceId, InputArbiter inputArbiter, bool ownsInputArbiter)
     {
         _instanceId = instanceId ?? throw new ArgumentNullException(nameof(instanceId));
         _inputArbiter = inputArbiter ?? throw new ArgumentNullException(nameof(inputArbiter));
+        _ownsInputArbiter = ownsInputArbiter;
         _input = new WindowsInputController(_inputArbiter, _instanceId);
         _images = new WindowsImageService(_windows);
         _images.VisualDebugUpdated += value => VisualDebugUpdated?.Invoke(value);
@@ -814,5 +826,7 @@ internal sealed class PlaybackRunner : IDisposable
         _images.Clear();
         _windows.Dispose();
         _httpSession.Dispose();
+        if (_ownsInputArbiter)
+            _inputArbiter.Dispose();
     }
 }
