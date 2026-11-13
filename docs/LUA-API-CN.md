@@ -3,7 +3,7 @@
 > 这是当前运行时 API 契约与完整目标 API 设计的技术规格。当前函数与目标函数的状态以 [中文函数/参数参考手册](FUNCTION-REFERENCE-CN.md) 和 [完整功能矩阵](FEATURE-MATRIX-CN.md) 为准。
 
 - Lua 版本：5.4
-- API 版本：0.9（M12 文件操作扩展；仅 main 开发版，尚未发布到 preview.4）
+- API 版本：1.0（M12 剪贴板/对话框扩展；仅 main 开发版，尚未发布到 preview.4）
 - 命令风格：全局英文函数名 + 标准 Lua 函数调用语法
 - 时间单位：毫秒
 - 坐标单位：虚拟桌面物理像素
@@ -304,3 +304,27 @@ FindColorBlocks 的 step 是采样网格步长，pixelCount 指命中采样点�
 - 临时文件/目录的随机名称和 CreateNew 仅用于避免覆盖现有条目；API 不会自动访问系统 TEMP，也不会扩大批准根。调用者必须明确提供已授权写入目录。
 - 所有新增文件 IPC 同时经过 Worker bridge 与 PlaybackRunner 主进程 dispatcher 的 Grant 检查。Stop 在复制分块与提交前检查；同卷 rename 是单个句柄操作。
 - 本批 API 仍需 Windows 10/11 实机文件权限/真实桌面验收；CI 自动化测试不替代 M14 集中验收。
+
+## 12. M12 剪贴板与对话框 API（API 1.0；main 开发版）
+
+本批增加 `GetClipboardText`、`SetClipboardText`、`MessageBox`、`InputBox`、`Confirm`。每项操作先由 Worker bridge 检查当前运行 Grant，PlaybackRunner 在主进程再次按命令检查；伪造或未知 IPC 默认拒绝。剪贴板权限分别由 sidecar 的 `clipboardRead` / `clipboardWrite` 表达；对话框权限分别为 `dialogs: ["message"]`、`["input"]`、`["confirm"]`。声明不代表授权，仍需用户在每次运行的权限审阅中批准；未批准默认拒绝。小精灵尚未接入 sidecar 审阅，因此当前仍为空 Grant。
+
+- `GetClipboardText()`：返回 Unicode 文本；剪贴板没有文本时返回空字符串。最多 1,048,576 个 UTF-16 字符。
+- `SetClipboardText(text)`：最多 1,048,576 个 UTF-16 字符；空字符串清空剪贴板；成功返回 true。
+- `MessageBox(text, title?)`：默认标题为“按键精灵 2026”；正文最多 32,768 个字符、标题最多 256 个字符。点击确定返回 true，关闭窗口返回 false。
+- `InputBox(prompt, title?, defaultValue?)`：默认标题为“按键精灵 2026”、默认值为空字符串；提示和默认值/输入最多 32,768 个字符、标题最多 256 个字符。确定返回字符串，取消/关闭返回 nil。
+- `Confirm(text, title?)`：默认标题为“按键精灵 2026”；点击是返回 true，点击否或关闭返回 false。
+
+Clipboard 与所有自定义对话框都通过主 UI 线程执行，满足 WinForms STA 要求。打开的对话框使用自定义模态窗体；Stop 会关闭正在显示的对话框并终止 Worker。暂停在操作前按命令边界生效；若用户在对话框显示期间暂停，结果返回后脚本在下一条命令边界等待恢复。Windows 若已接受剪贴板写入，Stop 不会回滚这一外部副作用。剪贴板被其他进程占用、UI 线程不可用、请求损坏或超长时返回明确错误。API 内容不会自动写入应用日志；脚本主动打印内容不在此保证范围内。
+
+权限 sidecar 示例：
+
+```json
+{
+  "schemaVersion": 1,
+  "clipboardRead": true,
+  "clipboardWrite": true,
+  "dialogs": ["message", "input", "confirm"]
+}
+```
+

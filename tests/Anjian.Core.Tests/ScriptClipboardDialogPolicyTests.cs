@@ -48,4 +48,56 @@ public sealed class ScriptClipboardDialogPolicyTests
         Assert.False(grant.AllowsClipboardRead);
         Assert.False(grant.AllowsClipboardWrite);
     }
+
+
+    [Fact]
+    public void LuaClipboardAndDialogApisUseTypedRequestsAndRequireGrant()
+    {
+        var grant = new ScriptPermissionGrant([], [], true, true, ["message", "input", "confirm"], [], [], [], false);
+        var pipe = new ApiRecorder([
+            JsonSerializer.Serialize("剪贴板内容"),
+            "true",
+            "true",
+            JsonSerializer.Serialize("用户输入"),
+            "false"
+        ]);
+        using var lua = new NLua.Lua(openLibs: true);
+        Anjian.Core.Api.LuaApiRuntime.Register(lua,
+            new Anjian.Core.Api.WorkerLuaApi(pipe, lua, permissions: grant));
+        var result = lua.DoString("""
+            local clipboard = GetClipboardText()
+            local wrote = SetClipboardText("写入文本")
+            local shown = MessageBox("提示")
+            local value = InputBox("请输入")
+            local confirmed = Confirm("继续？")
+            return clipboard, wrote, shown, value, confirmed
+            """);
+        Assert.Equal("剪贴板内容", result[0]?.ToString());
+        Assert.True(Convert.ToBoolean(result[1]));
+        Assert.True(Convert.ToBoolean(result[2]));
+        Assert.Equal("用户输入", result[3]?.ToString());
+        Assert.False(Convert.ToBoolean(result[4]));
+        Assert.Equal(
+            ["clipboard-read-text", "clipboard-write-text", "dialog-message", "dialog-input", "dialog-confirm"],
+            pipe.Messages.Select(m => m.Command).ToArray());
+        var inputRequest = JsonDocument.Parse(pipe.Messages.Single(m => m.Command == "dialog-input").Payload!);
+        Assert.Equal("按键精灵 2026", inputRequest.RootElement.GetProperty("Title").GetString());
+        Assert.Equal("", inputRequest.RootElement.GetProperty("DefaultValue").GetString());
+    }
+
+    private sealed class ApiRecorder(IEnumerable<string?> responses) : Anjian.Core.Api.ILuaCommandPipe
+    {
+        private readonly Queue<string?> _responses = new(responses);
+        public List<ApiMessage> Messages { get; } = [];
+        public void Send(string type, string? name = null, double x = 0, double y = 0, int milliseconds = 0, string? text = null) =>
+            _ = Request(type, name, x, y, milliseconds, text);
+        public string? Request(string type, string? name = null, double x = 0, double y = 0, int milliseconds = 0, string? text = null)
+        {
+            Messages.Add(new ApiMessage(type, text));
+            return _responses.Count == 0 ? "true" : _responses.Dequeue();
+        }
+    }
+
+    private sealed record ApiMessage(string Command, string? Payload);
+
 }
