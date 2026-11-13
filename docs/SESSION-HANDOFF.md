@@ -777,3 +777,45 @@ M12-10 已完成本地插件包/manifest/生命周期与独立 Worker 基础；�
 4. **安全与生命周期**：必须复用插件的闭合文件/hash 校验、API 版本检查和三方权限交集；插件 disabled/损坏/卸载后不得继续暴露或调用其贡献；碰撞、未知贡献字段、未来 schema 和伪造 IPC 默认拒绝。不得自动联网、不加载任意 DLL、不扩大当前用户批准的 Grant。
 5. 添加 Core/集成测试覆盖贡献 schema、命名冲突、启停/兼容、调用/失败隔离、registry/IDE/handbook 一致性；实际 Windows Actions build/test/self-contained package 需要通过。不创建 Release，不改版本号。
 6. 同步 DECISIONS、ARCHITECTURE、ROADMAP、FEATURE-MATRIX、ACCEPTANCE、USER-GUIDE、DEVELOPMENT-LOG 与 handoff。Windows 10/11 的插件管理、WinForms/DPI/多屏及完整用户交互仍 NOT RUN，统一留 M14；CI PASS 不等于桌面实测。
+
+---
+
+# 最新交接状态覆盖：M12-12 插件 Lua API/命令贡献已完成（2026-11-13）
+
+本节优先于本文件历史中任何旧的 M12-12 待实现/下一会话任务声明。M12 阶段现已完成；下一会话唯一任务转入 M13-01。
+
+## M12-12 实现范围
+
+- 先冻结贡献契约与 ADR-032：插件 manifest 可选 contributions schemaVersion=1；每插件最多 64 个函数，每函数最多 16 个必填标量参数；同一 manifest 声明稳定函数 ID、公开名称、签名、参数/返回类型、错误、暂停/取消契约、示例与模块导出。
+- Core validator 拒绝未知/未来 schema、非法/重复 ID、Lua 保留/宿主/内置 API 名称、无效/非唯一模块路径、未登记模块及与受限参数/返回契约不一致的元数据。内置 API registry 仍为 1.2 / 103；插件信息只进入运行时内存 registry extension view。
+- 已启用插件贡献的签名/说明由同一个 extension view 提供给 IDE 补全/签名、API 命令面板和本机动态参考生成器。静态 FUNCTION-REFERENCE-CN.md 仍只对应内置 registry；动态参考必须显式指定输出路径。
+- 普通脚本 Worker 启动重新校验插件 catalog、enabled 状态、manifest/API 兼容、闭合文件清单和 SHA-256。启用前检查完整启用集合；跨插件命名冲突拒绝并且不保存 catalog。disabled/损坏/卸载的插件不能贡献后续计划。
+- 插件 helper 只支持受限纯 Lua，模块在普通脚本独立 Worker 中惰性加载。模块环境没有宿主键鼠、文件、剪贴板、对话框、进程、窗口、图像、OCR、HTTP 等自动化 API；不增加 host IPC、不扩大脚本 Grant、不加载任意 DLL/native code、不自动联网。参数数量/类型与返回类型在调用时验证，错误留在当前 Worker/脚本边界。
+- 插件 Worker 与小精灵 Worker 不继承普通用户脚本的插件贡献计划；内置 registry 不写回、不改 API 版本、不变更已发布 v0.1.0-preview.4。
+
+## 提交与自动化验收
+
+- Schema/registry 契约提交：f387c0c3ce46243c71dcbaf7484c92a76bc4b5b3。
+- Worker/插件 store 接入：1f13e01b317a9bc9b9165b7f2e36d30d41c4c776。
+- Core 契约测试：5bf867173368d6151625247b375f49e6f603ab3f；随后按 Actions 日志修复 nullable 与 xUnit/NLua 异常断言。
+- App/IDE/命令面板/动态参考接入：9c46cfd098430857eec23e45633313faef798e03。
+- 自动化最终通过基线为代码 HEAD 6cb86e9111fa6ea792122ec07667c0e9ee0f3b94，Windows Actions [43441156420](https://github.com/xiaobei206/anjian/actions/runs/43441156420) SUCCESS：Restore PASS；Release Build 0 warnings / 0 errors；Core tests 177 passed / 0 failed / 0 skipped；API handbook check（103 个内置函数）；self-contained win-x64 publish；published Sprite/Plugin Worker smoke；ZIP/SHA256 与 artifact upload 全 PASS。
+- Actions artifact ID 14044284665，87,281,040 bytes，SHA-256 29b125cbb56b21f8e52075713474c72591c8df9a38f5e8cd5383d8c3e26c5a0d，有效至 2026-12-13。此 artifact 为临时 Actions 产物，不是 GitHub Release。
+- 文档随后继续同步进入 main；最新文档提交仍需以当前 main 上的 Actions 实际状态为准。当前容器没有 .NET SDK，local Restore/Build/Test 为 NOT RUN。Windows 10/11 的 WinForms 插件管理/命令面板、权限交互、DPI/多显示器及完整用户交互仍 NOT RUN（M14），不得以 CI PASS 代替桌面验收。
+- 未修改 VERSION、AssemblyVersion、FileVersion；未创建 tag/Release；已发布的 v0.1.0-preview.4 资产保持不变。
+
+## 下一会话唯一任务：M13-01 — 多实例运行实例模型与隔离契约
+
+这是 M13 的第一项任务。本次仅做契约设计和 ADR/可验收状态模型，不提前实现定时任务或做大规模 runtime 重构。
+
+开始时重新核对 main 最新 HEAD，并读取 AGENTS.md、README.md、本 handoff、docs/ROADMAP-CN.md、PRD、FEATURE-MATRIX、ARCHITECTURE、DECISIONS，以及 PlaybackRunner、WorkerLaunchPayload、WorkerProgram、脚本 Grant 与输入清理路径。不要重复询问仓库中已有的答案。
+
+### 范围与验收条件
+
+1. 冻结稳定 instanceId 与运行实例状态机，至少定义创建、排队/启动、运行、暂停、停止请求、取消/超时、成功、失败、强制终止与清理完成的状态/合法转换。
+2. 定义每实例脚本路径、参数、Lua Worker、日志/错误、暂停/取消令牌、计时/超时、输入按下资源与清理归属；实例间不能共享 Lua state、计时状态、句柄或 Stop 清理状态。
+3. 明确并发启动/重复点击 Start、同脚本多实例、实例数上限、输入资源争用、进程退出/窗口关闭时行为及失败策略；明确输入事件是串行化、排队还是显式限制并发。
+4. 明确每实例权限 request 与用户本次批准的 Grant 如何绑定，任何实例不得借用另一个实例的授权或随机进程句柄；仍按现有 host 对每条 IPC fail-closed 验证。
+5. 增加 ADR 与可机读/可测试的状态转换契约，标出需要的 Core/集成测试、日志和 Windows 包 smoke；本次不实现 cron/定时器、不创建 Release、不改版本。
+6. 更新 ROADMAP、DECISIONS、ARCHITECTURE、ACCEPTANCE、DEVELOPMENT-LOG 和 handoff。真实 Windows 10/11 WinForms、并发输入、DPI/多显示器实测仍按 M14 处理。
+
