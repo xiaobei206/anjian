@@ -249,3 +249,13 @@
 - M12-10 自动化边界：不增加公开 Lua API，因此 registry 为 1.2 / 103、函数手册与 IDE 补全保持同一来源；管理器不提供第三方 API 动态注册或内置命令面板集成。SHA-256 非数字签名，Worker 非 OS 沙箱，不作为任意恶意代码隔离承诺。
 
 - Windows Actions run [43433992383](https://github.com/xiaobei206/anjian/actions/runs/43433992383) 对代码 HEAD 582db78d9bddbed820727dd1bf01b19847beb5f6 全 PASS：Restore；Release Build 0 warnings / 0 errors；Core tests 171 passed / 0 failed / 0 skipped；API handbook check；self-contained win-x64 publish；published plugin Worker 与 Sprite Worker smoke；ZIP/SHA256 和 artifact upload 全 PASS。Artifact ID 14042985442，87,263,152 bytes，archive SHA-256 ebe8ca9bc7c4f82723e86628da5755bd783d655a9c1a170c7112336919e95af1，有效至 2026-12-13；这是 Actions 临时 artifact，不是 GitHub Release。
+
+
+## ADR-031：小精灵按入口绑定权限请求 sidecar
+
+- 状态：ACCEPTED（M12-11 规格冻结；实施与自动化结果见路线图和 handoff；真实桌面审批仍留 M14）。
+- 入口 sidecar 使用现有脚本权限 schema v1，源文件名为 `<entry.lua>.permissions.json`。包内通过新增可空字段 `SpritePackageEntry.permissionManifestPath` 绑定到该入口，规范路径必须精确等于 `scriptPath + ".permissions.json"`，不可交叉引用其他入口。
+- Sidecar 作为 payload 纳入 `Anjian.Sprite.json.files`，核对大小/SHA-256 与 `SHA256SUMS.txt`。构建时验证 UTF-8/schema/大小与 reparse point；包校验和每次入口启动都复核文件、闭合清单、哈希与 schema。
+- 入口没有 sidecar 时合法但权限为空；有 sidecar 时其内容只建立 request。仅有用户本次逐项批准后，现有 `ScriptPermissionPolicy.CreateGrant` 才能产生非空 Grant。请求清单、manifest/hash 都不能代替用户同意；拒绝时不启动 Worker，审批不持久化/跨入口共享。
+- Worker bridge 和 host IPC 维持双层检查，不修改 Lua API registry。Sidecar 损坏、丢失、hash 或绑定不一致均 fail-closed。
+- Core 测试覆盖多入口绑定、清单闭合/篡改；发布包 smoke 要验证 sidecar 请求不会在缺少显式 Grant 时自动生效。SHA-256 不是数字签名；CI smoke 不代替 M14 Windows 10/11 审批窗体实机验收。

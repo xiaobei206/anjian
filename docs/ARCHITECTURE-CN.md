@@ -357,6 +357,13 @@ preview.4 当前采用低级鼠标/键盘 Hook，已纳入 Windows CI 编译与�
 - CI 增加真实 self-contained 发布包冒烟：运行重命名后的 apphost，经 Worker IPC 运行 package-local require 模块并注入 Args，检查完整执行结果；这不覆盖 WinForms UI/DPI/真实输入实机验收。
 
 
+### 16.4 M12-11 小精灵逐入口权限 sidecar
+
+- 契约详见 [小精灵权限 sidecar 规格](SPRITE-PERMISSIONS-CN.md)。可选文件命名为 `<entry.lua>.permissions.json`，并通过 `SpritePackageEntry.permissionManifestPath` 与当前入口一对一绑定。
+- Sidecar 是请求，不是 Grant。打包时校验 schema 并纳入包文件闭合清单、大小与 SHA-256；每次启动选定入口前复核绑定和哈希。绑定文件缺失、损坏或不匹配时拒绝运行。
+- 启动器复用 `ScriptPermissionService` 逐次审阅；无 sidecar/无请求时只给空 Grant，用户拒绝不启动 Worker。主进程仍对每条 IPC 做最终授权检查。
+- 自动化应以 self-contained apphost/Worker smoke 验证“声明不自动授权”；真实 WinForms 审批、DPI/多屏留 M14。
+
 ## 17. M12 权限基础层（M12-01；后续系统 API 尚未开放）
 
 ### 17.1 声明与授权数据流
