@@ -2,6 +2,7 @@ using System.Text.Json;
 using Anjian.Core.Api;
 using Anjian.Core.Imaging;
 using Anjian.Core.Ocr;
+using Anjian.Core.Windows;
 using NLua;
 using Xunit;
 
