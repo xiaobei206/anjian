@@ -15,6 +15,8 @@ internal static class Program
             return SpriteSmokeTestRunner.Run();
         if (args.Length > 0 && args[0].Equals("--plugin-smoke-test", StringComparison.OrdinalIgnoreCase))
             return PluginSmokeTestRunner.Run();
+        if (args.Length > 0 && args[0].Equals("--multi-instance-smoke-test", StringComparison.OrdinalIgnoreCase))
+            return MultiInstanceSmokeTestRunner.Run();
 
         ApplicationConfiguration.Initialize();
         if (args.Length > 0 && args[0].Equals("--automation-probe", StringComparison.OrdinalIgnoreCase))
