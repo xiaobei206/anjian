@@ -17,6 +17,7 @@ internal sealed class WorkerLaunchPayload
     public string InstanceId { get; set; } = "";
     public string WorkerAttemptId { get; set; } = "";
     public string SessionNonce { get; set; } = "";
+    public string? ScriptSource { get; set; }
     public LuaDebugLaunchOptions? DebugOptions { get; set; }
     public Dictionary<string, JsonElement> Parameters { get; set; } = new(StringComparer.Ordinal);
     public string? ModuleRootPath { get; set; }
