@@ -559,9 +559,10 @@ public sealed class ScriptFileSystem
         string destinationPath,
         bool overwrite)
     {
-        var nameBytes = Encoding.Unicode.GetBytes(destinationPath);
+        var verbatimPath = ToVerbatimPath(destinationPath);
+        var nameBytes = Encoding.Unicode.GetBytes(verbatimPath);
         var nameOffset = (IntPtr.Size * 2) + sizeof(uint);
-        var bufferSize = nameOffset + nameBytes.Length;
+        var bufferSize = nameOffset + nameBytes.Length + sizeof(char);
         var buffer = Marshal.AllocHGlobal(bufferSize);
         try
         {
@@ -572,12 +573,13 @@ public sealed class ScriptFileSystem
             Marshal.WriteByte(buffer, 0, overwrite ? (byte)1 : (byte)0);
             Marshal.WriteInt32(buffer, IntPtr.Size * 2, nameBytes.Length);
             Marshal.Copy(nameBytes, 0, IntPtr.Add(buffer, nameOffset), nameBytes.Length);
+            Marshal.WriteInt16(buffer, nameOffset + nameBytes.Length, 0);
             if (!SetFileInformationByHandle(fileHandle, FileRenameInfoClass,
                     buffer, (uint)bufferSize))
             {
                 var error = Marshal.GetLastWin32Error();
                 throw new IOException(
-                    $"无法原子重命名/移动文件到 {destinationPath}。",
+                    $"无法原子重命名/移动文件到 {verbatimPath}。",
                     new Win32Exception(error));
             }
         }
@@ -585,6 +587,16 @@ public sealed class ScriptFileSystem
         {
             Marshal.FreeHGlobal(buffer);
         }
+    }
+
+    private static string ToVerbatimPath(string path)
+    {
+        var fullPath = Path.GetFullPath(path);
+        if (fullPath.StartsWith(@"\\?\", StringComparison.Ordinal))
+            return fullPath;
+        if (fullPath.StartsWith(@"\\", StringComparison.Ordinal))
+            return @"\\?\UNC\" + fullPath[2..];
+        return @"\\?\" + fullPath;
     }
 
     private static void MarkFileForDeletion(SafeFileHandle fileHandle, string sourcePath)
