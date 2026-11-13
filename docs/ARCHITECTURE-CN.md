@@ -387,4 +387,4 @@ preview.4 当前采用低级鼠标/键盘 Hook，已纳入 Windows CI 编译与�
 - 剪贴板文本上限为 1,048,576 个 UTF-16 字符；消息/提示文本和 InputBox 默认值/输入上限为 32,768 个 UTF-16 字符；标题上限为 256 个字符。内容不会自动进入应用日志。
 - Pause 在调用前的 Runner 命令边界生效；打开对话框期间进入 Pause 时，当前对话框继续显示，脚本在下一命令边界等待恢复。Stop 取消等待任务并尝试关闭挂起窗体；如果剪贴板写入已由 Windows 接受，不承诺回滚副作用。
 - 小精灵尚未接入逐次 permissions sidecar 审阅，故启动其 Worker 时未传入 Grant 仍然使用 Empty，所有剪贴板/对话框 API 默认拒绝。CI 自动化不能代替 M14 实际 Windows 10/11 权限/DPI/交互验收。
-
+- M12-07 Windows Actions run [43408020908](https://github.com/xiaobei206/anjian/actions/runs/43408020908)：147/147 Core tests、0 warnings/0 errors、API handbook check、自包含 win-x64 publish、Sprite/Worker smoke、ZIP/SHA256 和 artifact 上传均 PASS；此结果不代表真实 Windows 桌面验收通过。

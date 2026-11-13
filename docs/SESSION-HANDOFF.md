@@ -581,3 +581,35 @@ M12-02 验收前不做剪贴板、对话框、进程、HTTP 或插件加载。�
 ## 下一会话唯一任务：M12-07 — 剪贴板与对话框 API
 
 严格只做剪贴板读写与消息/输入/确认对话框，沿用 default-deny + Worker/host 双层 Grant。先读取 PRD、权限 schema、MainForm 审阅、PlaybackRunner dispatcher 和当前 API registry；定义 clipboardRead/clipboardWrite、dialogs 资源权限语义，STA 与 WinForms 主 UI thread 调度，输入/返回值长度限制，取消/暂停/Stop 语义和错误处理。未授权/伪造 IPC 必须 fail closed。不得顺带启动进程 API、HTTP/JSON、插件 manifest 或小精灵 sidecar 审阅。
+
+---
+
+# 最新交接状态覆盖：M12-07 已完成实现与 Windows CI（2026-11-13）
+
+本节覆盖本文之前所有将 M12-07 标为待实现/待验证的描述。当前唯一任务 M12-07 已完成代码、API 契约、函数手册、验收记录和 Windows CI；真实 Windows 10/11 桌面交互仍保留 NOT RUN，按统一策略留 M14。
+
+## 当前 main 与交付提交
+- 最终核对的开发代码/文档 HEAD：`81a221e4d6a7b7754b084ff9209dc46fe176878d`（本条状态记录提交前；后续提交仅同步最终 handoff/status）。
+- 实现提交：`7c561f9d342d7d6f64a9a14535898b8790bb08f6`。
+- API 契约与 Lua API 规格提交：`bd316e26c34f6ddf3198036875baba06cb568d9a`。
+- 架构/路线图范围提交：`21886b64d31623e74ac96bfee7d988b6780ff9ee`。
+- Catalog 规则重生成函数手册提交：`6d1ae9e64764dd55bec9c55b439b3f8b6fcff4f0`。
+- 验收清单/开发日志/用户指南提交：`81a221e4d6a7b7754b084ff9209dc46fe176878d`。
+
+## M12-07 已交付
+- 新增 GetClipboardText、SetClipboardText、MessageBox、InputBox、Confirm；API registry 1.0 / 99 项。FUNCTION-REFERENCE 由同一 registry/Catalog 规则生成，IDE 提示仍读取同一 registry。
+- sidecar 沿用 clipboardRead、clipboardWrite 与 dialogs: message/input/confirm。Worker bridge 与 PlaybackRunner host 对每条 IPC 分别校验 Grant、命令类型与 payload；未知/伪造 IPC fail-closed。
+- WinForms Clipboard 和自定义模态窗体在所属 UI STA 线程执行；剪贴板文本最多 1,048,576 个 UTF-16 字符，Dialog 正文/提示/default/input 最多 32,768，标题最多 256；InputBox 取消返回 nil。Stop 关闭自定义模态窗体；暂停在命令边界生效。
+- 小精灵暂未接入 permissions sidecar 审阅，未显式提供批准时依旧为空 Grant；未默认放开剪贴板/对话框权限。
+
+## 最终 Windows Actions 结果
+- Run [43408020908](https://github.com/xiaobei206/anjian/actions/runs/43408020908) SUCCESS（HEAD `81a221e4d6a7b7754b084ff9209dc46fe176878d`）：Restore PASS；Release Build 0 warnings/0 errors；Core tests 147/147；API handbook `--check` PASS；self-contained win-x64 publish PASS；Sprite/Worker smoke 1/1 PASS；ZIP/SHA256 与 artifact upload PASS。
+- 临时 artifact ID `14027962784`，87,207,518 bytes，archive digest `sha256:0887a163767200037a81109f6be5e0695cdd7d66aeda0341fdeccf429fca0cce`。它不是 GitHub Release。
+- Run 248/249 的真实失败已保留在 DEVELOPMENT-LOG-CN.md：先是手册未同步，再是数字默认值缺反引号。按 Catalog 规则修复后由 run 43407935185 和 43408020908 全绿覆盖验证。
+- 本地环境没有 .NET SDK，因此本地 Restore/Build/Test 仍 NOT RUN；Windows Actions 为本轮构建测试证据。
+- Windows 10/11 真实剪贴板、权限审阅窗体、对话框布局/DPI、剪贴板占用和 Stop 实机交互仍 NOT RUN（M14）。CI PASS 不等于桌面实机验收。
+- 未修改 VERSION / AssemblyVersion / FileVersion；未建 tag/Release；v0.1.0-preview.4 官方资产不变。
+
+## 下一会话唯一任务：M12-08 — 受控进程 API
+
+先核对 main HEAD 并读取本 handoff、ROADMAP、PRD、FEATURE-MATRIX、ADR-024、API registry 和当前 Worker/PlaybackRunner dispatcher。只实现严格授权的进程/应用启动、等待与查询能力：精确批准的 EXE 路径、参数安全传递（不得拼 Shell 命令）、超时/Stop 取消、退出状态和错误契约；未声明/未批准路径默认拒绝。不得开放任意 shell、任意进程终止、HTTP/JSON 或插件。新增公开 API 前先定好参数/返回/权限/取消规格，再同步 registry、函数手册、IDE 提示、测试、开发日志和验收清单。直接在 main 小步提交，不建长期分支/PR；不改产品版本、不创建 Release。真实桌面验收统一留 M14。

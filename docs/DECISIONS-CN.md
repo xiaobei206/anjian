@@ -196,7 +196,7 @@
 
 ## ADR-027：剪贴板与对话框 API 使用 UI STA 调度和双层授权
 
-- 状态：ACCEPTED（M12-07；自动化结果待最终 Windows Actions 确认，真实桌面验收留 M14）。
+- 状态：ACCEPTED（M12-07；Windows Actions run 43408020908 自动化验收 PASS，真实桌面验收留 M14）。
 - 公开 API：`GetClipboardText()`、`SetClipboardText(text)`、`MessageBox(text,title?)`、`InputBox(prompt,title?,defaultValue?)`、`Confirm(text,title?)`。API registry 从 0.9 / 94 项递增为 1.0 / 99 项，函数手册继续由 registry 生成。
 - 授权字段沿用 ADR-024：剪贴板读写分别要求 `clipboardRead` / `clipboardWrite`；对话框分别要求 `dialogs` 中精确的 `message`、`input`、`confirm`。声明不等于批准，用户每次运行可批准子集；Worker 和 PlaybackRunner host dispatcher 各自验证。
 - Core 的 `ScriptClipboardDialogPolicy.ValidateCommand` 校验命令 allowlist、Grant 和请求载荷。剪贴板文本限制 1,048,576 个 UTF-16 字符；对话框正文/提示与 InputBox 默认值/输入限制 32,768 字符，标题 256 字符；未知命令及损坏/超限 payload fail-closed。

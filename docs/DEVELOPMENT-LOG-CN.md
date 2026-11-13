@@ -752,5 +752,5 @@ M4 基础调试器与 M5 可视化录制/动作列表均已完成 Windows CI 验
 - Run 248（HEAD 7c561f9d342d7d6f64a9a14535898b8790bb08f6）：Restore/Build PASS（0 warnings/0 errors）；145/146 测试通过。ManualGeneratedRegionMatchesCatalog 失败，因为 registry 已加 5 个 API 而函数手册未同步。
 - Run 249（HEAD bd316e26c34f6ddf3198036875baba06cb568d9a）：Restore/Build PASS（0 warnings/0 errors）；146/147 测试通过。剩余失败是手册生成规则不一致：Catalog 会给数字默认值加反引号，手动生成版本遗漏。
 - Run 250（HEAD 21886b64d31623e74ac96bfee7d988b6780ff9ee）执行的是手册修正前的树，不作为修正后的验证结果。按 Catalog 规则重新生成后的 HEAD 为 6d1ae9e64764dd55bec9c55b439b3f8b6fcff4f0；对应 Windows Actions run 43407935185 正在验证，完成后需把真实结论追加至日志与 handoff。
-- 在 run 43407935185 完成前，不能宣称 M12-07 CI 已通过。
+- 随后文档/验收清单 HEAD `81a221e4d6a7b7754b084ff9209dc46fe176878d` 对应 Windows Actions run [43408020908](https://github.com/xiaobei206/anjian/actions/runs/43408020908) 同样 SUCCESS：Restore PASS；Release Build 0 warnings/0 errors；147/147 Core tests；API handbook check；self-contained win-x64 publish；Sprite/Worker smoke 1/1；ZIP/SHA256 与 artifact upload 全 PASS。Artifact ID `14027962784`，87,207,518 bytes，archive SHA-256 `0887a163767200037a81109f6be5e0695cdd7d66aeda0341fdeccf429fca0cce`。没有创建 Release，preview.4 资产不变。
 - Windows 10/11 真实剪贴板、权限审阅和模态对话框/DPI/停止交互均 NOT RUN（M14）；未修改产品 VERSION、未创建 tag/Release，preview.4 资产不变。

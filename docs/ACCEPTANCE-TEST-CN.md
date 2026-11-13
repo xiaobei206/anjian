@@ -411,7 +411,7 @@ Windows Actions run [43385033936](https://github.com/xiaobei206/anjian/actions/r
 | ID | 场景 | 自动化覆盖/期望 | Windows 桌面状态 |
 |---|---|---|---|
 | M12-07-01 | 权限默认拒绝 | 无 Grant 时 Worker bridge 和 host policy 均拒绝 clipboard read/write、message/input/confirm；未发送授权 IPC | NOT RUN（M14） |
-| M12-07-02 | 主进程二次授权与伪造 IPC | 对每个命令重复验证当前 Grant；错误能力、未知命令、损坏 JSON 与超长载荷均 fail-closed | 自动化策略测试；待最新 CI |
+| M12-07-02 | 主进程二次授权与伪造 IPC | 对每个命令重复验证当前 Grant；错误能力、未知命令、损坏 JSON 与超长载荷均 fail-closed | 自动化 PASS（Run 43408020908；147/147 tests）；桌面实测 NOT RUN |
 | M12-07-03 | 剪贴板读取 | Unicode 文本原样返回；无文本时空字符串；大于 1,048,576 UTF-16 字符拒绝 | NOT RUN（M14） |
 | M12-07-04 | 剪贴板写入 | Unicode 文本写入；空字符串清空；大于 1,048,576 字符拒绝；Windows clipboard busy/访问错误明确传播 | NOT RUN（M14） |
 | M12-07-05 | MessageBox / Confirm | message/confirm 权限分离；正文 32,768 字符、标题 256 字符边界；确定/是/否/关闭返回值正确 | NOT RUN（M14） |
@@ -419,3 +419,8 @@ Windows Actions run [43385033936](https://github.com/xiaobei206/anjian/actions/r
 | M12-07-07 | UI 线程与 Stop | Clipboard / modal forms 在 WinForms UI STA 线程执行；Stop 可取消 IPC 并关闭自定义模态窗体；Pause 在命令边界生效；已提交剪贴板写入不保证回滚 | NOT RUN（M14） |
 
 真实剪贴板访问、权限审阅窗体、模态布局/DPI、剪贴板被占用与 Stop 关闭行为必须在 Windows 10/11 桌面执行；Windows CI 自动化通过也不能作为桌面 PASS。
+
+### M12-07 Windows Actions 最终自动化结果
+
+- Run [43408020908](https://github.com/xiaobei206/anjian/actions/runs/43408020908) SUCCESS：Restore/Build（0 warnings/0 errors）、147/147 Core tests、API handbook check、自包含 win-x64 publish、Sprite/Worker smoke、ZIP/SHA256 和 artifact upload 全 PASS。
+- 上述为自动化验收；M12-07-01 至 M12-07-07 涉及真实剪贴板、用户交互、模态对话框/DPI 和停止关闭行为仍全部 NOT RUN，统一延期 M14。
