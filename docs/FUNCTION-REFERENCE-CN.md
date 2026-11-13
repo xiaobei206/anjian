@@ -59,7 +59,7 @@ MoveTo(-120, 450)
 
 | 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
 |---|---|---|---|---|---|
-| `holdMs` | `integer` | 否 | 50 | 0–600000 毫秒 | 按钮按下持续时间；0 表示不增加人为等待。 |
+| `holdMs` | `integer` | 否 | `50` | 0–600000 毫秒 | 按钮按下持续时间；0 表示不增加人为等待。 |
 
 **返回值：** `nil` — 无显式返回值；成功后继续执行后续 Lua 语句。
 **错误：** 参数类型、整数性或范围不合法时产生 Lua 错误。；输入调用失败、权限不足或目标程序拒绝输入时会报告执行错误。
@@ -79,7 +79,7 @@ LeftClick()
 
 | 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
 |---|---|---|---|---|---|
-| `holdMs` | `integer` | 否 | 50 | 0–600000 毫秒 | 按钮按下持续时间；0 表示不增加人为等待。 |
+| `holdMs` | `integer` | 否 | `50` | 0–600000 毫秒 | 按钮按下持续时间；0 表示不增加人为等待。 |
 
 **返回值：** `nil` — 无显式返回值；成功后继续执行后续 Lua 语句。
 **错误：** 参数类型、整数性或范围不合法时产生 Lua 错误。；输入调用失败、权限不足或目标程序拒绝输入时会报告执行错误。
@@ -99,7 +99,7 @@ RightClick()
 
 | 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
 |---|---|---|---|---|---|
-| `holdMs` | `integer` | 否 | 50 | 0–600000 毫秒 | 按钮按下持续时间；0 表示不增加人为等待。 |
+| `holdMs` | `integer` | 否 | `50` | 0–600000 毫秒 | 按钮按下持续时间；0 表示不增加人为等待。 |
 
 **返回值：** `nil` — 无显式返回值；成功后继续执行后续 Lua 语句。
 **错误：** 参数类型、整数性或范围不合法时产生 Lua 错误。；输入调用失败、权限不足或目标程序拒绝输入时会报告执行错误。
@@ -119,8 +119,8 @@ MiddleClick()
 
 | 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
 |---|---|---|---|---|---|
-| `holdMs` | `integer` | 否 | 50 | 0–600000 毫秒 | 每次单击的按下持续时间。 |
-| `gapMs` | `integer` | 否 | 100 | 0–600000 毫秒 | 两次单击之间的延时。 |
+| `holdMs` | `integer` | 否 | `50` | 0–600000 毫秒 | 每次单击的按下持续时间。 |
+| `gapMs` | `integer` | 否 | `100` | 0–600000 毫秒 | 两次单击之间的延时。 |
 
 **返回值：** `nil` — 无显式返回值；成功后继续执行后续 Lua 语句。
 **错误：** 参数类型、整数性或范围不合法时产生 Lua 错误。；输入调用失败、权限不足或目标程序拒绝输入时会报告执行错误。
@@ -140,8 +140,8 @@ LeftDoubleClick(50, 100)
 
 | 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
 |---|---|---|---|---|---|
-| `holdMs` | `integer` | 否 | 50 | 0–600000 毫秒 | 每次单击的按下持续时间。 |
-| `gapMs` | `integer` | 否 | 100 | 0–600000 毫秒 | 两次单击之间的延时。 |
+| `holdMs` | `integer` | 否 | `50` | 0–600000 毫秒 | 每次单击的按下持续时间。 |
+| `gapMs` | `integer` | 否 | `100` | 0–600000 毫秒 | 两次单击之间的延时。 |
 
 **返回值：** `nil` — 无显式返回值；成功后继续执行后续 Lua 语句。
 **错误：** 参数类型、整数性或范围不合法时产生 Lua 错误。；输入调用失败、权限不足或目标程序拒绝输入时会报告执行错误。
@@ -161,8 +161,8 @@ RightDoubleClick(50, 100)
 
 | 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
 |---|---|---|---|---|---|
-| `holdMs` | `integer` | 否 | 50 | 0–600000 毫秒 | 每次单击的按下持续时间。 |
-| `gapMs` | `integer` | 否 | 100 | 0–600000 毫秒 | 两次单击之间的延时。 |
+| `holdMs` | `integer` | 否 | `50` | 0–600000 毫秒 | 每次单击的按下持续时间。 |
+| `gapMs` | `integer` | 否 | `100` | 0–600000 毫秒 | 两次单击之间的延时。 |
 
 **返回值：** `nil` — 无显式返回值；成功后继续执行后续 Lua 语句。
 **错误：** 参数类型、整数性或范围不合法时产生 Lua 错误。；输入调用失败、权限不足或目标程序拒绝输入时会报告执行错误。
@@ -313,7 +313,7 @@ MouseWheel(-120)
 | 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
 |---|---|---|---|---|---|
 | `key` | `keyName` | 是 | — | 固定值：ENTER、ESC、TAB、SPACE、BACKSPACE、DELETE、INSERT、HOME、END、PAGEUP、PAGEDOWN、UP、DOWN、LEFT、RIGHT、CTRL、CONTROL、SHIFT、ALT、WIN、CAPSLOCK、PRINTSCREEN、PAUSE、NUMLOCK、SCROLLLOCK、NUMPAD0、NUMPAD1、NUMPAD2、NUMPAD3、NUMPAD4、NUMPAD5、NUMPAD6、NUMPAD7、NUMPAD8、NUMPAD9、NUMPADMULTIPLY、NUMPADADD、NUMPADSUBTRACT、NUMPADDECIMAL、NUMPADDIVIDE、SEMICOLON、EQUALS、COMMA、MINUS、PERIOD、SLASH、BACKTICK、LEFTBRACKET、BACKSLASH、RIGHTBRACKET、QUOTE；规则：A-Z、0-9、F1-F24 | 按键名（不区分大小写）；具体映射由 Windows 输入层解析。 |
-| `holdMs` | `integer` | 否 | 50 | 0–600000 毫秒 | 按键持续时间；0 表示不增加人为等待。 |
+| `holdMs` | `integer` | 否 | `50` | 0–600000 毫秒 | 按键持续时间；0 表示不增加人为等待。 |
 
 **返回值：** `nil` — 无显式返回值；成功后继续执行后续 Lua 语句。
 **错误：** 参数类型、整数性或范围不合法时产生 Lua 错误。；输入调用失败、权限不足或目标程序拒绝输入时会报告执行错误。
@@ -481,7 +481,7 @@ Log("本轮完成")
 | `titleContains` | `string` | 否 | `` | — | 标题包含匹配；空字符串表示不筛选。 |
 | `className` | `string` | 否 | `` | — | 窗口类名精确匹配；空字符串表示不筛选。 |
 | `processName` | `string` | 否 | `` | — | 进程名匹配，可省略 .exe；空字符串表示不筛选。 |
-| `processId` | `integer` | 否 | 0 | 0–2147483647 | Windows 进程 ID；0 表示不筛选。 |
+| `processId` | `integer` | 否 | `0` | 0–2147483647 | Windows 进程 ID；0 表示不筛选。 |
 | `visibleOnly` | `boolean` | 否 | `true` | — | true 仅返回可见窗口；false 同时包括隐藏窗口。 |
 
 **返回值：** `table\|nil` — 窗口信息表；未在超时内找到时返回 nil。id 是本次脚本运行内有效的不透明字符串引用。
@@ -505,7 +505,7 @@ local w = WindowFind("记事本", "", "", 0, true)\nif w then WindowActivate(w.i
 | `titleContains` | `string` | 否 | `` | — | 标题包含匹配；空字符串表示不筛选。 |
 | `className` | `string` | 否 | `` | — | 窗口类名精确匹配；空字符串表示不筛选。 |
 | `processName` | `string` | 否 | `` | — | 进程名匹配，可省略 .exe；空字符串表示不筛选。 |
-| `processId` | `integer` | 否 | 0 | 0–2147483647 | Windows 进程 ID；0 表示不筛选。 |
+| `processId` | `integer` | 否 | `0` | 0–2147483647 | Windows 进程 ID；0 表示不筛选。 |
 | `visibleOnly` | `boolean` | 否 | `true` | — | true 仅返回可见窗口；false 同时包括隐藏窗口。 |
 
 **返回值：** `table` — 从 1 开始索引的窗口信息数组；无匹配时为空表。
@@ -753,8 +753,8 @@ local w = WindowFind("目标窗口")\nif w then WindowResize(w.id, 1280, 800) en
 |---|---|---|---|---|---|
 | `id` | `string` | 是 | — | — | 窗口引用 ID。 |
 | `anchor` | `string` | 否 | `center` | — | top-left/top-center/top-right/center-left/center/center-right/bottom-left/bottom-center/bottom-right。 |
-| `offsetX` | `integer` | 否 | 0 | -2147483648–2147483647 物理像素 | 水平物理像素偏移。 |
-| `offsetY` | `integer` | 否 | 0 | -2147483648–2147483647 物理像素 | 垂直物理像素偏移。 |
+| `offsetX` | `integer` | 否 | `0` | -2147483648–2147483647 物理像素 | 水平物理像素偏移。 |
+| `offsetY` | `integer` | 否 | `0` | -2147483648–2147483647 物理像素 | 垂直物理像素偏移。 |
 
 **返回值：** `boolean` — 操作请求成功返回 true。
 **错误：** 参数类型、整数性或范围不合法时产生 Lua 错误。；目标窗口关闭、权限不足或 Windows API 调用失败时报告执行错误。
@@ -777,9 +777,9 @@ local w = WindowFind("目标窗口")\nif w then WindowAlign(w.id, "center", 0, 0
 | `titleContains` | `string` | 否 | `` | — | 标题包含匹配；空字符串表示不筛选。 |
 | `className` | `string` | 否 | `` | — | 窗口类名精确匹配；空字符串表示不筛选。 |
 | `processName` | `string` | 否 | `` | — | 进程名匹配，可省略 .exe；空字符串表示不筛选。 |
-| `processId` | `integer` | 否 | 0 | 0–2147483647 | Windows 进程 ID；0 表示不筛选。 |
+| `processId` | `integer` | 否 | `0` | 0–2147483647 | Windows 进程 ID；0 表示不筛选。 |
 | `visibleOnly` | `boolean` | 否 | `true` | — | true 仅返回可见窗口；false 同时包括隐藏窗口。 |
-| `timeoutMs` | `integer` | 否 | 30000 | 0–600000 毫秒 | 等待超时，0 立即检查一次，最大 600000 毫秒。 |
+| `timeoutMs` | `integer` | 否 | `30000` | 0–600000 毫秒 | 等待超时，0 立即检查一次，最大 600000 毫秒。 |
 
 **返回值：** `table\|nil` — 出现时返回窗口信息表；超时返回 nil；取消会终止当前脚本。
 **错误：** 超时超出 0 到 600000 毫秒或筛选参数非法时产生 Lua 错误。；停止操作返回 Cancelled，不吞掉为 nil。
@@ -800,7 +800,7 @@ local w = WindowWait("记事本", "", "", 0, true, 10000)\nif w then Log(w.title
 | 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
 |---|---|---|---|---|---|
 | `id` | `string` | 是 | — | — | 窗口引用 ID。 |
-| `timeoutMs` | `integer` | 否 | 30000 | 0–600000 毫秒 | 等待超时，最大 600000 毫秒。 |
+| `timeoutMs` | `integer` | 否 | `30000` | 0–600000 毫秒 | 等待超时，最大 600000 毫秒。 |
 
 **返回值：** `boolean` — 窗口关闭返回 true；超时仍存在返回 false。
 **错误：** 窗口引用不存在时产生 Lua 错误。；停止操作返回 Cancelled，不吞掉为 false。
@@ -934,7 +934,7 @@ for i, item in ipairs(caps.capabilities) do Log(item.name .. ":" .. item.status)
 | 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
 |---|---|---|---|---|---|
 | `bindingId` | `string` | 是 | — | — | WindowBind 返回的运行期绑定 ID。 |
-| `maxResults` | `integer` | 否 | 256 | 1–512 | 最多返回控件数量，范围 1 到 512。 |
+| `maxResults` | `integer` | 否 | `256` | 1–512 | 最多返回控件数量，范围 1 到 512。 |
 
 **返回值：** `table` — 返回控件信息数组；每项含 controlId/name/automationId/className/controlType/bounds/isEnabled/isOffscreen/isKeyboardFocusable/isPassword/supportedPatterns。
 **错误：** 数量超出范围、绑定失效或 UI Automation 无法访问目标窗口时产生错误。
@@ -1149,10 +1149,10 @@ ControlInvoke(binding, button.controlId)
 | `backend` | `string` | 是 | — | 固定值：auto、foreground | auto 或 foreground。 |
 | `action` | `string` | 是 | — | 固定值：move、click、key-press、text | move、click、key-press 或 text。 |
 | `name` | `string` | 否 | `` | — | click/key-press 必填；click 为 left/right/middle，key-press 为现有规范键名。 |
-| `x` | `integer` | 否 | 0 | -2147483648–2147483647 物理像素 | move/click 必填；绑定窗口客户区内的屏幕绝对物理像素 X 坐标。 |
-| `y` | `integer` | 否 | 0 | -2147483648–2147483647 物理像素 | move/click 必填；绑定窗口客户区内的屏幕绝对物理像素 Y 坐标。 |
+| `x` | `integer` | 否 | `0` | -2147483648–2147483647 物理像素 | move/click 必填；绑定窗口客户区内的屏幕绝对物理像素 X 坐标。 |
+| `y` | `integer` | 否 | `0` | -2147483648–2147483647 物理像素 | move/click 必填；绑定窗口客户区内的屏幕绝对物理像素 Y 坐标。 |
 | `value` | `string` | 否 | `` | — | text 必填；Unicode 文本，最多 100000 个字符。 |
-| `holdMs` | `integer` | 否 | 50 | 0–600000 毫秒 | click/key-press 按下时长，范围 0 到 600000 毫秒。 |
+| `holdMs` | `integer` | 否 | `50` | 0–600000 毫秒 | click/key-press 按下时长，范围 0 到 600000 毫秒。 |
 
 **返回值：** `boolean` — 输入 API 成功提交返回 true；实际目标控件是否响应仍取决于前台焦点、权限与应用状态。
 **错误：** backend 不支持、目标不是前台窗口、参数非法、SendInput 被 Windows 拒绝或停止取消时产生错误。
@@ -1389,7 +1389,7 @@ local color = GetPixelColor(screen, 10, 20)
 | `x` | `integer` | 是 | — | 0–32767 像素 | 零基像素 X。 |
 | `y` | `integer` | 是 | — | 0–32767 像素 | 零基像素 Y。 |
 | `color` | `integer` | 是 | — | 0–16777215 | 目标 RGB 颜色。 |
-| `tolerance` | `integer` | 否 | 0 | 0–255 | 每个 RGB 通道最大绝对差。 |
+| `tolerance` | `integer` | 否 | `0` | 0–255 | 每个 RGB 通道最大绝对差。 |
 
 **返回值：** `boolean` — 所有 RGB 通道差值均在容差内返回 true。
 **错误：** 资源失效、坐标越界或颜色/容差不合法时产生错误。
@@ -1411,12 +1411,12 @@ CompareColor(screen, 10, 20, 0xFF0000, 4)
 |---|---|---|---|---|---|
 | `imageId` | `string` | 是 | — | — | 图像资源 ID。 |
 | `color` | `integer` | 是 | — | 0–16777215 | 目标 RGB 颜色。 |
-| `tolerance` | `integer` | 否 | 0 | 0–255 | RGB 各通道容差。 |
-| `left` | `integer` | 否 | 0 | 0–32767 像素 | 局部区域左边；0 为图像左边。 |
-| `top` | `integer` | 否 | 0 | 0–32767 像素 | 局部区域上边；0 为图像上边。 |
-| `width` | `integer` | 否 | 0 | 0–32768 像素 | 区域宽度；0 表示到图像右边界。 |
-| `height` | `integer` | 否 | 0 | 0–32768 像素 | 区域高度；0 表示到图像下边界。 |
-| `step` | `integer` | 否 | 1 | 1–64 像素 | 候选采样步长。 |
+| `tolerance` | `integer` | 否 | `0` | 0–255 | RGB 各通道容差。 |
+| `left` | `integer` | 否 | `0` | 0–32767 像素 | 局部区域左边；0 为图像左边。 |
+| `top` | `integer` | 否 | `0` | 0–32767 像素 | 局部区域上边；0 为图像上边。 |
+| `width` | `integer` | 否 | `0` | 0–32768 像素 | 区域宽度；0 表示到图像右边界。 |
+| `height` | `integer` | 否 | `0` | 0–32768 像素 | 区域高度；0 表示到图像下边界。 |
+| `step` | `integer` | 否 | `1` | 1–64 像素 | 候选采样步长。 |
 
 **返回值：** `table\|nil` — 命中位置表或未命中 nil。
 **错误：** 资源失效、区域越界或参数不合法时产生错误。
@@ -1439,12 +1439,12 @@ local hit = FindColor(screen, 0xFF0000, 5)
 | `imageId` | `string` | 是 | — | — | 图像资源 ID。 |
 | `color` | `integer` | 是 | — | 0–16777215 | 基准 RGB 颜色。 |
 | `pattern` | `string` | 是 | — | — | 分号分隔的 dx,dy,RRGGBB 列表。 |
-| `tolerance` | `integer` | 否 | 0 | 0–255 | RGB 各通道容差。 |
-| `left` | `integer` | 否 | 0 | 0–32767 像素 | 局部区域左边；0 为图像左边。 |
-| `top` | `integer` | 否 | 0 | 0–32767 像素 | 局部区域上边；0 为图像上边。 |
-| `width` | `integer` | 否 | 0 | 0–32768 像素 | 区域宽度；0 表示到图像右边界。 |
-| `height` | `integer` | 否 | 0 | 0–32768 像素 | 区域高度；0 表示到图像下边界。 |
-| `step` | `integer` | 否 | 1 | 1–64 像素 | 候选采样步长。 |
+| `tolerance` | `integer` | 否 | `0` | 0–255 | RGB 各通道容差。 |
+| `left` | `integer` | 否 | `0` | 0–32767 像素 | 局部区域左边；0 为图像左边。 |
+| `top` | `integer` | 否 | `0` | 0–32767 像素 | 局部区域上边；0 为图像上边。 |
+| `width` | `integer` | 否 | `0` | 0–32768 像素 | 区域宽度；0 表示到图像右边界。 |
+| `height` | `integer` | 否 | `0` | 0–32768 像素 | 区域高度；0 表示到图像下边界。 |
+| `step` | `integer` | 否 | `1` | 1–64 像素 | 候选采样步长。 |
 
 **返回值：** `table\|nil` — 首个命中位置表或未命中 nil。
 **错误：** 模式格式错误、点数超限、资源失效或区域越界时产生错误。
@@ -1466,12 +1466,12 @@ local hit = FindMultiColor(screen, 0x112233, "1,0,FF0000;0,1,00FF00", 2)
 |---|---|---|---|---|---|
 | `imageId` | `string` | 是 | — | — | 图像资源 ID。 |
 | `color` | `integer` | 是 | — | 0–16777215 | 目标 RGB 颜色。 |
-| `tolerance` | `integer` | 否 | 0 | 0–255 | RGB 各通道容差。 |
-| `left` | `integer` | 否 | 0 | 0–32767 像素 | 局部区域左边；0 为图像左边。 |
-| `top` | `integer` | 否 | 0 | 0–32767 像素 | 局部区域上边；0 为图像上边。 |
-| `width` | `integer` | 否 | 0 | 0–32768 像素 | 区域宽度；0 表示到图像右边界。 |
-| `height` | `integer` | 否 | 0 | 0–32768 像素 | 区域高度；0 表示到图像下边界。 |
-| `step` | `integer` | 否 | 1 | 1–64 像素 | 候选采样步长。 |
+| `tolerance` | `integer` | 否 | `0` | 0–255 | RGB 各通道容差。 |
+| `left` | `integer` | 否 | `0` | 0–32767 像素 | 局部区域左边；0 为图像左边。 |
+| `top` | `integer` | 否 | `0` | 0–32767 像素 | 局部区域上边；0 为图像上边。 |
+| `width` | `integer` | 否 | `0` | 0–32768 像素 | 区域宽度；0 表示到图像右边界。 |
+| `height` | `integer` | 否 | `0` | 0–32768 像素 | 区域高度；0 表示到图像下边界。 |
+| `step` | `integer` | 否 | `1` | 1–64 像素 | 候选采样步长。 |
 
 **返回值：** `integer` — 匹配的采样像素数量。
 **错误：** 资源失效、区域越界或参数不合法时产生错误。
@@ -1493,15 +1493,15 @@ local count = CountColors(screen, 0x00FF00, 0, 0, 0, 640, 480)
 |---|---|---|---|---|---|
 | `imageId` | `string` | 是 | — | — | 被搜索图像资源 ID。 |
 | `templateId` | `string` | 是 | — | — | 模板图像资源 ID。 |
-| `similarity` | `number` | 否 | 0.95 | 0–1 | 所需相似度比例。 |
-| `tolerance` | `integer` | 否 | 0 | 0–255 | RGB 每个通道允许的最大绝对差。 |
-| `left` | `integer` | 否 | 0 | 0–32767 像素 | 局部区域左边；0 为图像左边。 |
-| `top` | `integer` | 否 | 0 | 0–32767 像素 | 局部区域上边；0 为图像上边。 |
-| `width` | `integer` | 否 | 0 | 0–32768 像素 | 区域宽度；0 表示到图像右边界。 |
-| `height` | `integer` | 否 | 0 | 0–32768 像素 | 区域高度；0 表示到图像下边界。 |
-| `step` | `integer` | 否 | 1 | 1–64 像素 | 候选采样步长。 |
+| `similarity` | `number` | 否 | `0.95` | 0–1 | 所需相似度比例。 |
+| `tolerance` | `integer` | 否 | `0` | 0–255 | RGB 每个通道允许的最大绝对差。 |
+| `left` | `integer` | 否 | `0` | 0–32767 像素 | 局部区域左边；0 为图像左边。 |
+| `top` | `integer` | 否 | `0` | 0–32767 像素 | 局部区域上边；0 为图像上边。 |
+| `width` | `integer` | 否 | `0` | 0–32768 像素 | 区域宽度；0 表示到图像右边界。 |
+| `height` | `integer` | 否 | `0` | 0–32768 像素 | 区域高度；0 表示到图像下边界。 |
+| `step` | `integer` | 否 | `1` | 1–64 像素 | 候选采样步长。 |
 | `grayscale` | `boolean` | 否 | `false` | — | 是否按亮度灰度进行模板匹配。 |
-| `scale` | `number` | 否 | 1 | 0.25–4 | 模板缩放比例；1 为原尺寸，采用最近邻采样。 |
+| `scale` | `number` | 否 | `1` | 0.25–4 | 模板缩放比例；1 为原尺寸，采用最近邻采样。 |
 
 **返回值：** `table\|nil` — 命中位置/相似度与可用的 screenX/screenY；未命中返回 nil。
 **错误：** 模板全透明、资源失效、区域越界或达到像素比较预算时产生错误。
@@ -1523,16 +1523,16 @@ local hit = FindImage(screen, template, 0.95, 4, 0, 0, 0, 0, 1, true, 1.5)
 |---|---|---|---|---|---|
 | `imageId` | `string` | 是 | — | — | 被搜索图像资源 ID。 |
 | `templateId` | `string` | 是 | — | — | 模板图像资源 ID。 |
-| `similarity` | `number` | 否 | 0.95 | 0–1 | 所需相似度比例。 |
-| `tolerance` | `integer` | 否 | 0 | 0–255 | RGB 每个通道允许的最大绝对差。 |
-| `maxResults` | `integer` | 否 | 100 | 1–1000 | 最大返回数。 |
-| `left` | `integer` | 否 | 0 | 0–32767 像素 | 局部区域左边；0 为图像左边。 |
-| `top` | `integer` | 否 | 0 | 0–32767 像素 | 局部区域上边；0 为图像上边。 |
-| `width` | `integer` | 否 | 0 | 0–32768 像素 | 区域宽度；0 表示到图像右边界。 |
-| `height` | `integer` | 否 | 0 | 0–32768 像素 | 区域高度；0 表示到图像下边界。 |
-| `step` | `integer` | 否 | 1 | 1–64 像素 | 候选采样步长。 |
+| `similarity` | `number` | 否 | `0.95` | 0–1 | 所需相似度比例。 |
+| `tolerance` | `integer` | 否 | `0` | 0–255 | RGB 每个通道允许的最大绝对差。 |
+| `maxResults` | `integer` | 否 | `100` | 1–1000 | 最大返回数。 |
+| `left` | `integer` | 否 | `0` | 0–32767 像素 | 局部区域左边；0 为图像左边。 |
+| `top` | `integer` | 否 | `0` | 0–32767 像素 | 局部区域上边；0 为图像上边。 |
+| `width` | `integer` | 否 | `0` | 0–32768 像素 | 区域宽度；0 表示到图像右边界。 |
+| `height` | `integer` | 否 | `0` | 0–32768 像素 | 区域高度；0 表示到图像下边界。 |
+| `step` | `integer` | 否 | `1` | 1–64 像素 | 候选采样步长。 |
 | `grayscale` | `boolean` | 否 | `false` | — | 是否按亮度灰度进行模板匹配。 |
-| `scale` | `number` | 否 | 1 | 0.25–4 | 模板缩放比例；1 为原尺寸，采用最近邻采样。 |
+| `scale` | `number` | 否 | `1` | 0.25–4 | 模板缩放比例；1 为原尺寸，采用最近邻采样。 |
 
 **返回值：** `table` — Lua 数组形式的命中列表；没有匹配时为空表。
 **错误：** 模板全透明、资源失效、区域越界或达到像素比较预算时产生错误。
@@ -1553,13 +1553,13 @@ local hits = FindImages(screen, template, 0.95, 0, 20, 0, 0, 0, 0, 1, true, 1)
 | 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
 |---|---|---|---|---|---|
 | `templateId` | `string` | 是 | — | — | 模板图像资源 ID。 |
-| `similarity` | `number` | 否 | 0.95 | 0–1 | 所需相似度比例。 |
-| `tolerance` | `integer` | 否 | 0 | 0–255 | RGB 每个通道允许的最大绝对差。 |
-| `timeoutMs` | `integer` | 否 | 5000 | 0–600000 毫秒 | 最大等待时长。 |
-| `intervalMs` | `integer` | 否 | 100 | 10–5000 毫秒 | 两次检测间隔。 |
+| `similarity` | `number` | 否 | `0.95` | 0–1 | 所需相似度比例。 |
+| `tolerance` | `integer` | 否 | `0` | 0–255 | RGB 每个通道允许的最大绝对差。 |
+| `timeoutMs` | `integer` | 否 | `5000` | 0–600000 毫秒 | 最大等待时长。 |
+| `intervalMs` | `integer` | 否 | `100` | 10–5000 毫秒 | 两次检测间隔。 |
 | `grayscale` | `boolean` | 否 | `false` | — | 是否按亮度灰度进行模板匹配。 |
-| `scale` | `number` | 否 | 1 | 0.25–4 | 模板缩放比例；1 为原尺寸，采用最近邻采样。 |
-| `stableCount` | `integer` | 否 | 1 | 1–20 次 | 需连续满足条件的截图次数，用于抑制单帧误判。 |
+| `scale` | `number` | 否 | `1` | 0.25–4 | 模板缩放比例；1 为原尺寸，采用最近邻采样。 |
+| `stableCount` | `integer` | 否 | `1` | 1–20 次 | 需连续满足条件的截图次数，用于抑制单帧误判。 |
 
 **返回值：** `table\|nil` — 首次命中位置或超时 nil。
 **错误：** 模板失效、截图失败、图像过大或搜索达到像素比较预算时产生错误。
@@ -1580,13 +1580,13 @@ local hit = WaitImage(template, 0.95, 0, 5000, 100, false, 1, 2)
 | 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
 |---|---|---|---|---|---|
 | `templateId` | `string` | 是 | — | — | 模板图像资源 ID。 |
-| `similarity` | `number` | 否 | 0.95 | 0–1 | 所需相似度比例。 |
-| `tolerance` | `integer` | 否 | 0 | 0–255 | RGB 每个通道允许的最大绝对差。 |
-| `timeoutMs` | `integer` | 否 | 5000 | 0–600000 毫秒 | 最大等待时长。 |
-| `intervalMs` | `integer` | 否 | 100 | 10–5000 毫秒 | 两次检测间隔。 |
+| `similarity` | `number` | 否 | `0.95` | 0–1 | 所需相似度比例。 |
+| `tolerance` | `integer` | 否 | `0` | 0–255 | RGB 每个通道允许的最大绝对差。 |
+| `timeoutMs` | `integer` | 否 | `5000` | 0–600000 毫秒 | 最大等待时长。 |
+| `intervalMs` | `integer` | 否 | `100` | 10–5000 毫秒 | 两次检测间隔。 |
 | `grayscale` | `boolean` | 否 | `false` | — | 是否按亮度灰度进行模板匹配。 |
-| `scale` | `number` | 否 | 1 | 0.25–4 | 模板缩放比例；1 为原尺寸，采用最近邻采样。 |
-| `stableCount` | `integer` | 否 | 1 | 1–20 次 | 需连续满足条件的截图次数，用于抑制单帧误判。 |
+| `scale` | `number` | 否 | `1` | 0.25–4 | 模板缩放比例；1 为原尺寸，采用最近邻采样。 |
+| `stableCount` | `integer` | 否 | `1` | 1–20 次 | 需连续满足条件的截图次数，用于抑制单帧误判。 |
 
 **返回值：** `boolean` — 模板消失返回 true；超时仍存在返回 false。
 **错误：** 模板失效、截图失败、图像过大或搜索达到像素比较预算时产生错误。
@@ -1607,10 +1607,10 @@ if WaitImageGone(template, 0.95, 0, 5000, 100, false, 1, 2) then Log("目标已�
 | 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
 |---|---|---|---|---|---|
 | `color` | `integer` | 是 | — | 0–16777215 | 目标 RGB 颜色。 |
-| `tolerance` | `integer` | 否 | 0 | 0–255 | RGB 每个通道允许的最大绝对差。 |
-| `timeoutMs` | `integer` | 否 | 5000 | 0–600000 毫秒 | 最大等待时长。 |
-| `intervalMs` | `integer` | 否 | 100 | 10–5000 毫秒 | 两次检测之间的间隔。 |
-| `stableCount` | `integer` | 否 | 1 | 1–20 次 | 需连续满足条件的截图次数，用于抑制单帧误判。 |
+| `tolerance` | `integer` | 否 | `0` | 0–255 | RGB 每个通道允许的最大绝对差。 |
+| `timeoutMs` | `integer` | 否 | `5000` | 0–600000 毫秒 | 最大等待时长。 |
+| `intervalMs` | `integer` | 否 | `100` | 10–5000 毫秒 | 两次检测之间的间隔。 |
+| `stableCount` | `integer` | 否 | `1` | 1–20 次 | 需连续满足条件的截图次数，用于抑制单帧误判。 |
 
 **返回值：** `table\|nil` — 首次命中位置或超时 nil。
 **错误：** 截图失败、图像过大或参数无效时产生错误。
@@ -1631,10 +1631,10 @@ local hit = WaitColor(0x00FF00, 8, 3000, 100, 2)
 | 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
 |---|---|---|---|---|---|
 | `color` | `integer` | 是 | — | 0–16777215 | 目标 RGB 颜色。 |
-| `tolerance` | `integer` | 否 | 0 | 0–255 | RGB 每个通道允许的最大绝对差。 |
-| `timeoutMs` | `integer` | 否 | 5000 | 0–600000 毫秒 | 最大等待时长。 |
-| `intervalMs` | `integer` | 否 | 100 | 10–5000 毫秒 | 两次检测之间的间隔。 |
-| `stableCount` | `integer` | 否 | 1 | 1–20 次 | 需连续满足条件的截图次数，用于抑制单帧误判。 |
+| `tolerance` | `integer` | 否 | `0` | 0–255 | RGB 每个通道允许的最大绝对差。 |
+| `timeoutMs` | `integer` | 否 | `5000` | 0–600000 毫秒 | 最大等待时长。 |
+| `intervalMs` | `integer` | 否 | `100` | 10–5000 毫秒 | 两次检测之间的间隔。 |
+| `stableCount` | `integer` | 否 | `1` | 1–20 次 | 需连续满足条件的截图次数，用于抑制单帧误判。 |
 
 **返回值：** `boolean` — 颜色消失返回 true；超时仍存在返回 false。
 **错误：** 截图失败、图像过大或参数无效时产生错误。
@@ -1719,14 +1719,14 @@ local d = ColorDifference(0x102030, 0x132638)
 |---|---|---|---|---|---|
 | `imageId` | `string` | 是 | — | — | 图像资源 ID。 |
 | `color` | `integer` | 是 | — | 0–16777215 | 目标 0xRRGGBB。 |
-| `tolerance` | `integer` | 否 | 0 | 0–255 | RGB 各通道最大差。 |
-| `minPixels` | `integer` | 否 | 2 | 1–1000000 | 最小连通采样点数。 |
-| `left` | `integer` | 否 | 0 | 0–32767 | 局部区域左边。 |
-| `top` | `integer` | 否 | 0 | 0–32767 | 局部区域上边。 |
-| `width` | `integer` | 否 | 0 | 0–32768 | 区域宽；0 到图像右边界。 |
-| `height` | `integer` | 否 | 0 | 0–32768 | 区域高；0 到图像下边界。 |
-| `step` | `integer` | 否 | 1 | 1–64 | 采样步长。 |
-| `maxResults` | `integer` | 否 | 100 | 1–100 | 最大返回块数，按面积降序。 |
+| `tolerance` | `integer` | 否 | `0` | 0–255 | RGB 各通道最大差。 |
+| `minPixels` | `integer` | 否 | `2` | 1–1000000 | 最小连通采样点数。 |
+| `left` | `integer` | 否 | `0` | 0–32767 | 局部区域左边。 |
+| `top` | `integer` | 否 | `0` | 0–32767 | 局部区域上边。 |
+| `width` | `integer` | 否 | `0` | 0–32768 | 区域宽；0 到图像右边界。 |
+| `height` | `integer` | 否 | `0` | 0–32768 | 区域高；0 到图像下边界。 |
+| `step` | `integer` | 否 | `1` | 1–64 | 采样步长。 |
+| `maxResults` | `integer` | 否 | `100` | 1–100 | 最大返回块数，按面积降序。 |
 
 **返回值：** `table` — 颜色块数组；每项包含 x、y、width、height、pixelCount、centerX/centerY 以及可用 screenX/screenY。
 **错误：** 参数、颜色或图像资源不合法时产生 Lua 错误。
@@ -1750,7 +1750,7 @@ local blocks = FindColorBlocks(screen, 0xFF0000, 8, 4, 0, 0, 800, 600, 2, 20)
 |---|---|---|---|---|---|
 | `imageId` | `string` | 是 | — | — | 图像资源 ID。 |
 | `language` | `string` | 否 | `ch` | 固定值：ch、en、japan | 识别语言代码。 |
-| `minConfidence` | `number` | 否 | 0 | 0–1 | 低于该值的行不返回。 |
+| `minConfidence` | `number` | 否 | `0` | 0–1 | 低于该值的行不返回。 |
 
 **返回值：** `table` — 包含 text、lineCount、lines、languages、detectedLanguages、width、height、durationMs、hasScreenCoordinates；lines 为 1 起始的逐行数组，每项含 text/confidence/x/y/width/height/polygon，截图还含 screenX/screenY。
 **错误：** 图像 ID 无效/已释放、语言代码不支持、模型缺失或损坏、图像解码失败及引擎识别失败时产生明确错误。
@@ -1775,7 +1775,7 @@ for i, line in ipairs(result.lines) do Log(line.text .. " " .. line.confidence) 
 | `imageId` | `string` | 是 | — | — | 图像资源 ID。 |
 | `text` | `string` | 是 | — | — | 要查找的非空文本。 |
 | `language` | `string` | 否 | `ch` | 固定值：ch、en、japan | 识别语言代码。 |
-| `minConfidence` | `number` | 否 | 0 | 0–1 | 最低识别置信度。 |
+| `minConfidence` | `number` | 否 | `0` | 0–1 | 最低识别置信度。 |
 | `matchMode` | `string` | 否 | `contains` | 固定值：contains、exact | contains 或 exact。 |
 
 **返回值：** `table\|nil` — 命中行的 text、confidence、x/y/width/height、polygon；桌面截图还含 screenX/screenY。未命中返回 nil。
@@ -1798,10 +1798,10 @@ if hit then MoveTo(hit.screenX, hit.screenY) end
 | 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
 |---|---|---|---|---|---|
 | `text` | `string` | 是 | — | — | 要等待的非空文本。 |
-| `timeoutMs` | `integer` | 否 | 10000 | 0–600000 毫秒 | 总等待超时。 |
-| `intervalMs` | `integer` | 否 | 300 | 10–5000 毫秒 | 两次截图识别间隔。 |
+| `timeoutMs` | `integer` | 否 | `10000` | 0–600000 毫秒 | 总等待超时。 |
+| `intervalMs` | `integer` | 否 | `300` | 10–5000 毫秒 | 两次截图识别间隔。 |
 | `language` | `string` | 否 | `ch` | 固定值：ch、en、japan | 识别语言代码。 |
-| `minConfidence` | `number` | 否 | 0 | 0–1 | 最低识别置信度。 |
+| `minConfidence` | `number` | 否 | `0` | 0–1 | 最低识别置信度。 |
 | `matchMode` | `string` | 否 | `contains` | 固定值：contains、exact | contains 或 exact。 |
 
 **返回值：** `table\|nil` — 命中行的文字、置信度、图像局部矩形、多边形与虚拟桌面绝对物理像素 screenX/screenY；超时返回 nil。
