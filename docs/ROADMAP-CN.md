@@ -17,7 +17,7 @@
 | M4 调试器 | DONE（基础能力 Windows CI PASS；桌面实机验收 NOT RUN） | 文件/行号断点、单步、运行到光标、变量快照、调用栈 |
 | M5 可视化录制/动作列表 | DONE（Windows CI PASS；桌面手工验收 NOT RUN） | 结构化原始事件/动作、虚拟化动作编辑器、参数/延时/分组/注释/启用状态、Lua 区块同步保护、sidecar 和单步试运行 |
 | M6 坐标系统与窗口自动化 | DONE（按本 handoff 的 API/Win32 范围；最终 Windows CI PASS；桌面验收 NOT RUN） | screen/window/client/anchor/ratio、双向坐标转换、安全窗口引用/枚举/属性/操作/等待 |
-| M7 控件与前后台能力适配 | IN_PROGRESS（代码已接入；CI 与文档一致性验证中） | UI Automation Control View/Pattern；worker 隔离与可停止性；按能力报告语义后台控件操作、受限前台输入和明确 unsupported 边界 |
+| M7 控件与前后台能力适配 | DONE（Windows CI PASS；桌面验收 NOT RUN） | UI Automation Control View/Pattern；worker 隔离与可停止性；按能力报告语义后台控件操作、受限前台输入和明确 unsupported 边界；run 43350412493：64/64 tests、0 warning/error、API check、win-x64 publish、ZIP/SHA256、artifact upload 均 PASS |
 | M8 截图、图色与模板资源 | TODO | 截图区域、找色、多点找色、找图、阈值/多结果和资源管理 |
 | M9 OCR 与文本识别 | TODO | 本地 OCR、语言/字库配置、文字区域/置信度与等待文本 |
 | M10 参数、配置与脚本自定义 UI | TODO | 参数声明、类型/默认值/范围/选项、校验、持久化和通用表单 |
@@ -179,6 +179,8 @@ Windows CI 最终结果：run 43295924472 SUCCESS；37/37 tests、Release Build 
 - 坐标系统要支持窗口和客户区基准、锚点、归一化坐标以及多显示器/DPI。
 - 窗口 API 要有等待、关闭后失效、错误处理、对齐和尺寸调整测试。
 - 前台/后台适配需报告被验证支持的能力；不承诺任意第三方窗口都可后台操作。
+
+M7 实现/CI 已完成不代表 M7-01..M7-10 Windows 桌面验收通过；这些实机项仍以 ACCEPTANCE-TEST-CN.md 标记的 NOT RUN 为准。
 
 ## M8–M10 — 图像、OCR、参数和用户界面
 
