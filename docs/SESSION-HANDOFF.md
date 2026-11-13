@@ -1003,3 +1003,11 @@ M13-01..04 的代码与 Windows 自动化工作已收尾。下一会话不再重
 - 纯文档 HEAD `e5d1b9b22f028ad5fb4a8c938c35d1d7f1a1f55d` 的 Actions [43518513568](https://github.com/xiaobei206/anjian/actions/runs/43518513568) SUCCESS：228/228 tests、Build 0 warnings/errors、API check、win-x64 publish、package smoke 4/4 与 ZIP/SHA/artifact upload PASS。
 - 随后修正文档筛选契约的 HEAD `a2edd7fdc6176c7963a815d1939a522ef7c84262` 的 Actions [43518664871](https://github.com/xiaobei206/anjian/actions/runs/43518664871) SUCCESS：同样 228/228、0 warnings/errors、完整发布与 4/4 package smoke PASS。
 - 这两次 workflow 是对各自真实文档 HEAD 的验证；不能代替本记录之后任何新 HEAD 的 CI，也不能代替 M14 Windows 10/11 桌面手测。
+
+# M14 当前会话覆盖状态（2026-11-13；优先于上文计划状态）
+
+- **M14 未执行，状态 NOT RUN / 环境阻塞**。当前代理容器为 Linux x86_64，未安装 .NET SDK，无法访问真实 Windows 10/11 WinForms 桌面、物理键鼠、DPI/多屏、权限弹窗与托盘。本次没有声称任何实机测试通过，也未运行本地 Restore/Build/Test。
+- 开始时 main HEAD：`3fc67c4e5d60163ad686be397389028b36947d4b`。本会话可核实的最近一次 Windows 全 workflow 成功证据为 [43518664871](https://github.com/xiaobei206/anjian/actions/runs/43518664871)，HEAD `a2edd7fdc6176c7963a815d1939a522ef7c84262`；应用代码 HEAD `6d9513bec5de35ed8f20f656d8520217d949733a`，228/228 Core tests、0 warnings/errors、API handbook、self-contained win-x64 package、package smoke 4/4、ZIP/SHA 与 artifact upload PASS。当前 HEAD `3fc67c4...` 的独立 Actions 运行未在本次工具中核实，因此不能声称该 HEAD 的 CI PASS。
+- 开发包的最近可用证据为 Actions artifact ID `14081447842`（外层 archive digest `sha256:a702a44769706fd06dbbc197aa3f34f83cd6fe1dc9f550930326359239e34897`，预计保留到 2026-12-13；artifact 不是 Release）。包来自文档改动前后相同的应用代码 HEAD；使用时仍须核对包内产品 ZIP 的 SHA256 sidecar。
+- ROADMAP、FEATURE-MATRIX、ACCEPTANCE 已追加同一 M14 阻塞记录。对应提交：ROADMAP `3173d09335f3fafb9f659e7810152368028f262c`；FEATURE-MATRIX `ff9f186b0696a349823258572f216f78bc79e7dc`；ACCEPTANCE `f53383633da71d2c59d0f3a60ffeb6e28d0c2f42`。
+- **下一会话唯一任务仍是 M14**：在实际 Windows 10/11 x64 机器完成 `docs/ACCEPTANCE-TEST-CN.md` 中全部实机项并提供 OS build、DPI/屏幕拓扑、实际结果、日志/截图；根据可复现失败修复后重复相应项。用户未提供实机执行证据前，不将 NOT RUN 改为 PASS、不发布新版本，也不转做其他里程碑。
