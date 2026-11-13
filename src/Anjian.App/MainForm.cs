@@ -1,6 +1,8 @@
 using Anjian.App.Models;
 using Anjian.App.Services;
 using Anjian.App.Controls;
+using Anjian.Core.Parameters;
+using System.Text.Json;
 using Anjian.Core;
 using Anjian.Core.Api;
 using Anjian.Core.Editor;
@@ -233,6 +235,7 @@ internal sealed class MainForm : Form
         toolbar.Controls.Add(_alwaysOnTopCheck);
         toolbar.Controls.Add(MakeButton("图像资源", (_, _) => OpenImageResources()));
         toolbar.Controls.Add(MakeButton("OCR 模型", (_, _) => OpenOcrModelManager()));
+        toolbar.Controls.Add(MakeButton("参数定义", (_, _) => OpenParameterDesigner()));
         _visualDebugButton = MakeButton("视觉调试：关", (_, _) => ToggleVisualDebug());
         toolbar.Controls.Add(_visualDebugButton);
         toolbar.Controls.Add(MakeButton("返回悬浮窗", (_, _) => HideMainWindow(showFloatingWindow: true)));
@@ -1161,6 +1164,7 @@ internal sealed class MainForm : Form
         }
         if (_playback.IsRunning || _current is null || !SaveCurrent()) return;
         var scriptPath = _current.FullPath;
+        if (!TryCollectScriptParameters(scriptPath, out var launchParameters)) return;
         var options = new PlaybackOptions
         {
             RepeatCount = (int)_repeatCount.Value,
@@ -1187,7 +1191,7 @@ internal sealed class MainForm : Form
 
         try
         {
-            _runTask = _playback.RunAsync(scriptPath, options);
+            _runTask = _playback.RunAsync(scriptPath, options, parameters: launchParameters);
             UpdateFloatingState();
             await _runTask;
         }
@@ -1407,6 +1411,7 @@ internal sealed class MainForm : Form
 
         var tab = _activeTab;
         var scriptPath = tab.Entry.FullPath;
+        if (!TryCollectScriptParameters(scriptPath, out var launchParameters)) return;
         var breakpoints = tab.Breakpoints
             .Order()
             .Select(line => new LuaDebugBreakpoint(scriptPath, line))
@@ -1428,7 +1433,7 @@ internal sealed class MainForm : Form
 
         try
         {
-            _runTask = _playback.RunAsync(scriptPath, playbackOptions, launchOptions);
+            _runTask = _playback.RunAsync(scriptPath, playbackOptions, launchOptions, launchParameters);
             UpdateFloatingState();
             await _runTask;
         }
@@ -1541,6 +1546,50 @@ internal sealed class MainForm : Form
     {
         try { return Path.GetFullPath(path.TrimStart('@')); }
         catch { return path; }
+    }
+
+    private void OpenParameterDesigner()
+    {
+        if (_current is null)
+        {
+            MessageBox.Show(this, "请先选择一个脚本。", "参数定义", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        try
+        {
+            using var form = new ScriptParameterDesignerForm(_current.FullPath);
+            if (form.ShowDialog(this) == DialogResult.OK)
+                AppendLog("参数定义已保存：" + Path.GetFileName(_current.FullPath) + ".params.json");
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, "无法打开参数定义：" + ex.Message, "参数定义", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    private bool TryCollectScriptParameters(string scriptPath, out IReadOnlyDictionary<string, JsonElement> values)
+    {
+        values = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
+        var schemaPath = ScriptParameterService.SchemaPath(scriptPath);
+        if (!File.Exists(schemaPath)) return true;
+
+        try
+        {
+            var schema = ScriptParameterService.LoadSchema(schemaPath);
+            if (schema.Parameters.Count == 0) return true;
+            var initial = ScriptParameterService.LoadSavedValues(ScriptParameterService.ConfigurationPath(scriptPath), schema);
+            using var dialog = new ScriptParameterDialog(scriptPath, schema, initial);
+            if (dialog.ShowDialog(this) != DialogResult.OK) return false;
+            values = dialog.Values;
+            return true;
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, "参数定义/配置无效，脚本尚未启动：\n" + ex.Message,
+                "启动前参数校验", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return false;
+        }
     }
 
     private void OpenOcrModelManager()
