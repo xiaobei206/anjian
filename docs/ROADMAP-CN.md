@@ -18,7 +18,7 @@
 | M5 可视化录制/动作列表 | DONE（Windows CI PASS；桌面手工验收 NOT RUN） | 结构化原始事件/动作、虚拟化动作编辑器、参数/延时/分组/注释/启用状态、Lua 区块同步保护、sidecar 和单步试运行 |
 | M6 坐标系统与窗口自动化 | DONE（按本 handoff 的 API/Win32 范围；最终 Windows CI PASS；桌面验收 NOT RUN） | screen/window/client/anchor/ratio、双向坐标转换、安全窗口引用/枚举/属性/操作/等待 |
 | M7 控件与前后台能力适配 | DONE（Windows CI PASS；桌面验收 NOT RUN） | UI Automation Control View/Pattern；worker 隔离与可停止性；按能力报告语义后台控件操作、受限前台输入和明确 unsupported 边界；run 43350412493：64/64 tests、0 warning/error、API check、win-x64 publish、ZIP/SHA256、artifact upload 均 PASS |
-| M8 截图、图色与模板资源 | TODO | 截图区域、找色、多点找色、找图、阈值/多结果和资源管理 |
+| M8 截图、图色与模板资源 | IN_PROGRESS（核心 API/CI DONE；资源管理 UI 与实机验收待完成） | 截图/图像资源生命周期、区域捕获、RGB 找色/多点找色/计数、透明模板匹配、灰度/缩放/相似度、多结果与稳定等待；模板预览/命名/版本校验/视觉调试层尚未完成 |
 | M9 OCR 与文本识别 | TODO | 本地 OCR、语言/字库配置、文字区域/置信度与等待文本 |
 | M10 参数、配置与脚本自定义 UI | TODO | 参数声明、类型/默认值/范围/选项、校验、持久化和通用表单 |
 | M11 小精灵打包器 | TODO | 独立包/EXE 入口、独立参数界面、图标、依赖收集、运行控制、清单与校验 |
@@ -170,6 +170,28 @@ Windows CI 最终结果：run 43295924472 SUCCESS；37/37 tests、Release Build 
 - 本阶段未更新 VERSION / preview 版本，未创建 Release。
 
 
+## M8 — 截图、图色与模板资源（核心 API/CI DONE；完整阶段 IN_PROGRESS）
+
+### 已交付的 main 核心能力（尚未包含在 preview.4 Release）
+- Anjian.Core.Imaging 提供 PixelImage 与独立可测试的 ImageSearchEngine；Windows 端使用 GDI+ CopyFromScreen 捕获当前可见桌面合成画面。没有新增第三方图像识别依赖。
+- API registry 从 0.4 升至 0.5；公开函数从 54 项增至 74 项（新增 20 个截图、像素/颜色、资源管理、模板匹配与等待函数）。Lua worker IPC、运行时包装和中文函数手册同步更新。
+- 支持虚拟桌面、可见窗口外框、客户区和 screen/window/client/anchor/ratio 坐标空间的矩形捕获；屏幕图像保留负坐标/屏幕原点元数据。
+- 图像资源由每轮脚本运行持有，最多 128 个资源/轮、256 MiB 缓存/轮、单图最多 32,000,000 像素；支持 PNG 保存、加载、裁剪、读取像素、显式释放以及轮次结束清理。
+- 支持 RGB 颜色比较/单点找色/多点找色/区域计数、每通道容差、区域与 step；模板找图支持透明通配像素、相似度阈值、灰度模式、0.25–4 倍最近邻缩放、多结果（最多 1000 个）与非重叠结果筛选。
+- 支持等待图像/颜色出现或消失、超时、轮询间隔、连续确认次数（1–20）与停止取消。一次模板查询最多 50,000,000 次像素比较。
+- 截图来自当前交互桌面可见合成画面。窗口被遮挡时不承诺获得后台真实像素；隐藏/最小化窗口拒绝截图，不绕过 UIPI/UAC/安全桌面，也不承诺硬件加速或受保护表面可读。
+
+### Windows CI 代码验收
+- 代码基线 commit 1b87af713ff17c907feac6984bb96aa5dd8e821f，Windows Actions run 43353801969 SUCCESS：Restore PASS；Release Build 0 warnings / 0 errors；73 passed / 0 failed / 0 skipped；API handbook --check PASS；self-contained win-x64 publish、ZIP/SHA256 package 与 artifact upload 全 PASS。Artifact ID 14004658368，76,430,108 bytes。该 artifact 是 CI 临时产物，不是正式 Release。
+- 中间迭代曾出现 API 测试结构、生成手册漂移及灰度/缩放接线相关 CI 失败；已修复并由最新成功 run 覆盖验证，失败记录见 DEVELOPMENT-LOG-CN.md。
+- 没有更新 VERSION/csproj 预览版本，没有创建 Release；v0.1.0-preview.4 正式 ZIP/SHA256 不变。
+
+### 尚未完成，不能把 M8 标为 DONE
+- 图像资源 UI：模板列表、预览、命名/路径与版本校验、资源依赖校验，以及项目资源目录联动尚未完成。
+- 视觉调试层（截图区域框、命中位置、相似度/耗时/颜色值展示）尚未完成。
+- PRD 提及的 RGB/十六进制辅助转换、颜色差值/颜色块检测尚未形成完整公开 API 闭环；需补充规格、实现与测试后再评估。
+- docs/ACCEPTANCE-TEST-CN.md 中 M8 桌面项仍是 NOT RUN。实际 Windows 10/11、DPI/多显示器负坐标、部分遮挡、权限边界、GDI 失败路径、长时等待和资源清理仍须实机测试。CI 不替代实机验收。
+- OCR 属于 M9，本阶段不实现 OCR、不引入 OCR 模型/云服务。
 ## M3–M7 — IDE、调试、录制、坐标与窗口
 
 这些阶段必须形成可用闭环，而不是只有 API 名称：

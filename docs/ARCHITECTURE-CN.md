@@ -1,6 +1,6 @@
 # 技术架构与模块边界
 
-- 版本：Architecture 0.3
+- 版本：Architecture 0.4（追加 M8 图像 API/Core 与 Windows 捕获服务）
 - 目标框架：net10.0-windows
 - 平台：Windows x64
 - 状态：preview.4 实际实现已确认；后续模块化架构仍按路线图渐进演进。
@@ -30,7 +30,7 @@
     ├── docs/                           # 产品、架构、API、录制、验收和交接资料
     └── .github/workflows/              # Windows CI / self-contained 发布流程
 
-目前没有独立的 Anjian.Scripting、Anjian.Automation、Anjian.Recorder、Anjian.ProjectSystem 或 Imaging 项目；NLua Host、播放、录制和输入适配目前主要位于 Anjian.App 中。不要在接手时假设这些拆分项目已经存在。
+目前没有独立的 Anjian.Scripting、Anjian.Automation、Anjian.Recorder、Anjian.ProjectSystem 或 Imaging 项目。main 已在 Anjian.Core 中落地 Anjian.Core.Imaging（纯像素模型与匹配算法），在 Anjian.App 中落地 WindowsImageService（GDI+ 捕获与本轮资源池）；NLua Host、播放、录制、Win32 窗口和输入适配仍主要位于 Anjian.App。已发布 preview.4 的 Release 包不包含这些 M8 main 开发功能。不要假设规划中的独立项目已经存在。
 
 ### 2.2 后续目标模块（规划，不代表当前已落地）
 
@@ -237,3 +237,12 @@ preview.4 当前采用低级鼠标/键盘 Hook，已纳入 Windows CI 编译与�
 - 窗口句柄失效、截图失败、后台输入不支持、OCR 语言缺失和打包资源缺失都应有明确的错误类型。
 - API 清单与手册生成应先建立，然后再扩大公开函数数量，以免手册和代码分叉。
 - 后台输入是否支持按目标能力报告；不因有窗口查找函数就承诺任意窗口都可后台点击。
+
+## 13. M8 图像服务模块（main 开发版；Windows 桌面验收 NOT RUN）
+
+- Anjian.Core.Imaging.PixelImage 持有不可变的 32-bit ARGB 像素副本；单图最多 32,000,000 像素，图像裁剪会保留截图的屏幕原点偏移。
+- ImageSearchEngine 不依赖 Windows GDI 或第三方图像库；实现 RGB 各通道容差、单点找色、多点模式解析/匹配、区域计数、透明通配模板匹配、相似度、灰度亮度匹配、最近邻缩放和有上限的多结果搜索。模板匹配最多 50,000,000 次像素比较，并在循环内检查取消令牌。
+- WindowsImageService 是 Windows 适配层，使用 CopyFromScreen 捕获当前桌面合成图像；截图资源由脚本运行轮次管理，限 128 个资源/轮和 256 MiB/轮。PNG 读写、裁剪、像素读取、资源 ID、释放和轮次清理统一在此服务中。
+- PlaybackRunner 在主进程侧执行图像 IPC；Lua worker 只能拿随机资源 ID 和结构化结果，不接收原生 Bitmap/HWND。WaitImage/WaitColor 系列遵循暂停、取消令牌、超时和连续条件跟踪。
+- CaptureWindow/CaptureClient 只对可见且未最小化窗口调用屏幕区域捕获；遮挡区域不保证目标窗口真实后台像素。
+- 没有新增第三方图像识别/OCR 依赖。图像资源预览/管理 UI、模板命名/版本校验、视觉调试 overlay、颜色差值/颜色块检测还未完成，属于 M8 剩余工作。

@@ -3,7 +3,7 @@
 > 这是当前运行时 API 契约与完整目标 API 设计的技术规格。当前函数与目标函数的状态以 [中文函数/参数参考手册](FUNCTION-REFERENCE-CN.md) 和 [完整功能矩阵](FEATURE-MATRIX-CN.md) 为准。
 
 - Lua 版本：5.4
-- API 版本：0.4（M7 新增 UI Automation 控件 API 与显式前台输入；仅 main 开发版，尚未发布到 preview.4）
+- API 版本：0.5（M8 新增截图/图色/模板 API；仅 main 开发版，尚未发布到 preview.4）
 - 命令风格：全局英文函数名 + 标准 Lua 函数调用语法
 - 时间单位：毫秒
 - 坐标单位：虚拟桌面物理像素
@@ -208,10 +208,10 @@ WindowUnbind(binding)
 
 ## 8. API 注册与兼容
 
-- 唯一机器可读来源：`src/Anjian.Core/Api/lua-api-registry.json`，登记 54 个当前公开函数的稳定 ID、分类、签名、参数 schema、默认值/范围、返回值/错误、暂停/取消、坐标/权限、示例、实现状态和版本。
+- 唯一机器可读来源：`src/Anjian.Core/Api/lua-api-registry.json`，登记 74 个当前公开函数的稳定 ID、分类、签名、参数 schema、默认值/范围、返回值/错误、暂停/取消、坐标/权限、示例、实现状态和版本。
 - `Anjian.Core.Api.LuaApiRuntime` 从该注册表生成 Lua 全局包装；内部 `__...` 桥接绑定在包装闭包建立后隐藏。
 - `docs/FUNCTION-REFERENCE-CN.md` 第 2 节由 `tools/Anjian.ApiDocsGenerator` 生成；使用 `--write` 更新，`--check` 验证是否漂移。
-- 注册表只包含真实当前实现。窗口、图色、OCR 等候选仍在目标设计区，不会被标记为当前可用。
+- 注册表只包含真实当前实现。M6 窗口/坐标、M7 UIA 与 M8 核心图像函数已进入 main；OCR 及尚未完成的资源预览/视觉调试能力仍属于剩余工作，不会被伪装成可调用 API。
 - 后续 IDE 补全/参数提示/命令面板应读取 `LuaApiRegistry.Load().Categories` 与 `.Apis`，禁止另建静态函数清单。
 
 - API 注册中心维护命令标识、中文名、分类、参数 schema、默认值、返回值、示例、最低 API 版本和弃用状态。
@@ -219,3 +219,27 @@ WindowUnbind(binding)
 - 已发布 API 不随意改名或改变参数语义。
 - 有破坏性更改时增加 API 版本并提供迁移说明。
 - 全局函数是用户脚本层 API；内部 C# 仍按 Mouse / Keyboard / Runtime 等模块分层，避免把全局 API 设计泄漏为内部架构。
+
+## 9. M8 截图、图色与模板识别（API v0.5，main 开发版）
+
+本节中的新 API 当前仅存在于 main 开发版，未包含于 v0.1.0-preview.4 Release。完整参数、默认值与结构以自动生成的函数/参数参考手册第 2 节为准。
+
+| 能力 | 当前公开函数 | 约定 |
+|---|---|---|
+| 截图/资源 | CaptureScreen、CaptureWindow、CaptureClient、CaptureRegion、LoadImage、SaveScreenshot、ReleaseImage、GetImageSize、CropImage | 资源 ID 仅在当前运行轮次有效；轮次结束自动清理；PNG 文件读写；截图的屏幕原点/负坐标会保留 |
+| 像素/找色 | GetPixelColor、CompareColor、FindColor、FindMultiColor、CountColors | RGB 颜色为 0xRRGGBB；tolerance 是每个通道的最大绝对差；区域以图像局部零基像素表示 |
+| 模板找图 | FindImage、FindImages | similarity 为 0–1；支持透明模板像素、可选灰度模式与 0.25–4 倍最近邻缩放；多结果上限 1000 |
+| 等待 | WaitImage、WaitImageGone、WaitColor、WaitColorGone | 可配置 timeout/interval 和 1–20 次连续确认；Stop 取消搜索循环；超时返回 nil 或 false，不伪装成命中 |
+
+### 9.1 资源和性能上限
+- 单张图像最多 32,000,000 像素；单轮最多 128 个资源和 256 MiB 像素缓存。使用 ReleaseImage(id) 及时释放无用图像。
+- 单次模板搜索最多 50,000,000 次像素比较；超出上限会明确报错，建议缩小区域/模板或增大 step。
+- FindColor、FindMultiColor、CountColors 的 width/height 为 0 表示延伸至图像右/下边界；step 影响候选像素采样间隔。
+- FindImage/FindImages 默认 similarity=0.95、grayscale=false、scale=1；灰度比较使用亮度加权值，缩放使用最近邻，不做平滑插值。
+- Wait 系列 stableCount 默认 1。增加该值需要连续多次检测均满足条件；反向条件会重置连续计数。等待期间尊重暂停和 Stop。
+
+### 9.2 截图权限与可见性边界
+- CaptureScreen 捕获 Windows 虚拟桌面的可见合成画面；GetImageSize 返回尺寸与 hasScreenCoordinates、screenOriginX、screenOriginY。
+- CaptureWindow 与 CaptureClient 只接受可见、未最小化的窗口。底层是屏幕区域捕获；窗口被覆盖的部分不能保证得到目标窗口真实后台内容，硬件加速/受保护表面可能不可读。
+- 不绕过 UIPI、UAC、安全桌面或其他访问控制。截图 API 返回结果不代表通用后台输入受到支持。
+- 模板预览/命名/版本校验 UI、视觉调试 overlay、颜色差值/颜色块工具仍为 M8 剩余工作；OCR 不属于本阶段。
