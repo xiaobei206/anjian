@@ -1550,10 +1550,17 @@ internal sealed class MainForm : Form
             return;
         }
         if (!SaveCurrent()) return;
-        using var manager = new ImageResourceManagerForm(_current.FullPath, _editor.Text);
-        manager.ShowDialog(this);
-        if (manager.HasChanges)
-            AppendLog($"图像资源清单已更新：{Path.GetFileName(_current.FullPath)}");
+        try
+        {
+            using var manager = new ImageResourceManagerForm(_current.FullPath, _editor.Text);
+            manager.ShowDialog(this);
+            if (manager.HasChanges)
+                AppendLog($"图像资源清单已更新：{Path.GetFileName(_current.FullPath)}");
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, "无法打开图像资源管理", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
     }
 
     private void ToggleVisualDebug()

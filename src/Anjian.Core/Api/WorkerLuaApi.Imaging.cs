@@ -75,19 +75,19 @@ public sealed partial class WorkerLuaApi
 
     public LuaTable HexToRgb(string hex)
     {
-        var (red, green, blue) = RgbColor.ParseHex(hex);
+        var (red, green, blue) = Anjian.Core.Imaging.RgbColor.ParseHex(hex);
         var result = NewLuaTable();
         result["red"] = red;
         result["green"] = green;
         result["blue"] = blue;
-        result["hex"] = RgbColor.ToHex(red, green, blue);
-        result["color"] = (int)RgbColor.Pack(red, green, blue);
+        result["hex"] = Anjian.Core.Imaging.RgbColor.ToHex(red, green, blue);
+        result["color"] = (int)Anjian.Core.Imaging.RgbColor.Pack(red, green, blue);
         return result;
     }
 
     public LuaTable ColorDifference(double first, double second)
     {
-        var result = RgbColor.Difference(RgbColor.PackValue(first), RgbColor.PackValue(second));
+        var result = Anjian.Core.Imaging.RgbColor.Difference(Anjian.Core.Imaging.RgbColor.PackValue(first), Anjian.Core.Imaging.RgbColor.PackValue(second));
         var table = NewLuaTable();
         table["red"] = result.Red;
         table["green"] = result.Green;
@@ -102,7 +102,7 @@ public sealed partial class WorkerLuaApi
         double minPixels, double left, double top, double width, double height, double step, double maxResults)
     {
         var request = new ImageColorBlocksRequest(
-            RequiredId(imageId), RgbColor.PackValue(color), Integer(tolerance, 0, 255, "颜色容差"),
+            RequiredId(imageId), Anjian.Core.Imaging.RgbColor.PackValue(color), Integer(tolerance, 0, 255, "颜色容差"),
             Integer(minPixels, 1, 1_000_000, "最小像素数"), RegionValue(left, "区域左边"),
             RegionValue(top, "区域上边"), RegionDimension(width, "区域宽度"),
             RegionDimension(height, "区域高度"), Integer(step, 1, 64, "step"),
