@@ -170,7 +170,7 @@ public sealed class ImageSearchEngineTests
         Assert.Equal((0, 0, 2, 2, 4), (blocks[0].X, blocks[0].Y, blocks[0].Width, blocks[0].Height, blocks[0].PixelCount));
         Assert.Equal((-100, 20), (blocks[0].ScreenX, blocks[0].ScreenY));
         Assert.Equal(1, blocks[1].PixelCount);
-        Assert.Equal(0, ImageSearchEngine.FindColorBlocks(image, 0xFF0000, minPixels: 2, left: 4, top: 0, width: 2, height: 2).Count);
+        Assert.Empty(ImageSearchEngine.FindColorBlocks(image, 0xFF0000, minPixels: 2, left: 4, top: 0, width: 2, height: 2));
     }
 
     [Fact]

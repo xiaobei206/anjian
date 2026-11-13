@@ -242,6 +242,8 @@ internal sealed class ImageResourceManagerForm : Form
 
 internal sealed class ResourcePreviewPanel : Panel
 {
+    [Browsable(false)]
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public PixelImage? Image { get; set; }
 
     protected override void OnPaint(PaintEventArgs e)
