@@ -108,7 +108,6 @@ public sealed class ScriptHttpSession : IDisposable
     {
         AllowAutoRedirect = false,
         UseCookies = false,
-        UseDefaultCredentials = false,
         Credentials = null,
         UseProxy = false,
         AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate | DecompressionMethods.Brotli,
