@@ -1,85 +1,176 @@
 using System.Runtime.InteropServices;
 using System.Text;
+using Anjian.Core.Runtime;
 
 namespace Anjian.App.Services;
 
 internal sealed class WindowsInputController
 {
+    private readonly InputArbiter _arbiter;
+    private readonly RunInstanceId _owner;
     private readonly object _sync = new();
-    private readonly HashSet<string> _heldKeys = new(StringComparer.OrdinalIgnoreCase);
-    private readonly HashSet<string> _heldMouse = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, InputArbiter.InputArbiterLease> _heldKeys =
+        new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, InputArbiter.InputArbiterLease> _heldMouse =
+        new(StringComparer.OrdinalIgnoreCase);
 
-    public void MoveTo(int x, int y)
+    public WindowsInputController(InputArbiter arbiter, RunInstanceId owner)
     {
-        if (!SetCursorPos(x, y))
-            throw new InvalidOperationException($"SetCursorPos 失败：{Marshal.GetLastWin32Error()}");
+        _arbiter = arbiter ?? throw new ArgumentNullException(nameof(arbiter));
+        _owner = owner ?? throw new ArgumentNullException(nameof(owner));
+    }
+
+    public WindowsInputController()
+        : this(new InputArbiter(), RunInstanceId.Create())
+    {
+    }
+
+    public async Task MoveToAsync(int x, int y, CancellationToken token)
+    {
+        using var lease = await _arbiter.AcquireAsync(_owner, token).ConfigureAwait(false);
+        token.ThrowIfCancellationRequested();
+        MoveToCore(x, y);
     }
 
     public async Task ClickAsync(string button, int holdMs, CancellationToken token)
     {
-        MouseDown(button);
-        try { await Task.Delay(holdMs, token).ConfigureAwait(false); }
-        finally { MouseUp(button); }
+        using var operation = await _arbiter.AcquireAsync(_owner, token).ConfigureAwait(false);
+        token.ThrowIfCancellationRequested();
+        await ClickCoreAsync(button, holdMs, token).ConfigureAwait(false);
     }
 
-    public void MouseDown(string button)
+    public async Task ClickAtAsync(int x, int y, string button, int holdMs, CancellationToken token)
     {
-        var flag = button.ToLowerInvariant() switch
+        using var operation = await _arbiter.AcquireAsync(_owner, token).ConfigureAwait(false);
+        token.ThrowIfCancellationRequested();
+        MoveToCore(x, y);
+        await ClickCoreAsync(button, holdMs, token).ConfigureAwait(false);
+    }
+
+    public async Task MouseDownAsync(string button, CancellationToken token)
+    {
+        var normalized = NormalizeMouseButton(button);
+        var lease = await _arbiter.AcquireAsync(_owner, token).ConfigureAwait(false);
+        var stored = false;
+        try
         {
-            "left" => MouseLeftDown,
-            "right" => MouseRightDown,
-            "middle" => MouseMiddleDown,
-            _ => throw new ArgumentException($"不支持的鼠标按钮：{button}")
-        };
-        SendMouse(flag);
-        lock (_sync) _heldMouse.Add(button);
-    }
-
-    public void MouseUp(string button)
-    {
-        var flag = button.ToLowerInvariant() switch
+            token.ThrowIfCancellationRequested();
+            SendMouse(GetMouseDownFlag(normalized));
+            lock (_sync)
+            {
+                if (_heldMouse.TryGetValue(normalized, out _))
+                    return;
+                _heldMouse.Add(normalized, lease);
+                stored = true;
+            }
+        }
+        finally
         {
-            "left" => MouseLeftUp,
-            "right" => MouseRightUp,
-            "middle" => MouseMiddleUp,
-            _ => throw new ArgumentException($"不支持的鼠标按钮：{button}")
-        };
-        SendMouse(flag);
-        lock (_sync) _heldMouse.Remove(button);
+            if (!stored)
+                lease.Dispose();
+        }
     }
 
-    public void MouseWheel(int delta)
+    public async Task MouseUpAsync(string button)
     {
-        var input = new INPUT { Type = InputMouse, Union = new INPUTUNION { Mouse = new MOUSEINPUT { MouseData = unchecked((uint)delta), Flags = MouseWheelFlag } } };
+        var normalized = NormalizeMouseButton(button);
+        InputArbiter.InputArbiterLease? held;
+        lock (_sync)
+            _heldMouse.TryGetValue(normalized, out held);
+
+        if (held is null)
+        {
+            using var operation = await _arbiter.AcquireAsync(_owner).ConfigureAwait(false);
+            SendMouse(GetMouseUpFlag(normalized));
+            return;
+        }
+
+        try
+        {
+            SendMouse(GetMouseUpFlag(normalized));
+        }
+        catch (Exception ex)
+        {
+            _arbiter.MarkFaulted(_owner, $"释放鼠标 {normalized} 失败：{ex.Message}");
+            throw;
+        }
+        finally
+        {
+            lock (_sync)
+                _heldMouse.Remove(normalized);
+            held.Dispose();
+        }
+    }
+
+    public async Task MouseWheelAsync(int delta, CancellationToken token)
+    {
+        using var lease = await _arbiter.AcquireAsync(_owner, token).ConfigureAwait(false);
+        token.ThrowIfCancellationRequested();
+        var input = new INPUT
+        {
+            Type = InputMouse,
+            Union = new INPUTUNION
+            {
+                Mouse = new MOUSEINPUT
+                {
+                    MouseData = unchecked((uint)delta),
+                    Flags = MouseWheelFlag
+                }
+            }
+        };
         Send(ref input);
     }
 
     public async Task KeyPressAsync(string key, int holdMs, CancellationToken token)
     {
-        KeyDown(key);
-        try { await Task.Delay(holdMs, token).ConfigureAwait(false); }
-        finally { KeyUp(key); }
+        using var operation = await _arbiter.AcquireAsync(_owner, token).ConfigureAwait(false);
+        token.ThrowIfCancellationRequested();
+        await KeyDownCoreAsync(key, token).ConfigureAwait(false);
+        try
+        {
+            await Task.Delay(holdMs, token).ConfigureAwait(false);
+        }
+        finally
+        {
+            await KeyUpCoreAsync(key).ConfigureAwait(false);
+        }
     }
 
-    public void KeyDown(string key)
+    public async Task KeyDownAsync(string key, CancellationToken token)
     {
-        var vk = GetVirtualKey(key);
-        SendKeyboard(vk, 0);
-        lock (_sync) _heldKeys.Add(key);
+        var normalized = NormalizeKey(key);
+        var lease = await _arbiter.AcquireAsync(_owner, token).ConfigureAwait(false);
+        var stored = false;
+        try
+        {
+            token.ThrowIfCancellationRequested();
+            SendKeyboard(GetVirtualKey(normalized), 0);
+            lock (_sync)
+            {
+                if (_heldKeys.TryGetValue(normalized, out _))
+                    return;
+                _heldKeys.Add(normalized, lease);
+                stored = true;
+            }
+        }
+        finally
+        {
+            if (!stored)
+                lease.Dispose();
+        }
     }
 
-    public void KeyUp(string key)
+    public async Task KeyUpAsync(string key)
     {
-        var vk = GetVirtualKey(key);
-        SendKeyboard(vk, KeyUpFlag);
-        lock (_sync) _heldKeys.Remove(key);
+        await KeyUpCoreAsync(key).ConfigureAwait(false);
     }
 
-    public void TypeText(string text, CancellationToken cancellationToken)
+    public async Task TypeTextAsync(string text, CancellationToken token)
     {
+        using var lease = await _arbiter.AcquireAsync(_owner, token).ConfigureAwait(false);
         foreach (var rune in text.EnumerateRunes())
         {
-            cancellationToken.ThrowIfCancellationRequested();
+            token.ThrowIfCancellationRequested();
             var value = rune.Value;
             if (value <= 0xFFFF)
             {
@@ -91,46 +182,196 @@ internal sealed class WindowsInputController
                 var scalar = value - 0x10000;
                 var high = (ushort)(0xD800 + (scalar >> 10));
                 var low = (ushort)(0xDC00 + (scalar & 0x3FF));
-                // Send the surrogate pair as one UTF-16 sequence: both downs, then both ups.
                 SendUnicode(high, false);
                 SendUnicode(low, false);
                 SendUnicode(high, true);
                 SendUnicode(low, true);
             }
         }
-        cancellationToken.ThrowIfCancellationRequested();
+        token.ThrowIfCancellationRequested();
     }
 
-    public void ReleaseAll()
+    public Task<bool> ReleaseAllAsync()
     {
-        string[] keys, mouse;
+        KeyValuePair<string, InputArbiter.InputArbiterLease>[] keys;
+        KeyValuePair<string, InputArbiter.InputArbiterLease>[] mouse;
         lock (_sync)
         {
             keys = _heldKeys.ToArray();
             mouse = _heldMouse.ToArray();
-            _heldKeys.Clear();
-            _heldMouse.Clear();
         }
-        foreach (var key in keys)
-        {
-            try { SendKeyboard(GetVirtualKey(key), KeyUpFlag); } catch { }
-        }
-        foreach (var button in mouse)
+
+        var succeeded = true;
+        var failures = new List<string>();
+        foreach (var pair in keys)
         {
             try
             {
-                var flag = button.ToLowerInvariant() switch
-                {
-                    "left" => MouseLeftUp,
-                    "right" => MouseRightUp,
-                    "middle" => MouseMiddleUp,
-                    _ => 0u
-                };
-                if (flag != 0) SendMouse(flag);
+                SendKeyboard(GetVirtualKey(pair.Key), KeyUpFlag);
             }
-            catch { }
+            catch (Exception ex)
+            {
+                succeeded = false;
+                failures.Add($"key {pair.Key}: {ex.Message}");
+            }
+        }
+
+        foreach (var pair in mouse)
+        {
+            try
+            {
+                SendMouse(GetMouseUpFlag(pair.Key));
+            }
+            catch (Exception ex)
+            {
+                succeeded = false;
+                failures.Add($"mouse {pair.Key}: {ex.Message}");
+            }
+        }
+
+        if (!succeeded)
+            _arbiter.MarkFaulted(_owner, "实例输入清理失败；全局输入已锁定。 " + string.Join("; ", failures));
+
+        lock (_sync)
+        {
+            _heldKeys.Clear();
+            _heldMouse.Clear();
+        }
+        foreach (var pair in keys)
+            pair.Value.Dispose();
+        foreach (var pair in mouse)
+            pair.Value.Dispose();
+
+        return Task.FromResult(succeeded);
+    }
+
+    private async Task ClickCoreAsync(string button, int holdMs, CancellationToken token)
+    {
+        await MouseDownCoreAsync(button, token).ConfigureAwait(false);
+        try
+        {
+            await Task.Delay(holdMs, token).ConfigureAwait(false);
+        }
+        finally
+        {
+            await MouseUpAsync(button).ConfigureAwait(false);
         }
     }
+
+    private async Task MouseDownCoreAsync(string button, CancellationToken token)
+    {
+        var normalized = NormalizeMouseButton(button);
+        var lease = await _arbiter.AcquireAsync(_owner, token).ConfigureAwait(false);
+        var stored = false;
+        try
+        {
+            token.ThrowIfCancellationRequested();
+            SendMouse(GetMouseDownFlag(normalized));
+            lock (_sync)
+            {
+                if (_heldMouse.TryGetValue(normalized, out _))
+                    return;
+                _heldMouse.Add(normalized, lease);
+                stored = true;
+            }
+        }
+        finally
+        {
+            if (!stored)
+                lease.Dispose();
+        }
+    }
+
+    private async Task KeyDownCoreAsync(string key, CancellationToken token)
+    {
+        var normalized = NormalizeKey(key);
+        var lease = await _arbiter.AcquireAsync(_owner, token).ConfigureAwait(false);
+        var stored = false;
+        try
+        {
+            token.ThrowIfCancellationRequested();
+            SendKeyboard(GetVirtualKey(normalized), 0);
+            lock (_sync)
+            {
+                if (_heldKeys.TryGetValue(normalized, out _))
+                    return;
+                _heldKeys.Add(normalized, lease);
+                stored = true;
+            }
+        }
+        finally
+        {
+            if (!stored)
+                lease.Dispose();
+        }
+    }
+
+    private async Task KeyUpCoreAsync(string key)
+    {
+        var normalized = NormalizeKey(key);
+        InputArbiter.InputArbiterLease? held;
+        lock (_sync)
+            _heldKeys.TryGetValue(normalized, out held);
+
+        if (held is null)
+        {
+            using var operation = await _arbiter.AcquireAsync(_owner).ConfigureAwait(false);
+            SendKeyboard(GetVirtualKey(normalized), KeyUpFlag);
+            return;
+        }
+
+        try
+        {
+            SendKeyboard(GetVirtualKey(normalized), KeyUpFlag);
+        }
+        catch (Exception ex)
+        {
+            _arbiter.MarkFaulted(_owner, $"释放按键 {normalized} 失败：{ex.Message}");
+            throw;
+        }
+        finally
+        {
+            lock (_sync)
+                _heldKeys.Remove(normalized);
+            held.Dispose();
+        }
+    }
+
+    private static void MoveToCore(int x, int y)
+    {
+        if (!SetCursorPos(x, y))
+            throw new InvalidOperationException($"SetCursorPos 失败：{Marshal.GetLastWin32Error()}");
+    }
+
+    private static string NormalizeMouseButton(string button) =>
+        button.Trim().ToLowerInvariant() is "left" or "right" or "middle"
+            ? button.Trim().ToLowerInvariant()
+            : throw new ArgumentException($"不支持的鼠标按钮：{button}", nameof(button));
+
+    private static string NormalizeKey(string key)
+    {
+        if (string.IsNullOrWhiteSpace(key))
+            throw new ArgumentException("按键名称不能为空。", nameof(key));
+        var normalized = key.Trim().ToUpperInvariant();
+        _ = GetVirtualKey(normalized);
+        return normalized;
+    }
+
+    private static uint GetMouseDownFlag(string button) => button switch
+    {
+        "left" => MouseLeftDown,
+        "right" => MouseRightDown,
+        "middle" => MouseMiddleDown,
+        _ => throw new ArgumentException($"不支持的鼠标按钮：{button}")
+    };
+
+    private static uint GetMouseUpFlag(string button) => button switch
+    {
+        "left" => MouseLeftUp,
+        "right" => MouseRightUp,
+        "middle" => MouseMiddleUp,
+        _ => throw new ArgumentException($"不支持的鼠标按钮：{button}")
+    };
 
     private static ushort GetVirtualKey(string key)
     {
