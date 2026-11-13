@@ -1,4 +1,5 @@
 using Anjian.Core.Api;
+using Anjian.Core.Windows;
 using NLua;
 using Xunit;
 namespace Anjian.Core.Tests;
@@ -59,26 +60,100 @@ public sealed class LuaApiRegistryTests
  }
 
  [Fact]
- public void ControlAutomationApisAreRegistryBoundAndSendStructuredRequests()
+ public void ControlAutomationApisUseWorkerLocalServiceAndKeepHwndOutOfLua()
  {
-  var pipe = new Recorder { Response = "true" };
+  var target = new WindowAutomationTarget("window-token", 123456, 42, 7, "ProbeWindow", 1234, false);
+  var pipe = new Recorder { ResponseQueue = new Queue<string?>([JsonSerializer.Serialize(target, WindowApiJson.Options), "true"]) };
+  var automation = new AutomationRecorder();
   using var lua = new Lua(openLibs:true);
-  LuaApiRuntime.Register(lua, new WorkerLuaApi(pipe, lua));
-  lua.DoString("""
+  LuaApiRuntime.Register(lua, new WorkerLuaApi(pipe, lua, automation));
+  var result = lua.DoString("""
     local binding = WindowBind("window-token")
+    local info = ControlGetInfo(binding, "control-token")
+    local value = ControlGetValue(binding, "control-token")
+    ControlSetValue(binding, "control-token", "hello")
+    ControlInvoke(binding, "control-token")
     WindowUnbind(binding)
-    ControlSetValue("binding-token", "control-token", "hello")
-    ControlInvoke("binding-token", "control-token")
-    WindowInput("binding-token", "auto", "click", "left", -40, 100, "", 25)
+    WindowInput(binding, "auto", "click", "left", -40, 100, "", 25)
+    return value, info.controlId
     """);
-  Assert.Contains(pipe.Items, item => item.Type == "window-bind");
-  Assert.Contains(pipe.Items, item => item.Type == "window-unbind");
-  Assert.Contains(pipe.Items, item => item.Type == "control-set-value" && item.Text!.Contains("\"value\":\"hello\"", StringComparison.Ordinal));
-  Assert.Contains(pipe.Items, item => item.Type == "control-invoke");
-  Assert.Contains(pipe.Items, item => item.Type == "window-input" && item.Text!.Contains("\"x\":-40", StringComparison.Ordinal));
+  Assert.Equal("uia-value", result[0]?.ToString());
+  Assert.Equal("control-token", result[1]?.ToString());
+  Assert.Equal(target, automation.BoundTarget);
+  Assert.Equal("hello", automation.LastSetValue);
+  Assert.True(automation.WasInvoked);
+  Assert.True(automation.WasUnbound);
+  Assert.Contains(pipe.Items, item => item.Type == "window-automation-target");
+  var input = pipe.Items.Single(item => item.Type == "window-input");
+  Assert.Contains("\"windowId\":\"window-token\"", input.Text, StringComparison.Ordinal);
+  Assert.Contains("\"x\":-40", input.Text, StringComparison.Ordinal);
+ }
+
+ [Fact]
+ public void StringControlApiValuesAreReturnedWithoutJsonQuotes()
+ {
+  var automation = new AutomationRecorder();
+  using var lua = new Lua(openLibs:true);
+  LuaApiRuntime.Register(lua, new WorkerLuaApi(new Recorder(), lua, automation));
+  var result = lua.DoString("return ControlGetText('binding-token', 'control-token')");
+  Assert.Equal("uia-text", result[0]?.ToString());
+ }
+
+ [Fact]
+ public void WindowInputRejectsMissingActionSpecificArgumentsBeforeSending()
+ {
+  using var lua = new Lua(openLibs:true);
+  LuaApiRuntime.Register(lua, new WorkerLuaApi(new Recorder(), lua, new AutomationRecorder()));
+  var result = lua.DoString("""
+    local a = pcall(function() WindowInput("binding", "auto", "move") end)
+    local b = pcall(function() WindowInput("binding", "auto", "click", "left") end)
+    local c = pcall(function() WindowInput("binding", "auto", "text") end)
+    return a, b, c
+    """);
+  Assert.All(result, item => Assert.False(Convert.ToBoolean(item)));
  }
  [Fact] public void ManualGeneratedRegionMatchesCatalog(){var root=FindRoot();var m=File.ReadAllText(Path.Combine(root,"docs","FUNCTION-REFERENCE-CN.md"));Assert.Equal(LuaApiRegistry.NormalizeNewlines(m),LuaApiRegistry.NormalizeNewlines(LuaApiRegistry.Load().UpdateGeneratedReferenceSection(m)));Assert.Contains("MoveTo(x, y)",m,StringComparison.Ordinal);Assert.Contains("600000",m,StringComparison.Ordinal);Assert.Contains("完整产品目标中的函数类别",m,StringComparison.Ordinal);Assert.Contains("目标设计",m,StringComparison.Ordinal);}
  private static string FindRoot(){foreach(var s in new[]{Environment.CurrentDirectory,AppContext.BaseDirectory}){var d=new DirectoryInfo(s);while(d is not null){if(File.Exists(Path.Combine(d.FullName,"docs","FUNCTION-REFERENCE-CN.md")))return d.FullName;d=d.Parent;}}throw new DirectoryNotFoundException();}
- private sealed class Recorder:ILuaCommandPipe{public List<Item> Items{get;}=[];public string? Response{get;set;} public void Send(string type,string? name=null,double x=0,double y=0,int milliseconds=0,string? text=null)=>Items.Add(new Item(type,name,x,y,milliseconds,text));public string? Request(string type,string? name=null,double x=0,double y=0,int milliseconds=0,string? text=null){Items.Add(new Item(type,name,x,y,milliseconds,text));return Response;}}
+ private sealed class Recorder:ILuaCommandPipe
+ {
+  public List<Item> Items{get;}=[];
+  public string? Response{get;set;}
+  public Queue<string?> ResponseQueue{get;set;}=[];
+  public void Send(string type,string? name=null,double x=0,double y=0,int milliseconds=0,string? text=null) =>
+    Items.Add(new Item(type,name,x,y,milliseconds,text));
+  public string? Request(string type,string? name=null,double x=0,double y=0,int milliseconds=0,string? text=null)
+  {
+   Items.Add(new Item(type,name,x,y,milliseconds,text));
+   return ResponseQueue.Count>0?ResponseQueue.Dequeue():Response;
+  }
+ }
  private sealed record Item(string Type,string? Name,double X,double Y,int Ms,string? Text);
+
+ private sealed class AutomationRecorder : IWindowAutomationService
+ {
+  public WindowAutomationTarget? BoundTarget { get; private set; }
+  public string? LastSetValue { get; private set; }
+  public bool WasInvoked { get; private set; }
+  public bool WasUnbound { get; private set; }
+  public string Bind(WindowAutomationTarget target) { BoundTarget=target; return "binding-token"; }
+  public string GetWindowId(string bindingId) => "window-token";
+  public bool Unbind(string bindingId) { WasUnbound=true; return true; }
+  public void ClearBindings() { }
+  public WindowAutomationCapabilities GetCapabilities(string bindingId) =>
+    new(bindingId,"test-provider",42,true,Array.Empty<AutomationCapability>());
+  public IReadOnlyList<ControlElementInfo> Enumerate(string bindingId,int maxResults) => Array.Empty<ControlElementInfo>();
+  public ControlElementInfo GetInfo(string bindingId,string controlId) =>
+    new(controlId,"Probe","ProbeAutomationId","Edit","ControlType.Edit",
+      new PixelRect(1,2,3,4),true,false,true,false,Array.Empty<string>());
+  public string GetValue(string bindingId,string controlId) => "uia-value";
+  public void SetValue(string bindingId,string controlId,string value) => LastSetValue=value;
+  public string GetText(string bindingId,string controlId) => "uia-text";
+  public IReadOnlyList<string> GetSelection(string bindingId,string controlId) => ["Selected"];
+  public void Select(string bindingId,string controlId) { }
+  public string GetToggleState(string bindingId,string controlId) => "On";
+  public void Toggle(string bindingId,string controlId) { }
+  public void Invoke(string bindingId,string controlId) => WasInvoked=true;
+  public void Dispose() { }
+ }
+
 }
