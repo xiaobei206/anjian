@@ -358,14 +358,22 @@ internal sealed class PlaybackRunner : IDisposable
     {
         var template = _images.Get(request.TemplateId);
         var timer = Stopwatch.StartNew();
+        var consecutiveMatches = 0;
         while (true)
         {
             token.ThrowIfCancellationRequested();
             await _gate.WaitUntilRunnableAsync(token).ConfigureAwait(false);
             var match = ImageSearchEngine.FindImage(_images.CaptureScreenPixels(), template,
-                request.Similarity, request.Tolerance, cancellationToken: token);
+                request.Similarity, request.Tolerance, grayscale: request.Grayscale,
+                scale: request.Scale, cancellationToken: token);
             if (match is not null)
-                return match;
+            {
+                consecutiveMatches++;
+                if (consecutiveMatches >= request.StableCount)
+                    return match;
+            }
+            else consecutiveMatches = 0;
+
             var remaining = request.TimeoutMilliseconds - (int)Math.Min(int.MaxValue, timer.ElapsedMilliseconds);
             if (remaining <= 0)
                 return null;
@@ -373,18 +381,27 @@ internal sealed class PlaybackRunner : IDisposable
         }
     }
 
-    private async Task<bool> WaitForImageGoneAsync(ImageWaitImageRequest request, CancellationToken token)
+    private async Task<bool> WaitForImageGoneAsync(
+        ImageWaitImageRequest request, CancellationToken token)
     {
         var template = _images.Get(request.TemplateId);
         var timer = Stopwatch.StartNew();
+        var consecutiveMisses = 0;
         while (true)
         {
             token.ThrowIfCancellationRequested();
             await _gate.WaitUntilRunnableAsync(token).ConfigureAwait(false);
             var match = ImageSearchEngine.FindImage(_images.CaptureScreenPixels(), template,
-                request.Similarity, request.Tolerance, cancellationToken: token);
+                request.Similarity, request.Tolerance, grayscale: request.Grayscale,
+                scale: request.Scale, cancellationToken: token);
             if (match is null)
-                return true;
+            {
+                consecutiveMisses++;
+                if (consecutiveMisses >= request.StableCount)
+                    return true;
+            }
+            else consecutiveMisses = 0;
+
             var remaining = request.TimeoutMilliseconds - (int)Math.Min(int.MaxValue, timer.ElapsedMilliseconds);
             if (remaining <= 0)
                 return false;
@@ -392,16 +409,25 @@ internal sealed class PlaybackRunner : IDisposable
         }
     }
 
-    private async Task<ImageMatchPoint?> WaitForColorAsync(ImageWaitColorRequest request, CancellationToken token)
+    private async Task<ImageMatchPoint?> WaitForColorAsync(
+        ImageWaitColorRequest request, CancellationToken token)
     {
         var timer = Stopwatch.StartNew();
+        var consecutiveMatches = 0;
         while (true)
         {
             token.ThrowIfCancellationRequested();
             await _gate.WaitUntilRunnableAsync(token).ConfigureAwait(false);
-            var match = ImageSearchEngine.FindColor(_images.CaptureScreenPixels(), request.Color, request.Tolerance, cancellationToken: token);
+            var match = ImageSearchEngine.FindColor(_images.CaptureScreenPixels(), request.Color,
+                request.Tolerance, cancellationToken: token);
             if (match is not null)
-                return match;
+            {
+                consecutiveMatches++;
+                if (consecutiveMatches >= request.StableCount)
+                    return match;
+            }
+            else consecutiveMatches = 0;
+
             var remaining = request.TimeoutMilliseconds - (int)Math.Min(int.MaxValue, timer.ElapsedMilliseconds);
             if (remaining <= 0)
                 return null;
@@ -409,16 +435,25 @@ internal sealed class PlaybackRunner : IDisposable
         }
     }
 
-    private async Task<bool> WaitForColorGoneAsync(ImageWaitColorRequest request, CancellationToken token)
+    private async Task<bool> WaitForColorGoneAsync(
+        ImageWaitColorRequest request, CancellationToken token)
     {
         var timer = Stopwatch.StartNew();
+        var consecutiveMisses = 0;
         while (true)
         {
             token.ThrowIfCancellationRequested();
             await _gate.WaitUntilRunnableAsync(token).ConfigureAwait(false);
-            var match = ImageSearchEngine.FindColor(_images.CaptureScreenPixels(), request.Color, request.Tolerance, cancellationToken: token);
+            var match = ImageSearchEngine.FindColor(_images.CaptureScreenPixels(), request.Color,
+                request.Tolerance, cancellationToken: token);
             if (match is null)
-                return true;
+            {
+                consecutiveMisses++;
+                if (consecutiveMisses >= request.StableCount)
+                    return true;
+            }
+            else consecutiveMisses = 0;
+
             var remaining = request.TimeoutMilliseconds - (int)Math.Min(int.MaxValue, timer.ElapsedMilliseconds);
             if (remaining <= 0)
                 return false;
