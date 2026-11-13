@@ -153,6 +153,72 @@ public sealed class ScriptParameterTests
         }
     }
 
+
+    [Fact]
+    public void ValidatorCoversNumbersRelativePathsAndTextPatterns()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "anjian-param-validation-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        Directory.CreateDirectory(Path.Combine(directory, "folder"));
+        File.WriteAllText(Path.Combine(directory, "exists.txt"), "ok");
+        try
+        {
+            var schema = new ScriptParameterSchema
+            {
+                Parameters =
+                [
+                    new() { Id = "ratio", Name = "ratio", Label = "比例", Type = "number", Required = true, Minimum = 0, Maximum = 1.5 },
+                    new() { Id = "file", Name = "file", Label = "文件", Type = "filePath", Required = true, MustExist = true },
+                    new() { Id = "folder", Name = "folder", Label = "目录", Type = "directoryPath", Required = true, MustExist = true },
+                    new() { Id = "code", Name = "code", Label = "代码", Type = "text", Required = true, Pattern = "^[A-Z]{2,4}$" }
+                ]
+            };
+            var valid = ScriptParameterValidator.ValidateValues(schema, new Dictionary<string, JsonElement>
+            {
+                ["ratio"] = Json("1.25"),
+                ["file"] = Json("\"exists.txt\""),
+                ["folder"] = Json("\"folder\""),
+                ["code"] = Json("\"ABCD\"")
+            }, directory);
+            Assert.True(valid.IsValid);
+
+            var invalid = ScriptParameterValidator.ValidateValues(schema, new Dictionary<string, JsonElement>
+            {
+                ["ratio"] = Json("2.5"),
+                ["file"] = Json("\"missing.txt\""),
+                ["folder"] = Json("\"missing-folder\""),
+                ["code"] = Json("\"lowercase\"")
+            }, directory);
+            Assert.False(invalid.IsValid);
+            Assert.Equal(4, invalid.Issues.Count);
+        }
+        finally
+        {
+            try { Directory.Delete(directory, recursive: true); } catch (IOException) { }
+        }
+    }
+
+    [Fact]
+    public void OptionalBlankValuesAreOmittedButRequiredBlankValuesFail()
+    {
+        var schema = new ScriptParameterSchema
+        {
+            Parameters =
+            [
+                new() { Id = "optional", Name = "optional", Label = "可选", Type = "text" },
+                new() { Id = "required", Name = "required", Label = "必填", Type = "text", Required = true }
+            ]
+        };
+        var result = ScriptParameterValidator.ValidateValues(schema, new Dictionary<string, JsonElement>
+        {
+            ["optional"] = Json("\"\""),
+            ["required"] = Json("\"\"")
+        });
+        Assert.False(result.IsValid);
+        Assert.False(result.Values.ContainsKey("optional"));
+        Assert.Contains(result.Issues, x => x.ParameterId == "required" && x.Message.Contains("必填"));
+    }
+
     private static JsonElement Json(string json)
     {
         using var document = JsonDocument.Parse(json);
