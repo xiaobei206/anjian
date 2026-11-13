@@ -107,3 +107,10 @@ F31 从 M13-01 的“契约/状态模型部分实现”更新为 M13-02“运行
 - Windows Actions [43517955937](https://github.com/xiaobei206/anjian/actions/runs/43517955937)，代码 HEAD `6d9513bec5de35ed8f20f656d8520217d949733a`：Restore/Build PASS（0 warnings、0 errors），Core tests 228/228，API handbook check PASS（内置 API 1.2 / 103），win-x64 self-contained publish PASS，发布包 smoke 4/4 PASS，ZIP/SHA256 与 artifact 上传 PASS。Artifact `14081741612`，87,373,960 bytes，Actions artifact archive digest `sha256:7ea0e15aff79bf89defafdf995ec7739a53045f59d264354c271dae1ef28bc29`，有效至 2026-12-13；仅临时 Actions artifact，不是 Release。
 - 历史失败运行 [43517447033](https://github.com/xiaobei206/anjian/actions/runs/43517447033)、[43517676054](https://github.com/xiaobei206/anjian/actions/runs/43517676054)、[43517843809](https://github.com/xiaobei206/anjian/actions/runs/43517843809)、[43517905641](https://github.com/xiaobei206/anjian/actions/runs/43517905641) 均有可定位的首次构建/测试问题，已分别修正 smoke 字符串、WinForms cell tooltip/脱敏变量命名和历史排序测试 fixture；最终结果以最新 HEAD/run 为准。
 - Windows 10/11 WinForms、真实键鼠、DPI/多屏、人工恢复、托盘退出及长时运行仍 NOT RUN（M14）。
+
+
+### M14 会话执行尝试记录（2026-11-13）
+
+- M14 实机验收本次仍为 **NOT RUN / 环境阻塞**：当前会话运行于 Linux x86_64、没有 .NET SDK，也没有可交互 Windows 桌面及物理键鼠通道。
+- 这不是产品测试失败，也不是 PASS；M14 所有真实键鼠、WinForms、DPI/多屏、权限、托盘/退出和长时运行项目继续 NOT RUN。已存在的 Windows Actions 结果仅作为自动化构建证据，不代替桌面验收。
+- 恢复条件：在实际 Windows 10/11 x64 设备上逐项执行 `docs/ACCEPTANCE-TEST-CN.md` 的 M14 清单，提交完整环境元数据、逐项结果及失败日志/截图，再更新相应功能状态。
