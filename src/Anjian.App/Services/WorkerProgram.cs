@@ -35,15 +35,17 @@ internal static class WorkerProgram
 
             try
             {
+                var fullPath = Path.GetFullPath(scriptPath);
+                var scriptDirectory = Path.GetDirectoryName(fullPath)
+                    ?? throw new InvalidDataException("无法确定脚本目录。");
                 using var automation = new WindowsControlAutomationProvider(client);
                 using var ocr = new PaddleOcrRecognitionService(launch.OcrModelDirectory);
                 using var lua = new NLua.Lua(openLibs: true);
-                var api = new WorkerLuaApi(client, lua, automation, ocr, launch.Permissions);
+                var api = new WorkerLuaApi(client, lua, automation, ocr, launch.Permissions, scriptDirectory);
                 LuaApiRuntime.Register(lua, api);
                 if (!string.IsNullOrWhiteSpace(launch.ModuleRootPath))
                     SpriteLuaModuleLoader.Register(lua, launch.ModuleRootPath);
                 LuaParameterInjector.Inject(lua, launch.Parameters);
-                var fullPath = Path.GetFullPath(scriptPath);
                 if (debugOptions is null)
                 {
                     lua.SetDebugHook(LuaHookMask.Count, 10_000);

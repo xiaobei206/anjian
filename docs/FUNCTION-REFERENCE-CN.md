@@ -2,7 +2,7 @@
 
 - 目标读者：脚本编写者与自动化工程维护者
 - 对应运行时：Lua 5.4
-- 当前 API 注册表版本：0.6（main 开发版，尚未进入已发布的 preview.4）
+- 当前 API 注册表版本：0.8（main 开发版，尚未进入已发布的 preview.4）
 - 当前产品版本：v0.1.0-preview.4
 - 文档状态：当前公开 API 第 2 节由机器可读注册表生成；其他目标设计章节与当前 API 明确分开。
 - 当前坐标规则：已实现函数仍使用虚拟桌面绝对物理像素坐标
@@ -393,7 +393,7 @@ TypeText("按键精灵 2026")
 
 | 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
 |---|---|---|---|---|---|
-| `keys` | `keyName[]` | 是 | — | 固定值：ENTER、ESC、TAB、SPACE、BACKSPACE、DELETE、INSERT、HOME、END、PAGEUP、PAGEDOWN、UP、DOWN、LEFT、RIGHT、CTRL、CONTROL、SHIFT、ALT、WIN、CAPSLOCK、PRINTSCREEN、PAUSE、NUMLOCK、SCROLLLOCK、NUMPAD0、NUMPAD1、NUMPAD2、NUMPAD3、NUMPAD4、NUMPAD5、NUMPAD6、NUMPAD7、NUMPAD8、NUMPAD9、NUMPADMULTIPLY、NUMPADADD、NUMPADSUBTRACT、NUMPADDECIMAL、NUMPADDIVIDE、SEMICOLON、EQUALS、COMMA、MINUS、PERIOD、SLASH、BACKTICK、LEFTBRACKET、BACKSLASH、RIGHTBRACKET、QUOTE；规则：A-Z、0-9、F1-F24；可变参数 | 一个或多个规范按键名，按输入顺序按下、逆序释放。 |
+| `keys` | `keyName[]` | 是 | — | 固定值：ENTER、ESC、TAB、SPACE、BACKSPACE、DELETE、INSERT、HOME、END、PAGEUP、PAGEDOWN、UP、DOWN、LEFT、RIGHT、CTRL、CONTROL、SHIFT、ALT、WIN、CAPSLOCK、PRINTSCREEN、PAUSE、NUMLOCK、SCROLLLOCK、NUMPAD0、NUMPAD1、NUMPAD2、NUMPAD3、NUMPAD4、NUMPAD5、NUMPAD6、NUMPAD7、NUMPAD8、NUMPAD9、NUMPADMULTIPLY、NUMPADADD、NUMPADSUBTRACT、NUMPADDECIMAL、NUMPADDIVIDE、SEMICOLON、EQUALS、COMMA、MINUS、PERIOD、SLASH、BACKTICK、LEFTBRACKET、BACKSLASH、RIGHTBRACKET、QUOTE；规则：A-Z、0-9、F1-F24 | 一个或多个规范按键名，按输入顺序按下、逆序释放。 |
 
 **返回值：** `nil` — 无显式返回值；成功后继续执行后续 Lua 语句。
 **错误：** 参数类型、整数性或范围不合法时产生 Lua 错误。；输入调用失败、权限不足或目标程序拒绝输入时会报告执行错误。
@@ -1813,6 +1813,170 @@ if hit then MoveTo(hit.screenX, hit.screenY) end
 ```lua
 local hit = WaitText("订单提交成功", 15000, 250, "ch", 0.65)
 if hit then Log("识别到：" .. hit.text) end
+```
+
+### 2.8 文件与目录
+
+#### `ReadTextFile(path)` — 读取文本文件
+
+- **稳定 ID：** `anjian.files.read-text`
+- **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
+- **说明：** 读取批准根目录内的 UTF-8 文本文件；相对路径以当前脚本所在目录为基准。拒绝无效 UTF-8 和超过 4 MiB 的文件。
+
+| 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
+|---|---|---|---|---|---|
+| `path` | `string` | 是 | — | — | 绝对路径或相对于当前脚本目录的路径。 |
+
+**返回值：** `string` — 文件的完整 UTF-8 文本内容；不自动剥离 BOM。
+**错误：** 路径未获本次运行读取授权、文件不存在、路径包含 reparse point/符号链接/多硬链接、文件超过 4 MiB 或文本不是有效 UTF-8 时产生错误。
+**执行/取消语义：** 每条文件 IPC 在主进程执行前经过暂停检查点；暂停期间等待恢复。 Stop 取消当前运行 token；枚举循环会检查取消，写入在原子提交前再次检查；单次同步 I/O 受 4 MiB 上限约束。
+**坐标/权限：** 坐标空间：none。Worker 在 IPC 前检查本次 Grant；主进程对每条文件 IPC 再次检查。只允许批准的读取/写入根；拒绝 reparse point、符号链接和多硬链接普通文件。这不是恶意脚本的 OS 级沙箱。
+
+**示例：**
+```lua
+local text = ReadTextFile("data/config.txt")
+```
+
+#### `WriteTextFile(path, text)` — 写入文本文件
+
+- **稳定 ID：** `anjian.files.write-text`
+- **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
+- **说明：** 以 UTF-8（无 BOM）写入文件；先写同目录临时文件并 flush，再原子替换目标。内容最大 4 MiB。
+
+| 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
+|---|---|---|---|---|---|
+| `path` | `string` | 是 | — | — | 绝对路径或相对于当前脚本目录的路径。 |
+| `text` | `string` | 是 | — | — | 要写入的文本内容。 |
+
+**返回值：** `boolean` — 写入并替换成功时返回 true。
+**错误：** 路径未获本次运行写入授权、父目录不存在、目标是目录/链接、内容超过 4 MiB 或文件系统拒绝替换时产生错误。
+**执行/取消语义：** 每条文件 IPC 在主进程执行前经过暂停检查点；暂停期间等待恢复。 Stop 取消当前运行 token；枚举循环会检查取消，写入在原子提交前再次检查；单次同步 I/O 受 4 MiB 上限约束。
+**坐标/权限：** 坐标空间：none。Worker 在 IPC 前检查本次 Grant；主进程对每条文件 IPC 再次检查。只允许批准的读取/写入根；拒绝 reparse point、符号链接和多硬链接普通文件。这不是恶意脚本的 OS 级沙箱。
+
+**示例：**
+```lua
+WriteTextFile("data/output.txt", "hello\n")
+```
+
+#### `AppendTextFile(path, text)` — 追加文本文件
+
+- **稳定 ID：** `anjian.files.append-text`
+- **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
+- **说明：** 以 UTF-8（无 BOM）追加到批准根目录内的文件；文件与追加后内容总大小不得超过 4 MiB。
+
+| 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
+|---|---|---|---|---|---|
+| `path` | `string` | 是 | — | — | 绝对路径或相对于当前脚本目录的路径。 |
+| `text` | `string` | 是 | — | — | 要追加的文本内容。 |
+
+**返回值：** `boolean` — 追加成功时返回 true。
+**错误：** 路径未获本次运行写入授权、父目录不存在、目标是目录/链接/多硬链接文件或追加后超过 4 MiB 时产生错误。
+**执行/取消语义：** 每条文件 IPC 在主进程执行前经过暂停检查点；暂停期间等待恢复。 Stop 取消当前运行 token；枚举循环会检查取消，写入在原子提交前再次检查；单次同步 I/O 受 4 MiB 上限约束。
+**坐标/权限：** 坐标空间：none。Worker 在 IPC 前检查本次 Grant；主进程对每条文件 IPC 再次检查。只允许批准的读取/写入根；拒绝 reparse point、符号链接和多硬链接普通文件。这不是恶意脚本的 OS 级沙箱。
+
+**示例：**
+```lua
+AppendTextFile("data/run.log", "done\n")
+```
+
+#### `FileExists(path)` — 检查文件是否存在
+
+- **稳定 ID：** `anjian.files.file-exists`
+- **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
+- **说明：** 检查批准读取根目录中的普通文件是否存在；链接或其他特殊文件会拒绝而不是跟随。
+
+| 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
+|---|---|---|---|---|---|
+| `path` | `string` | 是 | — | — | 绝对路径或相对于当前脚本目录的路径。 |
+
+**返回值：** `boolean` — 普通文件存在时 true，否则 false。
+**错误：** 路径未获本次运行读取授权，或路径链包含 reparse point/符号链接/多硬链接时产生错误。
+**执行/取消语义：** 每条文件 IPC 在主进程执行前经过暂停检查点；暂停期间等待恢复。 Stop 取消当前运行 token；枚举循环会检查取消，写入在原子提交前再次检查；单次同步 I/O 受 4 MiB 上限约束。
+**坐标/权限：** 坐标空间：none。Worker 在 IPC 前检查本次 Grant；主进程对每条文件 IPC 再次检查。只允许批准的读取/写入根；拒绝 reparse point、符号链接和多硬链接普通文件。这不是恶意脚本的 OS 级沙箱。
+
+**示例：**
+```lua
+if FileExists("data/config.txt") then Log("配置存在") end
+```
+
+#### `DirectoryExists(path)` — 检查目录是否存在
+
+- **稳定 ID：** `anjian.files.directory-exists`
+- **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
+- **说明：** 检查批准读取根目录中的目录是否存在；拒绝任何 reparse point/符号链接目录。
+
+| 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
+|---|---|---|---|---|---|
+| `path` | `string` | 是 | — | — | 绝对路径或相对于当前脚本目录的路径。 |
+
+**返回值：** `boolean` — 目录存在时 true，否则 false。
+**错误：** 路径未获本次运行读取授权，或路径链包含 reparse point/符号链接时产生错误。
+**执行/取消语义：** 每条文件 IPC 在主进程执行前经过暂停检查点；暂停期间等待恢复。 Stop 取消当前运行 token；枚举循环会检查取消，写入在原子提交前再次检查；单次同步 I/O 受 4 MiB 上限约束。
+**坐标/权限：** 坐标空间：none。Worker 在 IPC 前检查本次 Grant；主进程对每条文件 IPC 再次检查。只允许批准的读取/写入根；拒绝 reparse point、符号链接和多硬链接普通文件。这不是恶意脚本的 OS 级沙箱。
+
+**示例：**
+```lua
+if DirectoryExists("data") then Log("目录存在") end
+```
+
+#### `ListFiles(path)` — 枚举目录文件
+
+- **稳定 ID：** `anjian.files.list-files`
+- **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
+- **说明：** 只返回批准目录的直接子级普通文件名；不递归，隐藏链接/重解析点和多硬链接文件，最多检查 1000 项。
+
+| 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
+|---|---|---|---|---|---|
+| `path` | `string` | 是 | — | — | 绝对路径或相对于当前脚本目录的目录路径。 |
+
+**返回值：** `table` — 按名称排序的 Lua 数组，元素为文件名字符串；不返回完整路径。
+**错误：** 目录未获本次运行读取授权、目录不存在、目录含无法读取的项目，或直接子项超过 1000 个时产生错误。
+**执行/取消语义：** 每条文件 IPC 在主进程执行前经过暂停检查点；暂停期间等待恢复。 Stop 取消当前运行 token；枚举循环会检查取消，写入在原子提交前再次检查；单次同步 I/O 受 4 MiB 上限约束。
+**坐标/权限：** 坐标空间：none。Worker 在 IPC 前检查本次 Grant；主进程对每条文件 IPC 再次检查。只允许批准的读取/写入根；拒绝 reparse point、符号链接和多硬链接普通文件。这不是恶意脚本的 OS 级沙箱。
+
+**示例：**
+```lua
+for _, name in ipairs(ListFiles("data")) do Log(name) end
+```
+
+#### `ListDirectories(path)` — 枚举子目录
+
+- **稳定 ID：** `anjian.files.list-directories`
+- **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
+- **说明：** 只返回批准目录的直接子级普通目录名；不递归，隐藏链接/重解析点，最多检查 1000 项。
+
+| 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
+|---|---|---|---|---|---|
+| `path` | `string` | 是 | — | — | 绝对路径或相对于当前脚本目录的目录路径。 |
+
+**返回值：** `table` — 按名称排序的 Lua 数组，元素为目录名字符串；不返回完整路径。
+**错误：** 目录未获本次运行读取授权、目录不存在、目录含无法读取的项目，或直接子项超过 1000 个时产生错误。
+**执行/取消语义：** 每条文件 IPC 在主进程执行前经过暂停检查点；暂停期间等待恢复。 Stop 取消当前运行 token；枚举循环会检查取消，写入在原子提交前再次检查；单次同步 I/O 受 4 MiB 上限约束。
+**坐标/权限：** 坐标空间：none。Worker 在 IPC 前检查本次 Grant；主进程对每条文件 IPC 再次检查。只允许批准的读取/写入根；拒绝 reparse point、符号链接和多硬链接普通文件。这不是恶意脚本的 OS 级沙箱。
+
+**示例：**
+```lua
+for _, name in ipairs(ListDirectories("data")) do Log(name) end
+```
+
+#### `CreateDirectory(path)` — 创建一级目录
+
+- **稳定 ID：** `anjian.files.create-directory`
+- **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
+- **说明：** 在已存在且获批准写入的父目录下创建单级目录；若目标目录已存在且不是链接则返回 true，不递归创建父目录。
+
+| 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
+|---|---|---|---|---|---|
+| `path` | `string` | 是 | — | — | 绝对路径或相对于当前脚本目录的路径。 |
+
+**返回值：** `boolean` — 目录已存在或创建成功时 true。
+**错误：** 目标路径未获本次运行写入授权、父目录不存在、目标为文件/链接或文件系统拒绝创建时产生错误。
+**执行/取消语义：** 每条文件 IPC 在主进程执行前经过暂停检查点；暂停期间等待恢复。 Stop 取消当前运行 token；枚举循环会检查取消，写入在原子提交前再次检查；单次同步 I/O 受 4 MiB 上限约束。
+**坐标/权限：** 坐标空间：none。Worker 在 IPC 前检查本次 Grant；主进程对每条文件 IPC 再次检查。只允许批准的读取/写入根；拒绝 reparse point、符号链接和多硬链接普通文件。这不是恶意脚本的 OS 级沙箱。
+
+**示例：**
+```lua
+CreateDirectory("data/cache")
 ```
 
 <!-- END GENERATED API REFERENCE -->

@@ -1,13 +1,14 @@
 using System.Text.Json;
 using Anjian.Core.Api;
 using Anjian.Core.Windows;
+using Anjian.Core.Permissions;
 using NLua;
 using Xunit;
 namespace Anjian.Core.Tests;
 public sealed class LuaApiRegistryTests
 {
- private static readonly string[] Expected=["MoveTo","LeftClick","RightClick","MiddleClick","LeftDoubleClick","RightDoubleClick","MiddleDoubleClick","LeftDown","LeftUp","RightDown","RightUp","MiddleDown","MiddleUp","MouseWheel","KeyPress","KeyDown","KeyUp","TypeText","Hotkey","Delay","RandomDelay","Log","WindowFind","WindowEnumerate","WindowEnumerateChildren","WindowGetInfo","WindowActivate","WindowShow","WindowHide","WindowMinimize","WindowMaximize","WindowRestore","WindowSetTopmost","WindowMove","WindowResize","WindowAlign","WindowWait","WindowWaitClosed","CoordinateToScreen","CoordinateFromScreen","WindowBind","WindowUnbind","WindowGetCapabilities","ControlEnumerate","ControlGetInfo","ControlGetValue","ControlSetValue","ControlGetText","ControlGetSelection","ControlSelect","ControlGetToggleState","ControlToggle","ControlInvoke","WindowInput","CaptureScreen","CaptureWindow","CaptureClient","CaptureRegion","LoadImage","SaveScreenshot","ReleaseImage","GetImageSize","CropImage","GetPixelColor","CompareColor","FindColor","FindMultiColor","CountColors","FindImage","FindImages","WaitImage","WaitImageGone","WaitColor","WaitColorGone","RgbToHex","HexToRgb","ColorDifference","FindColorBlocks","OCR","FindText","WaitText"];
- [Fact] public void RegistryContainsOnlyImplementedPublicFunctions(){var r=LuaApiRegistry.Load();Assert.Equal(1,r.SchemaVersion);Assert.Equal("0.7",r.ApiVersion);Assert.Equal(Expected.Order(StringComparer.Ordinal),r.PublicFunctionNames.Order(StringComparer.Ordinal));Assert.All(r.Apis,a=>{Assert.Equal("implemented",a.ImplementationStatus);Assert.NotEmpty(a.Id);Assert.NotEmpty(a.Signature);Assert.NotEmpty(a.Example);Assert.NotEmpty(a.Errors);Assert.NotEmpty(a.Behavior.PauseBehavior);Assert.NotEmpty(a.Behavior.CancellationBehavior);Assert.NotEmpty(a.Behavior.CoordinateSpace);Assert.NotEmpty(a.Behavior.PermissionNotes);});Assert.Contains(r.Apis,a=>a.Name=="FindImage");Assert.Contains(r.Apis,a=>a.Name=="CaptureScreen");Assert.Contains(r.Apis,a=>a.Name=="OCR");Assert.DoesNotContain(r.Apis,a=>a.Name=="MoveToWindow");var keys=r.Apis.Single(a=>a.Name=="KeyPress").Parameters.Single(p=>p.Name=="key").AllowedValues;Assert.Contains("NUMPAD0",keys);Assert.Contains("NUMPAD9",keys);Assert.DoesNotContain("NUMPAD0-9",keys);}
+ private static readonly string[] Expected=["MoveTo","LeftClick","RightClick","MiddleClick","LeftDoubleClick","RightDoubleClick","MiddleDoubleClick","LeftDown","LeftUp","RightDown","RightUp","MiddleDown","MiddleUp","MouseWheel","KeyPress","KeyDown","KeyUp","TypeText","Hotkey","Delay","RandomDelay","Log","WindowFind","WindowEnumerate","WindowEnumerateChildren","WindowGetInfo","WindowActivate","WindowShow","WindowHide","WindowMinimize","WindowMaximize","WindowRestore","WindowSetTopmost","WindowMove","WindowResize","WindowAlign","WindowWait","WindowWaitClosed","CoordinateToScreen","CoordinateFromScreen","WindowBind","WindowUnbind","WindowGetCapabilities","ControlEnumerate","ControlGetInfo","ControlGetValue","ControlSetValue","ControlGetText","ControlGetSelection","ControlSelect","ControlGetToggleState","ControlToggle","ControlInvoke","WindowInput","CaptureScreen","CaptureWindow","CaptureClient","CaptureRegion","LoadImage","SaveScreenshot","ReleaseImage","GetImageSize","CropImage","GetPixelColor","CompareColor","FindColor","FindMultiColor","CountColors","FindImage","FindImages","WaitImage","WaitImageGone","WaitColor","WaitColorGone","RgbToHex","HexToRgb","ColorDifference","FindColorBlocks","OCR","FindText","WaitText","ReadTextFile","WriteTextFile","AppendTextFile","FileExists","DirectoryExists","ListFiles","ListDirectories","CreateDirectory"];
+ [Fact] public void RegistryContainsOnlyImplementedPublicFunctions(){var r=LuaApiRegistry.Load();Assert.Equal(1,r.SchemaVersion);Assert.Equal("0.8",r.ApiVersion);Assert.Equal(Expected.Order(StringComparer.Ordinal),r.PublicFunctionNames.Order(StringComparer.Ordinal));Assert.All(r.Apis,a=>{Assert.Equal("implemented",a.ImplementationStatus);Assert.NotEmpty(a.Id);Assert.NotEmpty(a.Signature);Assert.NotEmpty(a.Example);Assert.NotEmpty(a.Errors);Assert.NotEmpty(a.Behavior.PauseBehavior);Assert.NotEmpty(a.Behavior.CancellationBehavior);Assert.NotEmpty(a.Behavior.CoordinateSpace);Assert.NotEmpty(a.Behavior.PermissionNotes);});Assert.Contains(r.Apis,a=>a.Name=="FindImage");Assert.Contains(r.Apis,a=>a.Name=="CaptureScreen");Assert.Contains(r.Apis,a=>a.Name=="OCR");Assert.DoesNotContain(r.Apis,a=>a.Name=="MoveToWindow");var keys=r.Apis.Single(a=>a.Name=="KeyPress").Parameters.Single(p=>p.Name=="key").AllowedValues;Assert.Contains("NUMPAD0",keys);Assert.Contains("NUMPAD9",keys);Assert.DoesNotContain("NUMPAD0-9",keys);}
  [Fact] public void RuntimeCreatesCatalogGlobalsAndHidesBridgeNames(){var r=LuaApiRegistry.Load();using var lua=new Lua(openLibs:true);LuaApiRuntime.Register(lua,new WorkerLuaApi(new Recorder()));foreach(var a in r.Apis)Assert.Equal("function",lua.DoString($"return type({a.Name})")[0]?.ToString());foreach(var b in r.Apis.SelectMany(a=>a.Runtime.Bindings))Assert.Equal("nil",lua.DoString($"return type({b.Name})")[0]?.ToString());Assert.Equal("nil",lua.DoString("return type(FindWindow)")[0]?.ToString());Assert.Equal("function",lua.DoString("return type(FindImage)")[0]?.ToString());Assert.Equal("function",lua.DoString("return type(CaptureScreen)")[0]?.ToString());Assert.Equal("function",lua.DoString("return type(OCR)")[0]?.ToString());Assert.Equal("nil",lua.DoString("return type(os)")[0]?.ToString());Assert.Equal("nil",lua.DoString("return type(io)")[0]?.ToString());}
  [Fact]
  public void LuaCallsAndDefaultsMatchCatalog()
@@ -113,6 +114,88 @@ public sealed class LuaApiRegistryTests
     """);
   Assert.All(result, item => Assert.False(Convert.ToBoolean(item)));
  }
+ [Fact]
+ public void FileApiCallsResolveAgainstScriptDirectoryAndReturnTypedValues()
+ {
+  var scriptDirectory=Path.Combine(Path.GetTempPath(),"Anjian2026-WorkerFileApi-"+Guid.NewGuid().ToString("N"));
+  var dataDirectory=Path.Combine(scriptDirectory,"data");
+  Directory.CreateDirectory(dataDirectory);
+  try
+  {
+   var grant=new ScriptPermissionGrant([dataDirectory],[dataDirectory],false,false,[],[],[],[],false);
+   var pipe=new Recorder
+   {
+    ResponseQueue=new Queue<string?>([
+     JsonSerializer.Serialize("read-back"),
+     "true","true","true","true",
+     JsonSerializer.Serialize(new[]{"one.txt"}),
+     JsonSerializer.Serialize(new[]{"child"}),
+     "true"
+    ])
+   };
+   using var lua=new Lua(openLibs:true);
+   LuaApiRuntime.Register(lua,new WorkerLuaApi(pipe,lua,permissions:grant,scriptDirectory:scriptDirectory));
+   var result=lua.DoString("""
+    local text=ReadTextFile("data/input.txt")
+    local written=WriteTextFile("data/output.txt","hello")
+    local appended=AppendTextFile("data/output.txt","!")
+    local file=FileExists("data/input.txt")
+    local dir=DirectoryExists("data")
+    local files=ListFiles("data")
+    local dirs=ListDirectories("data")
+    local created=CreateDirectory("data/cache")
+    return text,written,appended,file,dir,files[1],dirs[1],created
+    """);
+   Assert.Equal("read-back",result[0]?.ToString());
+   Assert.All(result.Skip(1).Where((_,i)=>i is 0 or 1 or 2 or 3 or 6),x=>Assert.True(Convert.ToBoolean(x)));
+   Assert.Equal("one.txt",result[5]?.ToString());
+   Assert.Equal("child",result[6]?.ToString());
+   var expected=Path.GetFullPath(Path.Combine(dataDirectory,"input.txt"));
+   Assert.Equal(expected,pipe.Items.Single(x=>x.Type=="file-read-text").Name);
+   Assert.Contains(expected,pipe.Items.Single(x=>x.Type=="file-read-text").Name,StringComparison.Ordinal);
+   Assert.Equal(Path.GetFullPath(Path.Combine(dataDirectory,"output.txt")),
+    JsonDocument.Parse(pipe.Items.Single(x=>x.Type=="file-write-text").Text!).RootElement.GetProperty("Path").GetString());
+   Assert.Equal("directory-list-files",pipe.Items.Single(x=>x.Type=="directory-list-files").Type);
+  }
+  finally
+  {
+   try{Directory.Delete(scriptDirectory,recursive:true);}catch{}
+  }
+ }
+
+ [Fact]
+ public void WorkerFileApiDeniesUnapprovedAndSiblingPathsBeforeAnyIpc()
+ {
+  var scriptDirectory=Path.Combine(Path.GetTempPath(),"Anjian2026-WorkerFileDeny-"+Guid.NewGuid().ToString("N"));
+  Directory.CreateDirectory(scriptDirectory);
+  try
+  {
+   var allowed=Path.Combine(scriptDirectory,"data");
+   Directory.CreateDirectory(allowed);
+   var sibling=Path.Combine(scriptDirectory,"data-sibling");
+   Directory.CreateDirectory(sibling);
+   var pipe=new Recorder();
+   using var lua=new Lua(openLibs:true);
+   LuaApiRuntime.Register(lua,new WorkerLuaApi(pipe,lua,
+    permissions:new ScriptPermissionGrant([allowed],[],false,false,[],[],[],[],false),
+    scriptDirectory:scriptDirectory));
+   var result=lua.DoString("""
+    local a=pcall(ReadTextFile,"../outside.txt")
+    local b=pcall(ReadTextFile,"data-sibling/secret.txt")
+    local c=pcall(WriteTextFile,"data/output.txt","blocked")
+    local d=pcall(ListFiles,"data-sibling")
+    return a,b,c,d
+    """);
+   Assert.Equal(4,result.Length);
+   Assert.All(result,x=>Assert.False(Convert.ToBoolean(x)));
+   Assert.Empty(pipe.Items);
+  }
+  finally
+  {
+   try{Directory.Delete(scriptDirectory,recursive:true);}catch{}
+  }
+ }
+
  [Fact] public void ManualGeneratedRegionMatchesCatalog(){var root=FindRoot();var m=File.ReadAllText(Path.Combine(root,"docs","FUNCTION-REFERENCE-CN.md"));Assert.Equal(LuaApiRegistry.NormalizeNewlines(m),LuaApiRegistry.NormalizeNewlines(LuaApiRegistry.Load().UpdateGeneratedReferenceSection(m)));Assert.Contains("MoveTo(x, y)",m,StringComparison.Ordinal);Assert.Contains("600000",m,StringComparison.Ordinal);Assert.Contains("完整产品目标中的函数类别",m,StringComparison.Ordinal);Assert.Contains("目标设计",m,StringComparison.Ordinal);}
  private static string FindRoot(){foreach(var s in new[]{Environment.CurrentDirectory,AppContext.BaseDirectory}){var d=new DirectoryInfo(s);while(d is not null){if(File.Exists(Path.Combine(d.FullName,"docs","FUNCTION-REFERENCE-CN.md")))return d.FullName;d=d.Parent;}}throw new DirectoryNotFoundException();}
  private sealed class Recorder:ILuaCommandPipe

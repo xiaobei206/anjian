@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "apiVersion": "0.7",
+  "apiVersion": "0.8",
   "product": "按键精灵 2026",
   "categories": [
     {
@@ -37,6 +37,11 @@
       "id": "ocr",
       "title": "文字识别",
       "description": "离线 OCR 识别、文字区域/置信度、按文本查找和可取消等待。"
+    },
+    {
+      "id": "files",
+      "title": "文件与目录",
+      "description": "在逐次批准的文件根目录内执行受限文本读写、存在性检查、非递归枚举与目录创建。"
     }
   ],
   "apis": [
@@ -5337,6 +5342,386 @@
             "name": "__WaitText",
             "method": "WaitText",
             "localName": "__AnjianBridge_WaitText"
+          }
+        ]
+      }
+    },
+    {
+      "id": "anjian.files.read-text",
+      "name": "ReadTextFile",
+      "category": "files",
+      "title": "读取文本文件",
+      "description": "读取批准根目录内的 UTF-8 文本文件；相对路径以当前脚本所在目录为基准。拒绝无效 UTF-8 和超过 4 MiB 的文件。",
+      "signature": "ReadTextFile(path)",
+      "parameters": [
+        {
+          "name": "path",
+          "type": "string",
+          "required": true,
+          "description": "绝对路径或相对于当前脚本目录的路径。"
+        }
+      ],
+      "returns": {
+        "type": "string",
+        "description": "文件的完整 UTF-8 文本内容；不自动剥离 BOM。"
+      },
+      "errors": [
+        "路径未获本次运行读取授权、文件不存在、路径包含 reparse point/符号链接/多硬链接、文件超过 4 MiB 或文本不是有效 UTF-8 时产生错误。"
+      ],
+      "behavior": {
+        "pauseBehavior": "每条文件 IPC 在主进程执行前经过暂停检查点；暂停期间等待恢复。",
+        "cancellationBehavior": "Stop 取消当前运行 token；枚举循环会检查取消，写入在原子提交前再次检查；单次同步 I/O 受 4 MiB 上限约束。",
+        "sideEffects": [
+          "读取批准目录中的一个文本文件。"
+        ],
+        "coordinateSpace": "none",
+        "permissionNotes": "Worker 在 IPC 前检查本次 Grant；主进程对每条文件 IPC 再次检查。只允许批准的读取/写入根；拒绝 reparse point、符号链接和多硬链接普通文件。这不是恶意脚本的 OS 级沙箱。"
+      },
+      "example": "local text = ReadTextFile(\"data/config.txt\")",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.8.0-dev.1",
+      "runtime": {
+        "definition": "function(path) return __AnjianBridge_ReadTextFile(path) end",
+        "bindings": [
+          {
+            "name": "__ReadTextFile",
+            "method": "ReadTextFile",
+            "localName": "__AnjianBridge_ReadTextFile"
+          }
+        ]
+      }
+    },
+    {
+      "id": "anjian.files.write-text",
+      "name": "WriteTextFile",
+      "category": "files",
+      "title": "写入文本文件",
+      "description": "以 UTF-8（无 BOM）写入文件；先写同目录临时文件并 flush，再原子替换目标。内容最大 4 MiB。",
+      "signature": "WriteTextFile(path, text)",
+      "parameters": [
+        {
+          "name": "path",
+          "type": "string",
+          "required": true,
+          "description": "绝对路径或相对于当前脚本目录的路径。"
+        },
+        {
+          "name": "text",
+          "type": "string",
+          "required": true,
+          "description": "要写入的文本内容。"
+        }
+      ],
+      "returns": {
+        "type": "boolean",
+        "description": "写入并替换成功时返回 true。"
+      },
+      "errors": [
+        "路径未获本次运行写入授权、父目录不存在、目标是目录/链接、内容超过 4 MiB 或文件系统拒绝替换时产生错误。"
+      ],
+      "behavior": {
+        "pauseBehavior": "每条文件 IPC 在主进程执行前经过暂停检查点；暂停期间等待恢复。",
+        "cancellationBehavior": "Stop 取消当前运行 token；枚举循环会检查取消，写入在原子提交前再次检查；单次同步 I/O 受 4 MiB 上限约束。",
+        "sideEffects": [
+          "创建或替换指定文件；不会自动创建父目录。"
+        ],
+        "coordinateSpace": "none",
+        "permissionNotes": "Worker 在 IPC 前检查本次 Grant；主进程对每条文件 IPC 再次检查。只允许批准的读取/写入根；拒绝 reparse point、符号链接和多硬链接普通文件。这不是恶意脚本的 OS 级沙箱。"
+      },
+      "example": "WriteTextFile(\"data/output.txt\", \"hello\\n\")",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.8.0-dev.1",
+      "runtime": {
+        "definition": "function(path, text) return __AnjianBridge_WriteTextFile(path, text) end",
+        "bindings": [
+          {
+            "name": "__WriteTextFile",
+            "method": "WriteTextFile",
+            "localName": "__AnjianBridge_WriteTextFile"
+          }
+        ]
+      }
+    },
+    {
+      "id": "anjian.files.append-text",
+      "name": "AppendTextFile",
+      "category": "files",
+      "title": "追加文本文件",
+      "description": "以 UTF-8（无 BOM）追加到批准根目录内的文件；文件与追加后内容总大小不得超过 4 MiB。",
+      "signature": "AppendTextFile(path, text)",
+      "parameters": [
+        {
+          "name": "path",
+          "type": "string",
+          "required": true,
+          "description": "绝对路径或相对于当前脚本目录的路径。"
+        },
+        {
+          "name": "text",
+          "type": "string",
+          "required": true,
+          "description": "要追加的文本内容。"
+        }
+      ],
+      "returns": {
+        "type": "boolean",
+        "description": "追加成功时返回 true。"
+      },
+      "errors": [
+        "路径未获本次运行写入授权、父目录不存在、目标是目录/链接/多硬链接文件或追加后超过 4 MiB 时产生错误。"
+      ],
+      "behavior": {
+        "pauseBehavior": "每条文件 IPC 在主进程执行前经过暂停检查点；暂停期间等待恢复。",
+        "cancellationBehavior": "Stop 取消当前运行 token；枚举循环会检查取消，写入在原子提交前再次检查；单次同步 I/O 受 4 MiB 上限约束。",
+        "sideEffects": [
+          "创建目标文件（若不存在）或修改已有文件内容。"
+        ],
+        "coordinateSpace": "none",
+        "permissionNotes": "Worker 在 IPC 前检查本次 Grant；主进程对每条文件 IPC 再次检查。只允许批准的读取/写入根；拒绝 reparse point、符号链接和多硬链接普通文件。这不是恶意脚本的 OS 级沙箱。"
+      },
+      "example": "AppendTextFile(\"data/run.log\", \"done\\n\")",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.8.0-dev.1",
+      "runtime": {
+        "definition": "function(path, text) return __AnjianBridge_AppendTextFile(path, text) end",
+        "bindings": [
+          {
+            "name": "__AppendTextFile",
+            "method": "AppendTextFile",
+            "localName": "__AnjianBridge_AppendTextFile"
+          }
+        ]
+      }
+    },
+    {
+      "id": "anjian.files.file-exists",
+      "name": "FileExists",
+      "category": "files",
+      "title": "检查文件是否存在",
+      "description": "检查批准读取根目录中的普通文件是否存在；链接或其他特殊文件会拒绝而不是跟随。",
+      "signature": "FileExists(path)",
+      "parameters": [
+        {
+          "name": "path",
+          "type": "string",
+          "required": true,
+          "description": "绝对路径或相对于当前脚本目录的路径。"
+        }
+      ],
+      "returns": {
+        "type": "boolean",
+        "description": "普通文件存在时 true，否则 false。"
+      },
+      "errors": [
+        "路径未获本次运行读取授权，或路径链包含 reparse point/符号链接/多硬链接时产生错误。"
+      ],
+      "behavior": {
+        "pauseBehavior": "每条文件 IPC 在主进程执行前经过暂停检查点；暂停期间等待恢复。",
+        "cancellationBehavior": "Stop 取消当前运行 token；枚举循环会检查取消，写入在原子提交前再次检查；单次同步 I/O 受 4 MiB 上限约束。",
+        "sideEffects": [
+          "读取文件元数据，不读取文件内容。"
+        ],
+        "coordinateSpace": "none",
+        "permissionNotes": "Worker 在 IPC 前检查本次 Grant；主进程对每条文件 IPC 再次检查。只允许批准的读取/写入根；拒绝 reparse point、符号链接和多硬链接普通文件。这不是恶意脚本的 OS 级沙箱。"
+      },
+      "example": "if FileExists(\"data/config.txt\") then Log(\"配置存在\") end",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.8.0-dev.1",
+      "runtime": {
+        "definition": "function(path) return __AnjianBridge_FileExists(path) end",
+        "bindings": [
+          {
+            "name": "__FileExists",
+            "method": "FileExists",
+            "localName": "__AnjianBridge_FileExists"
+          }
+        ]
+      }
+    },
+    {
+      "id": "anjian.files.directory-exists",
+      "name": "DirectoryExists",
+      "category": "files",
+      "title": "检查目录是否存在",
+      "description": "检查批准读取根目录中的目录是否存在；拒绝任何 reparse point/符号链接目录。",
+      "signature": "DirectoryExists(path)",
+      "parameters": [
+        {
+          "name": "path",
+          "type": "string",
+          "required": true,
+          "description": "绝对路径或相对于当前脚本目录的路径。"
+        }
+      ],
+      "returns": {
+        "type": "boolean",
+        "description": "目录存在时 true，否则 false。"
+      },
+      "errors": [
+        "路径未获本次运行读取授权，或路径链包含 reparse point/符号链接时产生错误。"
+      ],
+      "behavior": {
+        "pauseBehavior": "每条文件 IPC 在主进程执行前经过暂停检查点；暂停期间等待恢复。",
+        "cancellationBehavior": "Stop 取消当前运行 token；枚举循环会检查取消，写入在原子提交前再次检查；单次同步 I/O 受 4 MiB 上限约束。",
+        "sideEffects": [
+          "读取目录元数据。"
+        ],
+        "coordinateSpace": "none",
+        "permissionNotes": "Worker 在 IPC 前检查本次 Grant；主进程对每条文件 IPC 再次检查。只允许批准的读取/写入根；拒绝 reparse point、符号链接和多硬链接普通文件。这不是恶意脚本的 OS 级沙箱。"
+      },
+      "example": "if DirectoryExists(\"data\") then Log(\"目录存在\") end",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.8.0-dev.1",
+      "runtime": {
+        "definition": "function(path) return __AnjianBridge_DirectoryExists(path) end",
+        "bindings": [
+          {
+            "name": "__DirectoryExists",
+            "method": "DirectoryExists",
+            "localName": "__AnjianBridge_DirectoryExists"
+          }
+        ]
+      }
+    },
+    {
+      "id": "anjian.files.list-files",
+      "name": "ListFiles",
+      "category": "files",
+      "title": "枚举目录文件",
+      "description": "只返回批准目录的直接子级普通文件名；不递归，隐藏链接/重解析点和多硬链接文件，最多检查 1000 项。",
+      "signature": "ListFiles(path)",
+      "parameters": [
+        {
+          "name": "path",
+          "type": "string",
+          "required": true,
+          "description": "绝对路径或相对于当前脚本目录的目录路径。"
+        }
+      ],
+      "returns": {
+        "type": "table",
+        "description": "按名称排序的 Lua 数组，元素为文件名字符串；不返回完整路径。"
+      },
+      "errors": [
+        "目录未获本次运行读取授权、目录不存在、目录含无法读取的项目，或直接子项超过 1000 个时产生错误。"
+      ],
+      "behavior": {
+        "pauseBehavior": "每条文件 IPC 在主进程执行前经过暂停检查点；暂停期间等待恢复。",
+        "cancellationBehavior": "Stop 取消当前运行 token；枚举循环会检查取消，写入在原子提交前再次检查；单次同步 I/O 受 4 MiB 上限约束。",
+        "sideEffects": [
+          "读取目录项名称和普通文件元数据。"
+        ],
+        "coordinateSpace": "none",
+        "permissionNotes": "Worker 在 IPC 前检查本次 Grant；主进程对每条文件 IPC 再次检查。只允许批准的读取/写入根；拒绝 reparse point、符号链接和多硬链接普通文件。这不是恶意脚本的 OS 级沙箱。"
+      },
+      "example": "for _, name in ipairs(ListFiles(\"data\")) do Log(name) end",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.8.0-dev.1",
+      "runtime": {
+        "definition": "function(path) return __AnjianBridge_ListFiles(path) end",
+        "bindings": [
+          {
+            "name": "__ListFiles",
+            "method": "ListFiles",
+            "localName": "__AnjianBridge_ListFiles"
+          }
+        ]
+      }
+    },
+    {
+      "id": "anjian.files.list-directories",
+      "name": "ListDirectories",
+      "category": "files",
+      "title": "枚举子目录",
+      "description": "只返回批准目录的直接子级普通目录名；不递归，隐藏链接/重解析点，最多检查 1000 项。",
+      "signature": "ListDirectories(path)",
+      "parameters": [
+        {
+          "name": "path",
+          "type": "string",
+          "required": true,
+          "description": "绝对路径或相对于当前脚本目录的目录路径。"
+        }
+      ],
+      "returns": {
+        "type": "table",
+        "description": "按名称排序的 Lua 数组，元素为目录名字符串；不返回完整路径。"
+      },
+      "errors": [
+        "目录未获本次运行读取授权、目录不存在、目录含无法读取的项目，或直接子项超过 1000 个时产生错误。"
+      ],
+      "behavior": {
+        "pauseBehavior": "每条文件 IPC 在主进程执行前经过暂停检查点；暂停期间等待恢复。",
+        "cancellationBehavior": "Stop 取消当前运行 token；枚举循环会检查取消，写入在原子提交前再次检查；单次同步 I/O 受 4 MiB 上限约束。",
+        "sideEffects": [
+          "读取目录项名称和目录元数据。"
+        ],
+        "coordinateSpace": "none",
+        "permissionNotes": "Worker 在 IPC 前检查本次 Grant；主进程对每条文件 IPC 再次检查。只允许批准的读取/写入根；拒绝 reparse point、符号链接和多硬链接普通文件。这不是恶意脚本的 OS 级沙箱。"
+      },
+      "example": "for _, name in ipairs(ListDirectories(\"data\")) do Log(name) end",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.8.0-dev.1",
+      "runtime": {
+        "definition": "function(path) return __AnjianBridge_ListDirectories(path) end",
+        "bindings": [
+          {
+            "name": "__ListDirectories",
+            "method": "ListDirectories",
+            "localName": "__AnjianBridge_ListDirectories"
+          }
+        ]
+      }
+    },
+    {
+      "id": "anjian.files.create-directory",
+      "name": "CreateDirectory",
+      "category": "files",
+      "title": "创建一级目录",
+      "description": "在已存在且获批准写入的父目录下创建单级目录；若目标目录已存在且不是链接则返回 true，不递归创建父目录。",
+      "signature": "CreateDirectory(path)",
+      "parameters": [
+        {
+          "name": "path",
+          "type": "string",
+          "required": true,
+          "description": "绝对路径或相对于当前脚本目录的路径。"
+        }
+      ],
+      "returns": {
+        "type": "boolean",
+        "description": "目录已存在或创建成功时 true。"
+      },
+      "errors": [
+        "目标路径未获本次运行写入授权、父目录不存在、目标为文件/链接或文件系统拒绝创建时产生错误。"
+      ],
+      "behavior": {
+        "pauseBehavior": "每条文件 IPC 在主进程执行前经过暂停检查点；暂停期间等待恢复。",
+        "cancellationBehavior": "Stop 取消当前运行 token；枚举循环会检查取消，写入在原子提交前再次检查；单次同步 I/O 受 4 MiB 上限约束。",
+        "sideEffects": [
+          "在批准写入根目录中创建一个目录。"
+        ],
+        "coordinateSpace": "none",
+        "permissionNotes": "Worker 在 IPC 前检查本次 Grant；主进程对每条文件 IPC 再次检查。只允许批准的读取/写入根；拒绝 reparse point、符号链接和多硬链接普通文件。这不是恶意脚本的 OS 级沙箱。"
+      },
+      "example": "CreateDirectory(\"data/cache\")",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.8.0-dev.1",
+      "runtime": {
+        "definition": "function(path) return __AnjianBridge_CreateDirectory(path) end",
+        "bindings": [
+          {
+            "name": "__CreateDirectory",
+            "method": "CreateDirectory",
+            "localName": "__AnjianBridge_CreateDirectory"
           }
         ]
       }
