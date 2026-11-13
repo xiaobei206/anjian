@@ -541,3 +541,17 @@ M4 基础调试器与 M5 可视化录制/动作列表均已完成 Windows CI 验
 - 最新临时 CI artifact：`Anjian2026-preview-win-x64`，Artifact ID `14006903094`，大小 76,460,671 bytes，保留期 30 天；[下载 artifact](https://github.com/xiaobei206/anjian/actions/runs/43358188770/artifacts/14006903094)。它是 Actions 临时 artifact，不是 GitHub Release；“Create GitHub Release”步骤按分支 push 预期 SKIPPED。没有修改 VERSION/csproj 版本，也没有替换 v0.1.0-preview.4 官方 ZIP/SHA256。
 - 中间失败均保留并已修复：初次 Build 的 `RgbColor` 类型/方法同名遮蔽；随后 Build 的 WinForms `WFO1000` 和 xUnit 断言 analyzer；之后测试暴露 registry 0.6 仍残留 0.5/74 项旧预期。当前最终 run 已全绿。
 - M8-01..M8-18 Windows 10/11 桌面人工验收全部 NOT RUN。特别需要真实桌面验证多显示器负坐标、透明 PNG/GDI 预览、脚本资源迁移、点击穿透、SetWindowDisplayAffinity 返回及截图是否含 overlay。Windows Server CI 不代表用户桌面通过。
+## 2026-11-13 — M8-DESKTOP-ACCEPTANCE 执行受阻（未进行桌面测试）
+
+### 核查结果
+- 会话开始时 main HEAD：`b06910f93a40780c3ffa10a04d64d41d176b2767`，仅为文档同步提交。
+- M8 实现代码基线：`c2b30c1d9aabd876cd848d6203376060f294c34e`。关联 Windows Actions run [43358188770](https://github.com/xiaobei206/anjian/actions/runs/43358188770) SUCCESS：Restore PASS；Release Build 0 warnings / 0 errors；85/85 Core tests；API handbook `--check)；self-contained win-x64 publish；ZIP/SHA256 与 artifact upload 全 PASS。Artifact ID `14006903094`，76,460,671 bytes。
+- 该 run 使用 Windows Server 2025 runner。它证明代码构建和自动化测试通过，不证明 Windows 10/11 用户桌面的 GDI 截图、DPI、多显示器、WinForms 资源 UI、overlay 点击穿透或 Display Affinity 行为通过。
+
+### 本轮实际执行与限制
+- 当前执行环境：Debian GNU/Linux 13 x86_64；未安装 .NET SDK（`dotnet --info` 不可用）；无 Windows/PowerShell 桌面会话，也无交互访问用户 Windows 桌面的通道。
+- 因 M8 唯一任务要求真实 Windows 10/11 桌面，本轮未运行应用，未执行 M8-01..M8-18。18 项全部继续为 **NOT RUN**，没有将未执行项目记为 PASS 或 FAIL。
+- 未改动源码、公开 API、VERSION 或 v0.1.0-preview.4 Release 资产；未创建新 Release。
+
+### 精确后续
+下一会话仍只做 M8-DESKTOP-ACCEPTANCE：在可交互的 Windows 10/11 桌面使用最新 main 对应的 win-x64 artifact，逐项记录 OS build、DPI、显示器布局/负坐标、步骤、结果与日志/截图；优先覆盖资源管理 UI、manifest/路径/hash 防护、GDI 截图/透明像素、颜色/模板算法、overlay 点击穿透和 Display Affinity 截图隔离。没有实际桌面和证据时，保持 M8 IN_PROGRESS、M8-01..M8-18 NOT RUN，不进入 M9。
