@@ -23,7 +23,7 @@
 | M10 参数、配置与脚本自定义 UI | DONE（实现与 Windows 自动化验收完成；WinForms/桌面实测延期 M14） | 参数 sidecar schema v1、10 种类型、统一 validator、配置持久化/恢复、播放/调试前表单、参数设计器、JSON 导入导出、typed Worker IPC、递归只读 Lua Args、脚本目录相对路径解析 |
 | M11 小精灵打包器 | DONE（Windows CI run 229 PASS；WinForms/DPI/真实输入桌面验收延期 M14，NOT RUN） | 独立便携目录 + EXE 启动 ZIP、依赖/资源收集、M10 参数 UI、运行控制、manifest/SHA256、构建日志与离线函数参考 Markdown |
 | M12 内置扩展 API 与插件系统 | IN_PROGRESS（M12-01 权限基座和播放/调试审阅/Worker 注入已通过 Windows CI；系统 API 和插件待实现） | 默认拒绝权限契约、逐次运行审阅、Worker grant 注入；文件/剪贴板/对话框/进程/HTTP/JSON 的主机双重授权和插件 manifest/加载仍待实现 |
-| M13 多实例与定时任务 | TODO | 独立运行实例、任务状态、定时、超时、失败策略与隔离 |
+| M13 多实例与定时任务 | TODO（下一阶段先做 M13-01 契约设计） | 独立运行实例、任务状态、定时、超时、失败策略与隔离 |
 | M14 1.0 稳定化与发布 | TODO | 自动与手工验收、依赖许可、离线帮助、性能/长时测试和正式稳定版发布 |
 
 ## 统一 Windows 桌面实机验收策略（用户决定，2026-11-13）
@@ -266,7 +266,7 @@ M7 实现/CI 已完成不代表 M7-01..M7-10 Windows 桌面验收通过；这些
 3. M12-09：DONE（Windows Actions run 43427860126 全 PASS：161/161 Core tests、0 warnings/0 errors、API handbook 103 项、自包含 win-x64/Sprite Worker smoke/ZIP/SHA256 上传全通过）；HttpRequest、精确主机/方法、HTTPS 默认、HTTP 单独审批、重定向逐跳授权、超时/Stop、请求/响应上限；真实网络桌面验收留 M14。
 4. M12-10：DONE（本地 manifest/目录 ZIP、安全校验、API 兼容、三方权限交集、版本隔离、管理窗口与独立 Worker；自动化结果见下方 M12-10 实施与验证记录；真实桌面验收 M14）。不加载任意 DLL，不在主 UI 执行插件 Lua。
 5. M12-11：DONE（Windows Actions run 43436997492 全 PASS：173/173 Core tests、0 warnings/0 errors、API handbook、自包含 win-x64 发布、Sprite/Plugin Worker smoke、ZIP/SHA256 与 artifact upload 全通过）。小精灵按入口收集并绑定 permissions sidecar，Launcher 按 manifest SHA-256 对正在审阅的字节做校验并复用逐次权限审阅；无 sidecar 时为空 Grant，声明本身不授权。真实 WinForms/权限/DPI/多屏实机验收仍留 M14。
-6. M12-12（待办）：按 PRD §2.12 完成第三方插件 Lua API/命令贡献接入。先冻结贡献描述 schema、兼容性、命名冲突/权限边界与调用生命周期 ADR，再做最小端到端垂直切片，统一接入 API registry、IDE 补全/签名、命令面板和函数参考。不得让插件在主 UI 执行 Lua、加载任意 DLL 或扩大脚本 Grant。
+6. M12-12：代码与自动化测试已进入 main，最终验收以最新成功 Windows Actions run 为准。贡献 schema/ADR-032 冻结；纯 Lua helper 在独立 Worker 内按 hash 校验惰性执行，内存 registry extension view 同时服务 IDE 补全/签名、API 命令面板和本机动态参考生成。内置 registry 仍为 1.2 / 103；不加载 DLL、不增加 IPC/权限或修改 Grant。真实桌面实测留 M14。
 7. 每批功能完成后同步 registry/API version、中文函数手册、IDE 提示和契约测试；Windows CI 不替代 M14 桌面验收。
 
 - 增加有边界的文件/目录、剪贴板、对话框、进程、HTTP(S)/JSON 等常用 API。
@@ -274,6 +274,15 @@ M7 实现/CI 已完成不代表 M7-01..M7-10 Windows 桌面验收通过；这些
 - 多实例拥有独立 Lua state、参数、日志和输入清理资源。
 - 定时任务有时区/触发时刻定义、超时、失败策略和可取消行为。
 - 所有涉及网络和进程的功能不冻结 UI，且默认不自动联网。
+
+### M13 实施顺序（从 M12-12 完成后开始）
+
+1. **M13-01 — 多实例运行实例模型与隔离契约（下一会话唯一任务）**：先冻结 ADR 与数据模型，定义稳定 instanceId、状态机、脚本/参数/日志/输入清理资源归属、取消/超时、重复启动语义、并发上限、失败策略与可观察性；列出并发输入竞争和权限 Grant 逐实例绑定规则。只完成契约设计与可验证状态转换规格，不在此任务顺手引入定时器或大规模 runtime 重构。
+2. M13-02 — 独立运行实例与资源隔离：根据已验收的 M13-01 契约落地实例协调器与各自 Worker 生命周期。
+3. M13-03 — 单次/定时/周期触发与暂停、取消、超时和失败策略；明确时区/重复触发语义并使用确定性测试，不默认联网。
+4. M13-04 — UI 状态观测、日志与恢复行为、并发/停止回归和 Windows 包 smoke。
+
+M13-01 不是新 release；不得以设计文件代替实现测试证据，也不提前执行 M14 桌面验收。
 
 ## M14 — 1.0.0 稳定版定义
 

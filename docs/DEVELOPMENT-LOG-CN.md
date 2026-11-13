@@ -842,3 +842,13 @@ M4 基础调试器与 M5 可视化录制/动作列表均已完成 Windows CI 验
 - Windows Actions 最终 run [43436997492](https://github.com/xiaobei206/anjian/actions/runs/43436997492) SUCCESS：Restore PASS；Release Build 0 warnings / 0 errors；Core tests 173/173、0 skipped；API handbook check；self-contained win-x64 publish；published Sprite Worker smoke（sidecar 请求写入但空 Grant 拒绝）与 Plugin Worker smoke；ZIP/SHA256、artifact upload 全 PASS。Artifact ID `14044230189`，87,267,435 bytes，SHA-256 `8c4312eb072012db084917bd025d5640e105d623a4d7df819632bf7cf1e58fc0`；该 artifact 是临时 Actions 产物，不是 Release。
 - 未增加 Lua 公共 API；registry 保持 1.2 / 103，函数手册/IDE 数据无需改变。未修改 `VERSION` / AssemblyVersion / FileVersion，不创建 tag 或 Release，v0.1.0-preview.4 官方资产未变。
 - 本地容器无 .NET SDK，local Restore/Build/Test NOT RUN。WinForms 权限审阅、真实批准/拒绝、Windows 10/11 DPI/多屏交互仍 NOT RUN（M14）；CI smoke 不代表桌面验收通过。
+
+### M12-12 插件 Lua API/命令贡献接入统一注册体系（2026-11-13）
+
+- 先冻结贡献契约与 ADR-032：manifest 可选 contributions schemaVersion=1；每插件最多 64 项、每函数最多 16 个必填标量参数；函数 ID/公开名称稳定，签名、返回值、错误、暂停/取消语义、示例和模块导出在同一 manifest 声明。未知/未来字段、非法模块路径、保留名称和内置 API 冲突拒绝。
+- 内置 API registry 保持 1.2 / 103；插件 contributions 合并为只在内存使用的 registry extension view，不改源码 registry 或静态函数手册。IDE 补全/签名、API 命令面板和动态参考生成器使用同一视图。
+- PluginPackageStore 只将 API 兼容、完整 files 清单与 SHA-256 校验且已启用的插件放入计划；启用前验证完整启用集，跨插件名称冲突拒绝且不写 catalog。普通脚本 Worker 启动时重新验证 catalog、manifest、文件清单和 hash；小精灵及插件入口 Worker 不继承普通脚本贡献计划。
+- 插件 helper 仅纯 Lua；模块惰性执行于脚本独立 Worker 内的受限环境，不提供宿主自动化 API，不增加 host IPC 或用户 Grant。参数/返回类型在调用时检查；插件异常传播到当前 Worker。
+- 新增 Core tests：registry/IDE completion、实际 NLua 调用、参数数量/类型、异常传播、宿主全局隔离、内置/插件名称冲突、启用原子性、未来/未知 schema 与模块 hash 篡改。未修改 VERSION/AssemblyVersion/FileVersion，不创建 tag/Release；preview.4 发布资产不变。
+- Windows Actions 曾发现 nullable 检查、xUnit2031 和 NLua 异常类型断言问题，均按日志修复；最终结果以最新成功 run 补记为准，不将失败 run 记录为通过。当前容器无 .NET SDK，local Restore/Build/Test NOT RUN；真实 Windows 10/11 插件管理/命令面板/DPI/多屏验收 NOT RUN（M14）。
+
