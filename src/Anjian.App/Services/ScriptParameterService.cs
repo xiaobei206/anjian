@@ -13,7 +13,7 @@ internal static class ScriptParameterService
         WriteIndented = true
     };
 
-    public static string SchemaPath(string scriptPath) => Path.GetFullPath(scriptPath) + ".params.json";
+    public static string SchemaPath(string scriptPath) => Path.ChangeExtension(Path.GetFullPath(scriptPath), ".params.json");
 
     public static string ConfigurationPath(string scriptPath)
     {

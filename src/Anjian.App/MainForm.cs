@@ -1560,7 +1560,7 @@ internal sealed class MainForm : Form
         {
             using var form = new ScriptParameterDesignerForm(_current.FullPath);
             if (form.ShowDialog(this) == DialogResult.OK)
-                AppendLog("参数定义已保存：" + Path.GetFileName(_current.FullPath) + ".params.json");
+                AppendLog("参数定义已保存：" + Path.GetFileName(ScriptParameterService.SchemaPath(_current.FullPath)));
         }
         catch (Exception ex)
         {

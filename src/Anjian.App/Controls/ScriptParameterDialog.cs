@@ -115,7 +115,7 @@ internal sealed class ScriptParameterDialog : Form
             else number.Value = Math.Clamp(0m, number.Minimum, number.Maximum);
             return number;
         }
-        var text = new TextBox { Width = 360 };
+        var text = new TextBox { Width = 360, UseSystemPasswordChar = p.Sensitive };
         if (hasValue)
         {
             text.Text = value.ValueKind == JsonValueKind.String
