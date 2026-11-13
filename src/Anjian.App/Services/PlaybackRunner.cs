@@ -35,6 +35,7 @@ internal sealed class PlaybackRunner : IDisposable
     private IReadOnlyList<PluginApiRuntimePlan> _pluginApiContributions = [];
     private ScriptPermissionGrant _launchPermissions = ScriptPermissionGrant.Empty;
     private string _launchScriptDirectory = string.Empty;
+    private string? _launchScriptSource;
     private ClipboardDialogHost? _clipboardDialogHost;
     private TaskCompletionSource<LuaDebugCommand>? _debugCommandSource;
     private string? _workerAttemptId;
@@ -128,6 +129,11 @@ internal sealed class PlaybackRunner : IDisposable
         if (debugOptions is not null && (options.RepeatCount != 1 || options.IntervalMilliseconds != 0))
             throw new ArgumentException("调试运行固定执行单轮，不支持循环次数和轮间隔。", nameof(options));
 
+        var fullScriptPath = Path.GetFullPath(scriptPath);
+        var scriptSourceSnapshot = pluginRuntimeOptions is null
+            ? File.ReadAllText(fullScriptPath)
+            : null;
+
         using var cts = new CancellationTokenSource();
         _runCts = cts;
         _debugLaunchOptions = debugOptions;
@@ -136,8 +142,9 @@ internal sealed class PlaybackRunner : IDisposable
         _pluginRuntimeOptions = pluginRuntimeOptions;
         _pluginApiContributions = pluginApiContributions;
         _launchPermissions = permissions ?? ScriptPermissionGrant.Empty;
-        _launchScriptDirectory = Path.GetDirectoryName(Path.GetFullPath(scriptPath))
+        _launchScriptDirectory = Path.GetDirectoryName(fullScriptPath)
             ?? throw new InvalidDataException("无法确定脚本目录。");
+        _launchScriptSource = scriptSourceSnapshot;
         _gate.Resume();
         LastCleanupSucceeded = true;
         var token = cts.Token;
@@ -186,6 +193,7 @@ internal sealed class PlaybackRunner : IDisposable
             _pluginApiContributions = [];
             _launchPermissions = ScriptPermissionGrant.Empty;
             _launchScriptDirectory = string.Empty;
+            _launchScriptSource = null;
             _runCts = null;
             _gate.Resume();
             DebugSessionCompleted?.Invoke();
@@ -390,6 +398,7 @@ internal sealed class PlaybackRunner : IDisposable
                 PluginRuntime = _pluginRuntimeOptions,
                 PluginApiContributions = _pluginApiContributions.ToList(),
                 Permissions = _launchPermissions,
+                ScriptSource = _launchScriptSource,
                 InstanceId = _instanceId.Value,
                 WorkerAttemptId = _workerAttemptId ?? throw new InvalidOperationException("Worker attempt 尚未分配。"),
                 SessionNonce = _sessionNonce ?? throw new InvalidOperationException("Worker 会话 nonce 尚未分配。")
