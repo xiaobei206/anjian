@@ -315,6 +315,8 @@ internal sealed class PlaybackRunner : IDisposable
                 return JsonSerializer.Serialize(_images.ReleaseImage(ReadWindowPayload<ImageIdRequest>(message.Text).ImageId));
             case "image-size":
                 return JsonSerializer.Serialize(_images.GetSize(ReadWindowPayload<ImageIdRequest>(message.Text).ImageId), WindowApiJson.Options);
+            case "image-export-png":
+                return Convert.ToBase64String(_images.ExportPngBytes(ReadWindowPayload<ImageIdRequest>(message.Text).ImageId));
             case "image-crop":
                 return _images.CropImage(ReadWindowPayload<ImageCropRequest>(message.Text));
             case "image-pixel-color":

@@ -19,8 +19,8 @@ public sealed partial class WorkerLuaApi
     {
         ValidateText(text);
         var recognized = RecognizeImage(imageId, language, minConfidence);
-        var line = FindMatchingLine(recognized.Result, text, minConfidence, matchMode);
-        return line is null ? null : ToLuaLine(line, recognized.Size, 1);
+        var match = FindMatchingLine(recognized.Result, text, minConfidence, matchMode);
+        return match.Line is null ? null : ToLuaLine(match.Line, recognized.Size, match.Index);
     }
 
     public LuaTable? WaitText(
@@ -45,9 +45,9 @@ public sealed partial class WorkerLuaApi
             try
             {
                 var recognized = RecognizeImage(imageId, language, minConfidence);
-                var line = FindMatchingLine(recognized.Result, text, minConfidence, matchMode);
-                if (line is not null)
-                    return ToLuaLine(line, recognized.Size, recognized.Result.Lines.IndexOf(line) + 1);
+                var match = FindMatchingLine(recognized.Result, text, minConfidence, matchMode);
+                if (match.Line is not null)
+                    return ToLuaLine(match.Line, recognized.Size, match.Index);
             }
             finally
             {
@@ -157,20 +157,21 @@ public sealed partial class WorkerLuaApi
         return table;
     }
 
-    private static OcrTextLine? FindMatchingLine(
+    private static (OcrTextLine? Line, int Index) FindMatchingLine(
         OcrRecognitionResult result, string searchText, double minConfidence, string matchMode)
     {
         ValidateConfidence(minConfidence);
         ValidateMatchMode(matchMode);
-        foreach (var line in result.Lines)
+        for (var i = 0; i < result.Lines.Count; i++)
         {
+            var line = result.Lines[i];
             if (line.Confidence < minConfidence) continue;
             var matched = matchMode.Equals("exact", StringComparison.OrdinalIgnoreCase)
                 ? line.Text.Equals(searchText, StringComparison.OrdinalIgnoreCase)
                 : line.Text.Contains(searchText, StringComparison.OrdinalIgnoreCase);
-            if (matched) return line;
+            if (matched) return (line, i + 1);
         }
-        return null;
+        return (null, 0);
     }
 
     private static void ValidateMatchMode(string matchMode)

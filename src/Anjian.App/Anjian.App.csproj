@@ -17,5 +17,6 @@
   <ItemGroup>
     <ProjectReference Include="..\Anjian.Core\Anjian.Core.csproj" />
     <PackageReference Include="NLua" Version="1.7.9" />
+    <PackageReference Include="PaddleOcrNet" Version="2.4.0" />
   </ItemGroup>
 </Project>

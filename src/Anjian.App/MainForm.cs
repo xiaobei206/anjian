@@ -232,6 +232,7 @@ internal sealed class MainForm : Form
         _alwaysOnTopCheck.Margin = new Padding(4, 7, 4, 0);
         toolbar.Controls.Add(_alwaysOnTopCheck);
         toolbar.Controls.Add(MakeButton("图像资源", (_, _) => OpenImageResources()));
+        toolbar.Controls.Add(MakeButton("OCR 模型", (_, _) => OpenOcrModelManager()));
         _visualDebugButton = MakeButton("视觉调试：关", (_, _) => ToggleVisualDebug());
         toolbar.Controls.Add(_visualDebugButton);
         toolbar.Controls.Add(MakeButton("返回悬浮窗", (_, _) => HideMainWindow(showFloatingWindow: true)));
@@ -1540,6 +1541,18 @@ internal sealed class MainForm : Form
     {
         try { return Path.GetFullPath(path.TrimStart('@')); }
         catch { return path; }
+    }
+
+    private void OpenOcrModelManager()
+    {
+        using var form = new OcrModelManagerForm();
+        form.ShowDialog(this);
+    }
+
+    private void OpenOcrModelManager()
+    {
+        using var form = new OcrModelManagerForm();
+        form.ShowDialog(this);
     }
 
     private void OpenImageResources()

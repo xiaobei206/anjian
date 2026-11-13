@@ -189,6 +189,21 @@ internal sealed class WindowsImageService(WindowsWindowManager windows)
             image.ScreenOriginX, image.ScreenOriginY);
     }
 
+    public byte[] ExportPngBytes(string imageId)
+    {
+        var image = Get(RequiredId(imageId));
+        if ((long)image.Width * image.Height > 16_000_000)
+            throw new InvalidOperationException("OCR 单张图像最多支持 1600 万像素；请先 CropImage 缩小区域。");
+
+        using var bitmap = new Bitmap(image.Width, image.Height, PixelFormat.Format32bppArgb);
+        WriteBitmap(image, bitmap);
+        using var stream = new MemoryStream();
+        bitmap.Save(stream, ImageFormat.Png);
+        if (stream.Length > 64L * 1024 * 1024)
+            throw new InvalidOperationException("OCR PNG 编码超过 64 MiB IPC 限制；请先 CropImage 缩小区域。");
+        return stream.ToArray();
+    }
+
     public uint GetPixelColor(ImagePixelRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
