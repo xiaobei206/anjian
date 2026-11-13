@@ -137,6 +137,12 @@ public static class ScriptParameterValidator
                 continue;
             }
 
+            if (p.Required && IsEmpty(value))
+            {
+                issues.Add(new(p.Id, p.Label, "此参数为必填项，不能为空。"));
+                continue;
+            }
+
             var errors = ValidateValue(p, value, baseDirectory);
             foreach (var error in errors)
                 issues.Add(new(p.Id ?? string.Empty, label, error));
@@ -145,6 +151,10 @@ public static class ScriptParameterValidator
         }
         return new(values, issues);
     }
+
+    private static bool IsEmpty(JsonElement value) => value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined
+        || value.ValueKind == JsonValueKind.String && string.IsNullOrWhiteSpace(value.GetString())
+        || value.ValueKind == JsonValueKind.Array && !value.EnumerateArray().Any();
 
     private static List<string> ValidateValue(ScriptParameterDefinition p, JsonElement value, string? baseDirectory)
     {

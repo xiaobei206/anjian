@@ -15,7 +15,7 @@ public sealed record ParameterConfigurationLoadResult(
 
 public static class ParameterConfigurationStore
 {
-    private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web) { WriteIndented = true };
     private const long MaximumFileBytes = 1_048_576;
 
     public static ParameterConfigurationLoadResult LoadOrRecover(string path)
