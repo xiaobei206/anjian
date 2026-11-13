@@ -21,7 +21,7 @@ public sealed class ScriptParameterTests
         };
         var result = ScriptParameterValidator.ValidateValues(schema, new Dictionary<string, JsonElement>
         {
-            ["title"] = Json(""hello"")
+            ["title"] = Json("\"hello\"")
         });
         Assert.True(result.IsValid);
         Assert.Equal(3, result.Values["count"].GetInt32());
@@ -65,10 +65,10 @@ public sealed class ScriptParameterTests
         };
         var result = ScriptParameterValidator.ValidateValues(schema, new Dictionary<string, JsonElement>
         {
-            ["mode"] = Json(""invalid""),
+            ["mode"] = Json("\"invalid\""),
             ["targets"] = Json("[\"a\",\"a\"]"),
-            ["shortcut"] = Json(""Ctrl+Banana""),
-            ["tint"] = Json(""red"")
+            ["shortcut"] = Json("\"Ctrl+Banana\""),
+            ["tint"] = Json("\"red\"")
         });
         Assert.False(result.IsValid);
         Assert.Equal(4, result.Issues.Count);
