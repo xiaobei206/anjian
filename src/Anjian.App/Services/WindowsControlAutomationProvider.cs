@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.Json;
 using System.Windows.Automation;
 using Anjian.Core.Api;
 using Anjian.Core.Windows;
@@ -70,7 +71,7 @@ internal sealed class WindowsControlAutomationProvider(ILuaCommandPipe pipe) : I
             new("backgroundKeyboard","unsupported","none","未实现经过验证的通用后台键盘 provider。","不伪造 PostMessage 按键。"),
             new("backgroundTextInput","unsupported","none","未实现经过验证的通用后台文本注入 provider。","控件值设置不等价于键盘文本输入。")
         };
-        return new WindowAutomationCapabilities(id, "Microsoft UI Automation Control View",
+        return new WindowAutomationCapabilities(bindingId, "Microsoft UI Automation Control View",
             binding.Target.ProcessId, IsForeground(binding.Target), capabilities);
     }
 
@@ -307,6 +308,14 @@ internal sealed class WindowsControlAutomationProvider(ILuaCommandPipe pipe) : I
         a.WindowId == b.WindowId && a.Handle == b.Handle && a.ProcessId == b.ProcessId &&
         a.ThreadId == b.ThreadId && a.ClassName == b.ClassName &&
         a.ProcessStartTicks == b.ProcessStartTicks && a.IsChild == b.IsChild;
+
+    private static string ReadClassName(IntPtr h)
+    {
+        var buffer = new StringBuilder(512);
+        if (GetClassName(h, buffer, buffer.Capacity) == 0)
+            throw new Win32Exception(Marshal.GetLastWin32Error(), "读取目标窗口类名失败。");
+        return buffer.ToString();
+    }
 
     private static void ValidateTarget(WindowAutomationTarget t)
     {
