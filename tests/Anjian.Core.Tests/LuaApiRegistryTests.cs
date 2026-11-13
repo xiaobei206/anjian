@@ -74,8 +74,8 @@ public sealed class LuaApiRegistryTests
     local value = ControlGetValue(binding, "control-token")
     ControlSetValue(binding, "control-token", "hello")
     ControlInvoke(binding, "control-token")
-    WindowUnbind(binding)
     WindowInput(binding, "auto", "click", "left", -40, 100, "", 25)
+    WindowUnbind(binding)
     return value, info.controlId
     """);
   Assert.Equal("uia-value", result[0]?.ToString());
