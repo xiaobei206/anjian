@@ -12,14 +12,11 @@ internal sealed class PlaybackRunner : IDisposable
 {
     private readonly WindowsInputController _input = new();
     private readonly WindowsWindowManager _windows = new();
-    private readonly WindowsControlAutomationProvider _controls;
     private readonly ExecutionGate _gate = new();
     private CancellationTokenSource? _runCts;
     private Process? _worker;
     private LuaDebugLaunchOptions? _debugLaunchOptions;
     private TaskCompletionSource<LuaDebugCommand>? _debugCommandSource;
-
-    public PlaybackRunner() => _controls = new WindowsControlAutomationProvider(_windows, _input);
 
     public event Action<string>? Log;
     public event Action<int, int>? IterationChanged;
@@ -151,7 +148,6 @@ internal sealed class PlaybackRunner : IDisposable
             worker.Dispose();
             _worker = null;
             _input.ReleaseAll();
-            _controls.ClearBindings();
             _windows.ClearReferences();
         }
     }
@@ -272,79 +268,15 @@ internal sealed class PlaybackRunner : IDisposable
                     .ConfigureAwait(false);
                 return JsonSerializer.Serialize(result);
             }
-            case "window-bind":
+            case "window-automation-target":
             {
-                var request = ReadWindowPayload<WindowBindingRequest>(message.Text);
-                return _controls.Bind(request.WindowId);
-            }
-            case "window-unbind":
-            {
-                var request = ReadWindowPayload<WindowBindingIdRequest>(message.Text);
-                return JsonSerializer.Serialize(_controls.Unbind(request.BindingId));
-            }
-            case "window-capabilities":
-            {
-                var request = ReadWindowPayload<WindowBindingIdRequest>(message.Text);
-                return JsonSerializer.Serialize(_controls.GetCapabilities(request.BindingId), WindowApiJson.Options);
-            }
-            case "control-enumerate":
-            {
-                var request = ReadWindowPayload<ControlEnumerateRequest>(message.Text);
-                return JsonSerializer.Serialize(_controls.Enumerate(request.BindingId, request.MaxResults), WindowApiJson.Options);
-            }
-            case "control-get-info":
-            {
-                var request = ReadWindowPayload<ControlReferenceRequest>(message.Text);
-                return JsonSerializer.Serialize(_controls.GetInfo(request.BindingId, request.ControlId), WindowApiJson.Options);
-            }
-            case "control-get-value":
-            {
-                var request = ReadWindowPayload<ControlReferenceRequest>(message.Text);
-                return JsonSerializer.Serialize(_controls.GetValue(request.BindingId, request.ControlId));
-            }
-            case "control-set-value":
-            {
-                var request = ReadWindowPayload<ControlSetValueRequest>(message.Text);
-                _controls.SetValue(request.BindingId, request.ControlId, request.Value);
-                return JsonSerializer.Serialize(true);
-            }
-            case "control-get-text":
-            {
-                var request = ReadWindowPayload<ControlReferenceRequest>(message.Text);
-                return JsonSerializer.Serialize(_controls.GetText(request.BindingId, request.ControlId));
-            }
-            case "control-get-selection":
-            {
-                var request = ReadWindowPayload<ControlReferenceRequest>(message.Text);
-                return JsonSerializer.Serialize(_controls.GetSelection(request.BindingId, request.ControlId), WindowApiJson.Options);
-            }
-            case "control-select":
-            {
-                var request = ReadWindowPayload<ControlReferenceRequest>(message.Text);
-                _controls.Select(request.BindingId, request.ControlId);
-                return JsonSerializer.Serialize(true);
-            }
-            case "control-get-toggle":
-            {
-                var request = ReadWindowPayload<ControlReferenceRequest>(message.Text);
-                return JsonSerializer.Serialize(_controls.GetToggleState(request.BindingId, request.ControlId));
-            }
-            case "control-toggle":
-            {
-                var request = ReadWindowPayload<ControlReferenceRequest>(message.Text);
-                _controls.Toggle(request.BindingId, request.ControlId);
-                return JsonSerializer.Serialize(true);
-            }
-            case "control-invoke":
-            {
-                var request = ReadWindowPayload<ControlReferenceRequest>(message.Text);
-                _controls.Invoke(request.BindingId, request.ControlId);
-                return JsonSerializer.Serialize(true);
+                var request = ReadWindowPayload<WindowReferenceRequest>(message.Text);
+                return JsonSerializer.Serialize(_windows.GetAutomationTarget(request.Id), WindowApiJson.Options);
             }
             case "window-input":
             {
                 var request = ReadWindowPayload<WindowInputRequest>(message.Text);
-                await _controls.SendInputAsync(request, token).ConfigureAwait(false);
+                await SendWindowInputAsync(request, token).ConfigureAwait(false);
                 return JsonSerializer.Serialize(true);
             }
             case "coordinate-to-screen":
@@ -359,6 +291,55 @@ internal sealed class PlaybackRunner : IDisposable
         }
 
         return null;
+    }
+
+    private async Task SendWindowInputAsync(WindowInputRequest request, CancellationToken token)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var backend = request.Backend.Trim().ToLowerInvariant();
+        if (backend is not ("auto" or "foreground"))
+            throw new InvalidOperationException("Unsupported: M7 未提供通用后台鼠标/键盘/文本注入；请使用 UIA 控件操作或明确前台后端。");
+        var action = request.Action.Trim().ToLowerInvariant();
+        var info = _windows.GetInfo(request.WindowId);
+        if (!info.Visible || info.Minimized || !_windows.IsForeground(request.WindowId))
+            throw new InvalidOperationException("目标窗口不可见、已最小化或不是前台窗口；不会自动抢占焦点。");
+        switch (action)
+        {
+            case "move":
+            case "click":
+            {
+                var c = info.ClientRect;
+                if (request.X < c.Left || request.X >= c.Right || request.Y < c.Top || request.Y >= c.Bottom)
+                    throw new ArgumentOutOfRangeException(nameof(request), "move/click 坐标必须位于目标客户区（屏幕物理像素）。");
+                if (!_windows.IsForeground(request.WindowId))
+                    throw new InvalidOperationException("目标窗口失去前台状态，拒绝输入。");
+                _input.MoveTo(request.X, request.Y);
+                if (action == "click")
+                {
+                    var button = request.Name.Trim().ToLowerInvariant();
+                    if (button is not ("left" or "right" or "middle"))
+                        throw new ArgumentException("click name 必须为 left/right/middle。", nameof(request));
+                    await _input.ClickAsync(button, request.HoldMilliseconds, token).ConfigureAwait(false);
+                }
+                break;
+            }
+            case "key-press":
+                if (!info.Focused || !_windows.IsForeground(request.WindowId))
+                    throw new InvalidOperationException("目标窗口必须是前台窗口且窗口内有键盘焦点；不会自动转移焦点。");
+                if (string.IsNullOrWhiteSpace(request.Name))
+                    throw new ArgumentException("key-press 必须提供按键名称。", nameof(request));
+                await _input.KeyPressAsync(request.Name, request.HoldMilliseconds, token).ConfigureAwait(false);
+                break;
+            case "text":
+                if (request.Value.Length > 100000)
+                    throw new ArgumentOutOfRangeException(nameof(request), "单次文本最多 100000 个字符。");
+                if (!info.Focused || !_windows.IsForeground(request.WindowId))
+                    throw new InvalidOperationException("目标窗口必须是前台窗口且窗口内有键盘焦点；不会自动转移焦点。");
+                _input.TypeText(request.Value, token);
+                break;
+            default:
+                throw new ArgumentException("action 必须是 move/click/key-press/text。", nameof(request));
+        }
     }
 
     private static T ReadWindowPayload<T>(string? json) =>

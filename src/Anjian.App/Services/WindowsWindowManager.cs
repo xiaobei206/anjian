@@ -45,6 +45,15 @@ internal sealed class WindowsWindowManager : IDisposable
     /// <summary>Returns a validated HWND only to in-process Windows adapters; it is never serialized to Lua.</summary>
     public nint GetValidatedHandle(string id) => Resolve(id).Handle;
 
+    // Internal short-lived descriptor sent only over the private local named pipe.
+    public WindowAutomationTarget GetAutomationTarget(string id)
+    {
+        var r = Resolve(id);
+        return new WindowAutomationTarget(
+            r.Id, r.Handle.ToInt64(), checked((int)r.ProcessId), r.ThreadId,
+            r.ClassName, r.ProcessStartTicks, r.IsChild);
+    }
+
     /// <summary>Checks the top-level foreground window without activating or stealing focus.</summary>
     public bool IsForeground(string id)
     {

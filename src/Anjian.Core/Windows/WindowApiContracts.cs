@@ -65,15 +65,15 @@ public sealed record WindowBindingIdRequest(string BindingId);
 public sealed record ControlEnumerateRequest(string BindingId, int MaxResults);
 public sealed record ControlReferenceRequest(string BindingId, string ControlId);
 public sealed record ControlSetValueRequest(string BindingId, string ControlId, string Value);
+// Internal one-run descriptor sent only over the local named pipe to the isolated worker.
+// Handle is never registered as or returned from a Lua API.
+public sealed record WindowAutomationTarget(
+    string WindowId, long Handle, int ProcessId, uint ThreadId,
+    string ClassName, long ProcessStartTicks, bool IsChild);
+
 public sealed record WindowInputRequest(
-    string BindingId,
-    string Backend,
-    string Action,
-    string Name,
-    int X,
-    int Y,
-    string Value,
-    int HoldMilliseconds);
+    string WindowId, string Backend, string Action, string Name,
+    int X, int Y, string Value, int HoldMilliseconds);
 
 public sealed record AutomationCapability(
     string Name,
@@ -101,3 +101,24 @@ public sealed record ControlElementInfo(
     bool IsKeyboardFocusable,
     bool IsPassword,
     IReadOnlyList<string> SupportedPatterns);
+
+
+/// <summary>Worker-local UI Automation adapter inside the killable Lua worker.</summary>
+public interface IWindowAutomationService : IDisposable
+{
+    string Bind(WindowAutomationTarget target);
+    string GetWindowId(string bindingId);
+    bool Unbind(string bindingId);
+    void ClearBindings();
+    WindowAutomationCapabilities GetCapabilities(string bindingId);
+    IReadOnlyList<ControlElementInfo> Enumerate(string bindingId, int maxResults);
+    ControlElementInfo GetInfo(string bindingId, string controlId);
+    string GetValue(string bindingId, string controlId);
+    void SetValue(string bindingId, string controlId, string value);
+    string GetText(string bindingId, string controlId);
+    IReadOnlyList<string> GetSelection(string bindingId, string controlId);
+    void Select(string bindingId, string controlId);
+    string GetToggleState(string bindingId, string controlId);
+    void Toggle(string bindingId, string controlId);
+    void Invoke(string bindingId, string controlId);
+}
