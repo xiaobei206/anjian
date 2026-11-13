@@ -346,7 +346,7 @@ public static class PluginPackageValidator
         string modulesRoot, string moduleName, IEnumerable<string> manifestFilePaths)
     {
         var root = NormalizeRelativePath(modulesRoot);
-        if (!LuaModuleNamePattern.IsMatch(moduleName ?? ""))
+        if (string.IsNullOrWhiteSpace(moduleName) || !LuaModuleNamePattern.IsMatch(moduleName))
             throw new InvalidDataException("插件 API 模块名不合法：" + moduleName);
         var relative = moduleName.Replace('.', '/');
         var candidates = new[] { root + "/" + relative + ".lua", root + "/" + relative + "/init.lua" };
