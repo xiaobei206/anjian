@@ -95,6 +95,7 @@ internal sealed class MainForm : Form
         _playback.SetUiOwner(this);
         RefreshPluginApiRegistry();
 
+        _playback.StateChanged += _ => Ui(SetIdle);
         _playback.Log += message => Ui(() =>
         {
             AppendLog(message);
@@ -867,7 +868,9 @@ internal sealed class MainForm : Form
         }
         finally
         {
-            _status.Text = _playback.IsRunning ? "正在运行" : "未运行";
+            _status.Text = _playback.HasActiveInstances || _playback.QueuedCount > 0
+            ? $"运行中 {_playback.ActiveCount} 个实例，排队 {_playback.QueuedCount} 个"
+            : "未运行";
         }
     }
 
@@ -1014,7 +1017,7 @@ internal sealed class MainForm : Form
 
     private void StartRecording()
     {
-        if (_recordSessionActive || _playback.IsRunning) return;
+        if (_recordSessionActive || _playback.HasActiveInstances || _playback.QueuedCount > 0) return;
         if (!SaveCurrent()) return;
         try
         {
@@ -1192,8 +1195,8 @@ internal sealed class MainForm : Form
         SaveSettings();
         _playButton.Enabled = _playback.CanAccept;
         _recordButton.Enabled = false;
-        _pauseButton.Enabled = true;
-        _stopButton.Enabled = true;
+        _pauseButton.Enabled = _playback.SelectedCanPause;
+        _stopButton.Enabled = _playback.IsRunning;
         _pauseButton.Text = "暂停";
         _status.Text = "正在运行";
         UpdateDebuggerButtons(isPaused: false);
@@ -1389,10 +1392,10 @@ internal sealed class MainForm : Form
         try
         {
             File.WriteAllText(temporaryPath, snippet, new UTF8Encoding(false));
-            _playButton.Enabled = false;
+            _playButton.Enabled = _playback.CanAccept;
             _recordButton.Enabled = false;
-            _pauseButton.Enabled = true;
-            _stopButton.Enabled = true;
+            _pauseButton.Enabled = _playback.SelectedCanPause;
+            _stopButton.Enabled = _playback.IsRunning;
             _pauseButton.Text = "暂停";
             _status.Text = "正在试运行动作";
             var runTask = _playback.RunAsync(
