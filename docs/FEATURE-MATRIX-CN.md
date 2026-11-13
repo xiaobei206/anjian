@@ -63,6 +63,12 @@
 - 电脑版窗口函数目录：https://zimaoxy.com/docs/qscript/category/窗口/
 - 前台/后台相对坐标基础说明：https://bbs.anjian.com/thread-542625-1-1.html
 
+## M8 当前实机验收执行边界（2026-11-13）
+
+- M8 代码和自动化测试证据：Windows Actions run [43358188770](https://github.com/xiaobei206/anjian/actions/runs/43358188770)，85/85 Core tests、Release Build 0 warnings / 0 errors、API 手册检查、自包含发布与 artifact 上传均 PASS。
+- 本轮执行环境为 Debian 13，无 .NET SDK、无 Windows 桌面会话，也无法交互访问用户 Windows 桌面；因此未执行 M8-01..M8-18。上述 18 项状态全部仍是 NOT RUN。Windows Server 2025 CI 不构成 Windows 10/11 桌面实测证据。
+- F16/F17/F18 继续保持部分实现；M8 不得标 DONE，不能据 CI 结果推断 GDI、DPI、多屏、资源 UI、overlay 点击穿透或 Display Affinity 实测通过。
+
 ## 变更纪律
 
 - 如需删减完整产品目标，必须明确向用户说明影响并获得用户确认；不得通过把项目号改成 P2 或重排路线图来悄悄删除功能。
