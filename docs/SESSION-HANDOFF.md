@@ -398,7 +398,7 @@ M4 基础调试器已在 main 实现并通过 Windows CI。具体实现提交与
 ## 当前 HEAD / CI
 - 当前 main HEAD 在更新本文档前为 `45454f4ec7397544d878b5371b9c07dedd90d504`，包含两项额外 Core validator tests。
 - 代码基线 commit `64c981382b2cc9dfec4b0a87084a6e8f3c8860c3` 的 Windows Actions run [43366381240](https://github.com/xiaobei206/anjian/actions/runs/43366381240) SUCCESS：Restore、Build 0 warnings/errors、98/98 tests、API handbook check、self-contained win-x64 publish、ZIP/SHA256、artifact upload 全 PASS。artifact ID 14011010562，87,098,604 bytes，digest `7d5f988b7cdaabd3f0c3db2fe3f9b8c1ecb2fb205ee9963ca3614c745dc12b17`。
-- 当前 HEAD 新增 2 项 Core tests（数值/相对路径/正则；可选空值与必填空值），run [43366600434](https://github.com/xiaobei206/anjian/actions/runs/43366600434) 尚待验证。不得把旧 run 的 98/98 写成当前 HEAD 的 100/100。
+- 当前 M10 代码 commit `45454f4ec7397544d878b5371b9c07dedd90d504` 新增 2 项 Core tests（数值/相对路径/正则；可选空值与必填空值），run [43366600434](https://github.com/xiaobei206/anjian/actions/runs/43366600434) SUCCESS：100/100 Core tests、Build 0 warnings/errors、API handbook check、自包含发布、ZIP/SHA256 与 artifact upload 全 PASS。artifact ID 14009953905，87,098,620 bytes，digest `da291400de9917568941c927d441e1df7cec3e6daf6a2ca877b9ec83cce7cd88`。后续文档同步提交只改文档；其新触发 CI 结果须按最新 HEAD 重新核对。
 - M1–M13 Windows 桌面验收统一延期 M14 后，所有未执行项保持 NOT RUN；M14 发布必须等待用户集中验收和缺陷修复。
 
 ## M10 已实现首轮范围
@@ -412,6 +412,6 @@ M4 基础调试器已在 main 实现并通过 Windows CI。具体实现提交与
 1. 先核对 main 最新 HEAD，并读取 AGENTS、README、handoff、ROADMAP、PRD 2.9/2.13、F20/F26、ARCHITECTURE、DECISIONS、registry 和 Worker IPC。
 2. 检查 run 43366600434；若失败，按真实 job log 修复。目标是 100/100 Core tests、0 warnings/errors、API handbook check、self-contained win-x64/ZIP/SHA256/artifact 全 PASS。
 3. 补齐 M10 自动化边界：路径/正则/数值/多选/空值/敏感参数与配置恢复；检查参数默认值路径相对脚本目录的语义、损坏/未来 schema 的保护和导入/导出行为。修正后重新跑完整 CI。
-4. 复核 UI/Worker 启动顺序：schema 读取不执行 Lua；校验失败或用户取消绝不启动 Worker；播放与调试收到相同 typed Args；普通日志不得输出参数值。
+4. 复核 UI/Worker 启动顺序：schema 读取不执行 Lua；校验失败或用户取消绝不启动 Worker；播放与调试收到相同 typed Args；普通日志不得输出参数值。代码基线 CI 已 100/100 PASS，但仍需对剩余 edge cases 做代码审查/测试。
 5. M10 的真实 WinForms DPI/交互和运行时验收仍延期 M14；不要把桌面 NOT RUN 标为 PASS。M10 尚未全部完成前，不进入 M11。
 6. 不修改 VERSION、不创建 Release，不创建长期分支/PR；在本轮完成后更新 log/handoff/roadmap/feature matrix，再提交 main。
