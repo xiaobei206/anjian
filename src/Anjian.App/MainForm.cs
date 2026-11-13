@@ -1549,12 +1549,6 @@ internal sealed class MainForm : Form
         form.ShowDialog(this);
     }
 
-    private void OpenOcrModelManager()
-    {
-        using var form = new OcrModelManagerForm();
-        form.ShowDialog(this);
-    }
-
     private void OpenImageResources()
     {
         if (_recordSessionActive || _playback.IsRunning || _current is null || _activeTab is null)
