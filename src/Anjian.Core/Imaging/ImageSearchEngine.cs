@@ -103,50 +103,54 @@ public static class ImageSearchEngine
 
     public static ImageMatchPoint? FindImage(
         PixelImage source, PixelImage template, double similarity = 0.95, int tolerance = 0,
-        int left = 0, int top = 0, int width = 0, int height = 0, int step = 1, CancellationToken cancellationToken = default)
+        int left = 0, int top = 0, int width = 0, int height = 0, int step = 1,
+        bool grayscale = false, double scale = 1.0, CancellationToken cancellationToken = default)
     {
-        var matches = FindImages(source, template, similarity, tolerance, 1, left, top, width, height, step, cancellationToken);
+        var matches = FindImages(source, template, similarity, tolerance, 1, left, top, width, height, step, grayscale, scale, cancellationToken);
         return matches.Count == 0 ? null : matches[0];
     }
 
     public static IReadOnlyList<ImageMatchPoint> FindImages(
         PixelImage source, PixelImage template, double similarity = 0.95, int tolerance = 0, int maxResults = 100,
-        int left = 0, int top = 0, int width = 0, int height = 0, int step = 1, CancellationToken cancellationToken = default)
+        int left = 0, int top = 0, int width = 0, int height = 0, int step = 1,
+        bool grayscale = false, double scale = 1.0, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(template);
         ValidateSimilarity(similarity);
         ValidateTolerance(tolerance);
         ValidateStep(step);
+        ValidateScale(scale);
         if (maxResults is < 1 or > MaximumResults)
             throw new ArgumentOutOfRangeException(nameof(maxResults), $"maxResults 必须在 1 到 {MaximumResults} 之间。");
 
+        var effectiveTemplate = scale == 1.0 ? template : ResizeTemplate(template, scale, cancellationToken);
         var region = NormalizeRegion(source, left, top, width, height);
-        if (template.Width > region.Width || template.Height > region.Height)
+        if (effectiveTemplate.Width > region.Width || effectiveTemplate.Height > region.Height)
             return Array.Empty<ImageMatchPoint>();
 
-        var totalSamples = CountOpaquePixels(template, cancellationToken);
+        var totalSamples = CountOpaquePixels(effectiveTemplate, cancellationToken);
         if (totalSamples == 0)
             throw new ArgumentException("模板图像不能全部透明。", nameof(template));
         var requiredSamples = (int)Math.Ceiling(similarity * totalSamples);
         var matches = new List<ImageMatchPoint>(Math.Min(maxResults, 16));
         long comparisons = 0;
 
-        var lastY = region.Top + region.Height - template.Height;
-        var lastX = region.Left + region.Width - template.Width;
+        var lastY = region.Top + region.Height - effectiveTemplate.Height;
+        var lastX = region.Left + region.Width - effectiveTemplate.Width;
         for (var y = region.Top; y <= lastY && matches.Count < maxResults; y += step)
         {
             cancellationToken.ThrowIfCancellationRequested();
             for (var x = region.Left; x <= lastX && matches.Count < maxResults;)
             {
-                var score = ScoreAt(source, template, x, y, tolerance, totalSamples, requiredSamples, ref comparisons, cancellationToken);
+                var score = ScoreAt(source, effectiveTemplate, x, y, tolerance, totalSamples, requiredSamples, grayscale, ref comparisons, cancellationToken);
                 if (score >= similarity)
                 {
                     var candidate = CreatePoint(source, x, y, score);
-                    if (!OverlapsExisting(candidate, template.Width, template.Height, matches))
+                    if (!OverlapsExisting(candidate, effectiveTemplate.Width, effectiveTemplate.Height, matches))
                     {
                         matches.Add(candidate);
-                        x += Math.Max(step, template.Width);
+                        x += Math.Max(step, effectiveTemplate.Width);
                     }
                     else
                     {
@@ -161,6 +165,38 @@ public static class ImageSearchEngine
         }
 
         return matches;
+    }
+
+    public static PixelImage ResizeTemplate(PixelImage template, double scale, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(template);
+        ValidateScale(scale);
+        if (scale == 1.0)
+            return template;
+
+        var widthDouble = Math.Round(template.Width * scale, MidpointRounding.AwayFromZero);
+        var heightDouble = Math.Round(template.Height * scale, MidpointRounding.AwayFromZero);
+        if (!double.IsFinite(widthDouble) || !double.IsFinite(heightDouble)
+            || widthDouble < 1 || heightDouble < 1
+            || widthDouble > PixelImage.MaximumDimension || heightDouble > PixelImage.MaximumDimension
+            || widthDouble * heightDouble > PixelImage.MaximumPixelCount)
+            throw new ArgumentOutOfRangeException(nameof(scale), "缩放后的模板尺寸超出图像资源限制。");
+
+        var width = checked((int)widthDouble);
+        var height = checked((int)heightDouble);
+        var sourcePixels = template.CopyArgbPixels();
+        var result = new uint[checked(width * height)];
+        for (var y = 0; y < height; y++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var sourceY = Math.Min(template.Height - 1, (int)((long)y * template.Height / height));
+            for (var x = 0; x < width; x++)
+            {
+                var sourceX = Math.Min(template.Width - 1, (int)((long)x * template.Width / width));
+                result[y * width + x] = sourcePixels[sourceY * template.Width + sourceX];
+            }
+        }
+        return new PixelImage(width, height, result);
     }
 
     public static ImageSearchRegion NormalizeRegion(
@@ -216,14 +252,24 @@ public static class ImageSearchEngine
         return probes;
     }
 
-    public static bool ColorsMatch(uint actual, uint expected, int tolerance)
+    public static bool ColorsMatch(uint actual, uint expected, int tolerance, bool grayscale = false)
     {
         ValidateTolerance(tolerance);
         actual &= 0xFFFFFF;
         expected &= 0xFFFFFF;
+        if (grayscale)
+            return Math.Abs(Gray(actual) - Gray(expected)) <= tolerance;
         return Math.Abs((int)((actual >> 16) & 0xFF) - (int)((expected >> 16) & 0xFF)) <= tolerance
             && Math.Abs((int)((actual >> 8) & 0xFF) - (int)((expected >> 8) & 0xFF)) <= tolerance
             && Math.Abs((int)(actual & 0xFF) - (int)(expected & 0xFF)) <= tolerance;
+    }
+
+    private static int Gray(uint rgb)
+    {
+        var red = (int)((rgb >> 16) & 0xFF);
+        var green = (int)((rgb >> 8) & 0xFF);
+        var blue = (int)(rgb & 0xFF);
+        return (red * 299 + green * 587 + blue * 114 + 500) / 1000;
     }
 
     private static bool OverlapsExisting(
@@ -242,7 +288,7 @@ public static class ImageSearchEngine
 
     private static double ScoreAt(
         PixelImage source, PixelImage template, int originX, int originY,
-        int tolerance, int totalSamples, int requiredSamples, ref long comparisons, CancellationToken cancellationToken)
+        int tolerance, int totalSamples, int requiredSamples, bool grayscale, ref long comparisons, CancellationToken cancellationToken)
     {
         var matched = 0;
         var examined = 0;
@@ -261,7 +307,7 @@ public static class ImageSearchEngine
                         $"模板搜索超过 {MaximumPixelComparisons:N0} 次像素比较上限；请缩小区域/模板或增大 step。");
 
                 examined++;
-                if (ColorsMatch(source.GetPixelColor(originX + x, originY + y), expected & 0xFFFFFF, tolerance))
+                if (ColorsMatch(source.GetPixelColor(originX + x, originY + y), expected & 0xFFFFFF, tolerance, grayscale))
                     matched++;
 
                 if (matched + (totalSamples - examined) < requiredSamples)
@@ -308,5 +354,11 @@ public static class ImageSearchEngine
     {
         if (!double.IsFinite(similarity) || similarity is < 0 or > 1)
             throw new ArgumentOutOfRangeException(nameof(similarity), "相似度阈值必须在 0 到 1 之间。");
+    }
+
+    private static void ValidateScale(double scale)
+    {
+        if (!double.IsFinite(scale) || scale is < 0.25 or > 4.0)
+            throw new ArgumentOutOfRangeException(nameof(scale), "模板 scale 必须在 0.25 到 4 之间。");
     }
 }
