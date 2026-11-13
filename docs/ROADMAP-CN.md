@@ -23,7 +23,7 @@
 | M10 参数、配置与脚本自定义 UI | DONE（实现与 Windows 自动化验收完成；WinForms/桌面实测延期 M14） | 参数 sidecar schema v1、10 种类型、统一 validator、配置持久化/恢复、播放/调试前表单、参数设计器、JSON 导入导出、typed Worker IPC、递归只读 Lua Args、脚本目录相对路径解析 |
 | M11 小精灵打包器 | DONE（Windows CI run 229 PASS；WinForms/DPI/真实输入桌面验收延期 M14，NOT RUN） | 独立便携目录 + EXE 启动 ZIP、依赖/资源收集、M10 参数 UI、运行控制、manifest/SHA256、构建日志与离线函数参考 Markdown |
 | M12 内置扩展 API 与插件系统 | DONE（M12-01..M12-12 实现与 Windows CI 自动化完成；WinForms/权限/DPI/多屏桌面验收延期 M14） | 文件/剪贴板/对话框/进程/HTTP(S)/JSON 双层授权；本地插件 manifest/hash/三方 Grant 交集、入口 sidecar 与受限 Lua contribution；内置 API registry 1.2 / 103 |
-| M13 多实例与定时任务 | IN_PROGRESS（M13-01/02 DONE；M13-03 下一步） | M13-02 已完成并通过 Windows Actions：4 active + 16 FIFO、独立 Worker/Grant/源码快照、IPC identity/PID 绑定、全局 InputArbiter、独立 Stop 与 Worker crash 隔离；定时/周期触发、用户运行超时/重试和完整实例管理 UI 尚未实现 |
+| M13 多实例与定时任务 | IN_PROGRESS（M13-01/02/03 实现完成；M13-04 下一步） | M13-03 已实现一次性/延迟/每日/每周调度、本地时区/DST/misfire、持久化游标、重叠策略、每实例超时与 Stop/Continue/Retry；Windows CI 与最终代码 HEAD 验证待本轮执行；完整实例列表/筛选/日志/恢复 UI 留 M13-04 |
 | M14 1.0 稳定化与发布 | TODO | 自动与手工验收、依赖许可、离线帮助、性能/长时测试和正式稳定版发布 |
 
 ## 统一 Windows 桌面实机验收策略（用户决定，2026-11-13）
@@ -417,7 +417,7 @@ M13-01 不是新 release；不得以设计文件代替实现测试证据，也�
 - 每实例独立 PlaybackRunner、Worker/Lua state、CancellationTokenSource/Pause gate、ScriptProcessSession、HTTP/Window/Image/debug 状态、参数快照、权限 Grant 快照及普通脚本源码快照。每次 Start 仍独立走原权限审阅；不按脚本路径共享 Grant。
 - 每个 Worker attempt 有随机 workerAttemptId/nonce，IPC 消息与响应逐条核验；宿主在 named pipe 建立后读取 OS client PID，必须匹配本实例刚启动的 Worker PID。Worker 不接收或覆盖宿主 Grant；进程句柄只存在所属 ScriptProcessSession。
 - 主进程 FIFO InputArbiter 串行化 SendInput/SetCursorPos；Down 租约由 owner 持有至 Up，原子 Click/KeyPress/TypeText 不交错；Stop/Worker exit 仅清理本实例 held 输入。释放失败锁定新输入并提供人工检查/恢复入口。
-- MainForm 已连接 Start/Pause/Stop-selected 与明确退出 StopAll；关闭主窗体隐藏到托盘仍继续运行。完整实例列表、切换/筛选与独立日志浏览留 M13-04。M13-03 的定时器、用户配置运行超时和重试尚未实现。
+- MainForm 已连接 Start/Pause/Stop-selected 与明确退出 StopAll；关闭主窗体隐藏到托盘仍继续运行。M13-03 已新增调度服务、任务配置、实例运行超时与失败策略；完整实例列表、切换/筛选与独立日志浏览留 M13-04。
 - M14 的 Windows 10/11 实际键鼠、WinForms、DPI、多显示器、托盘/退出与长时稳定性仍 NOT RUN；不得以发布包 smoke 代替桌面验收。
 
 ### M13-02 Windows Actions 最终验收（2026-11-14）
@@ -427,3 +427,18 @@ M13-01 不是新 release；不得以设计文件代替实现测试证据，也�
 - Actions artifact ID 14056846918，87,318,097 bytes，uploaded artifact archive SHA-256 393bd08c9da97368cb9ddb39c0de790000befa9ecad27ce161accaf8892987c8；临时 Actions artifact，不是 GitHub Release。
 - 早期 package crash smoke run 43460703769 / 43460805818 / 43460823813 / 43460841956 失败揭示 Worker 在 host IPC Delay 中途退出不能及时取消 dispatch；已在 PlaybackRunner 中同时监听 Worker process exit、取消当前 dispatch，并覆盖 pipe connect / worker-ready handshake；最终 HEAD 对应 run 全通过。
 - 本地容器没有 .NET SDK，local Restore/Build/Test NOT RUN。Windows 10/11 实际键鼠输入、WinForms、DPI/多屏、托盘/退出与长时稳定性仍 NOT RUN（M14）。
+
+
+## M13-03 — 单次/延迟/定时/周期触发、运行超时与失败策略（代码实现完成；Windows CI 待验）
+
+- Core 新增 ScheduledTaskDefinition、ScheduledTaskEngine、ScheduledTaskCalculator、ScheduledTaskPolicy 与 RunInstanceTimeoutTracker；调度使用可注入 TimeProvider，日历推进不依赖 Thread.Sleep。
+- 触发类型：创建时间起算的一次性延迟、UTC 存储/指定 Windows 时区本地时刻的一次性任务、每日和每周本地时刻。每个任务保存时区 ID；DST 不存在时间向前顺延到首个有效分钟，DST 歧义时间选择产生较早 UTC instant 的 offset。
+- Misfire 规则：正常调度轮询容差 2 分钟；超过容差视为错过触发。Skip 丢弃该次并推进游标；RunOnce 仅当最近一次错过时间仍在配置宽限期内补跑一次；多次错过只处理最近一次，不无限追赶。
+- 应用将 schemaVersion=1 的任务定义与游标原子写入 %LOCALAPPDATA%\Anjian2026\scheduled-tasks.json，替换前保留 .bak。应用重启读取最后处理时间/下一次触发；游标在投递前持久化，选择 at-most-once，避免断电重放造成重复桌面输入（极窄的 persist-before-dispatch 崩溃窗口可能丢失一次触发，明确不保证 exactly-once）。
+- 重叠策略：Skip 忽略新触发；QueueOne 保留一个待执行 occurrence，后续触发合并；Parallel 可并行，但所有实例仍由 M13-02 4 active + 16 FIFO admission 限制。全局容量满时暂存一个触发，待容量恢复后重试 admission。禁用/删除清除尚未启动的 pending 并阻止新 retry；已进入 RunInstanceCoordinator 的实例继续按原快照运行。编辑只影响未来触发，正在执行的 occurrence/retry 保留当时定义快照。
+- occurrence key 由 taskId + scheduled UTC ticks 组成；每次 attempt 的 startRequestId 由 taskId + occurrence key + attempt 序号稳定哈希生成，重试创建新的 instanceId/Worker attempt，并重新收集参数、逐次审阅 Grant。绝不把 retry 当成同一 startRequestId 重复派发。
+- 用户运行超时允许 1 秒至 7 天；手动播放工具栏以分钟配置并持久化，定时任务可各自覆盖。计时仅从 Worker worker-ready 首次转入 Running 时开始，Starting/权限审阅/FIFO queue 不计入；Pause 仍计入墙钟 elapsed。Stop 与 timeout 通过同一个 coordinator lock 提交，先提交者获胜，之后复用 Runner.Stop / Worker 宽限 / owner-only 输入清理。
+- 失败策略：Stop 首次失败即禁用任务；Continue 记录失败并等下次计划；Retry 按 1–10 次上限及 1 秒至 1 小时基础延迟、1–10 退避倍数（单次延迟封顶 1 小时）新建实例重试；连续失败达到 1–1000 配置上限时禁用任务。参数取消/权限拒绝视为本次取消，不将其算作脚本失败；清理失败立即禁用调度，避免错误输入状态下继续注入。
+- MainForm 新增“定时任务”入口、任务列表/编辑、启停/删除和可持久化手动运行超时。任务触发时在 UI 线程收集参数并逐次弹出权限审阅；Close-to-tray 不停止调度，明确退出先停止调度投递，再执行 M13-02 StopAll。
+- 自动化计划包含 DST/时区/misfire/重复投递/重叠/队列取消/禁用恢复/超时 Pause 语义/Stop-timeout race/retry/backoff/应用重启 cursor 等 deterministic tests。真实 WinForms、Windows 10/11 权限提示、DPI/多屏、真实键鼠和长期运行仍 NOT RUN（M14）。
+- 本轮不增加 Lua API，不改变 registry 1.2 / 103，不修改 VERSION/AssemblyVersion/FileVersion，不创建 tag/Release。

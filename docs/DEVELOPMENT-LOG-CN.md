@@ -890,3 +890,21 @@ M4 基础调试器与 M5 可视化录制/动作列表均已完成 Windows CI 验
 - Artifact ID 14056846918，87,318,097 bytes，archive SHA-256 393bd08c9da97368cb9ddb39c0de790000befa9ecad27ce161accaf8892987c8；临时 Actions artifact，非 GitHub Release。
 - 中间失败记录保留：首次运行 `43460703769`、`43460805818`、`43460823813`、`43460841956` 失败均由新 crash smoke 暴露 Worker crash/host IPC 耦合问题；修复后最终 run 43461688129 全 PASS。
 - 本地环境无 .NET SDK，Restore/Build/Test NOT RUN。Windows 10/11 桌面输入、KeyUp 清理、DPI/多屏、WinForms 托盘/退出与长时稳定性 NOT RUN（M14）。
+
+## 2026-11-14 — M13-03 — 定时调度、运行超时与失败策略（代码实现批次）
+
+### 实现目标
+按 SESSION-HANDOFF.md 唯一任务 M13-03 实现确定性触发模型、时区/DST/misfire 规则、重叠/恢复/失败策略，以及从 Running 起算的运行超时；不提前做 M13-04。
+
+### 本批代码
+- Core 新增 Schedule definition/engine/calculator/policy、occurrence+attempt 幂等键和 TimeProvider 驱动的运行超时 tracker。
+- 触发覆盖一次性延迟、指定 UTC instant（UI 输入任务本地时间并解析入 UTC）、每日/每周本地时区时间；DST gap/overlap 规则冻结，错过触发只处理最近一次并受 grace 限制。
+- App 新增 schemaVersion=1 ScheduledTaskStore、每秒 Scheduler Service、misfire cursor 原子持久化、Skip/QueueOne/Parallel 重叠管理及 Stop/Continue/有限 Retry/backoff/连续失败禁用。
+- MainForm 增加定时任务入口、任务编辑/启停/删除、每次 occurrence/retry 的参数采集与权限审阅，以及手动运行超时分钟项持久化。所有触发继续经 M13-02 RunInstanceRuntimeCoordinator admission/Worker/IPC/InputArbiter。
+- Runtime timeout 从首次 WorkerReady/Running 开始，Running 与 Paused 都计时；Stop/timeout 的胜者由同一个 coordinator 锁下的首次状态转换确定，并复用 Worker stop 与输入清理。
+- 未增加 Lua API，registry 仍为 1.2 / 103；未修改版本号/tag/Release。
+
+### 验证状态
+- 新增 ScheduledTaskSchedulerTests（TimeProvider deterministic tests），覆盖时区/DST/misfire、延迟/一次性触发、游标重启、重叠/失败 policy、超时与 Stop-timeout race、禁用期间跳过和编辑一次性任务重置。
+- 本地容器无 .NET SDK，Restore/Build/Test NOT RUN；需以 Windows Actions 最终 HEAD 结果覆盖此临时状态。
+- Windows 10/11 WinForms 权限提示、真实键鼠、DPI/多屏、托盘/退出和长时稳定性均 NOT RUN（M14）。

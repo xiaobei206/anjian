@@ -574,3 +574,24 @@ M12-09 只实现有上限的显式 HTTP 缓冲请求；不代表大文件流式�
 - Actions artifact ID 14056846918，87,318,097 bytes，archive SHA-256 393bd08c9da97368cb9ddb39c0de790000befa9ecad27ce161accaf8892987c8；临时 artifact，非 Release。
 - 调试收敛记录：多 Worker 初版 smoke 揭示 Worker 被杀时 host 可能仍等待 Delay IPC；PlaybackRunner 已修复为在 pipe connect、worker-ready handshake 和 dispatch 过程中同时监视 Worker 进程退出并取消当前请求。早期失败 run 保留在 Actions 历史，最终 run 43461688129 覆盖并通过。
 - 本地 Restore/Build/Test NOT RUN（容器无 .NET SDK）；Windows 10/11 实际键鼠输入/KeyUp、WinForms、DPI/多屏、托盘退出、2 小时稳定性继续 NOT RUN（M14）。
+
+## M13-03 定时、超时和失败策略自动化验收
+
+| ID | 验收项 | 自动化验证范围 | Windows 10/11 桌面 |
+|---|---|---|---|
+| M13-03-01 | OnceAfterDelay / OnceAtUtc 触发且每个只执行一次 | ScheduledTaskSchedulerTests：可注入 ManualTimeProvider、时间推进及 cursor Exhausted | NOT RUN（M14） |
+| M13-03-02 | 每日/每周与 timezone ID | 时区映射、weekday selection、下次 occurrence 计算 | NOT RUN（M14） |
+| M13-03-03 | DST gap / overlap | Pacific DST gap 向前到 03:00；ambiguous 取较早 UTC instant | NOT RUN（M14） |
+| M13-03-04 | Misfire Skip / RunOnce / grace | 跳过、宽限期内补一次、超过宽限不补、多周期只收敛最近 occurrence | NOT RUN（M14） |
+| M13-03-05 | 重启游标与幂等 | 持久化 LastHandled/Next/Exhausted 后新 Engine 重载；occurrence attempt request ID 稳定且不同 attempt 不同 ID | NOT RUN（M14） |
+| M13-03-06 | Overlap Skip / QueueOne / Parallel | Core policy 覆盖跳过、单 pending、pending 合并、Parallel 仍由全局 admission 限流 | NOT RUN（M14） |
+| M13-03-07 | 禁用/删除/编辑与 pending | 禁用清空 pending；禁用期间错过的计划不追跑；删除阻止尚未 admission 的 retry；编辑只影响未来 occurrence | NOT RUN（M14） |
+| M13-03-08 | RuntimeTimeout 起算与 Pause 语义 | TimeProvider tracker：未 Running 不起算；首次 Running 起算；Paused 仍累计；清理后移除计时 | NOT RUN（M14） |
+| M13-03-09 | Stop/timeout 竞争 | RunInstanceCoordinator test 分别模拟 Stop 先提交和 timeout 先提交，首个 outcome 不覆盖 | NOT RUN（M14） |
+| M13-03-10 | Failure Stop / Continue / Retry | Stop 禁用、Continue 不重试、有限 retry + capped exponential backoff + consecutive failure limit | NOT RUN（M14） |
+| M13-03-11 | 真实参数/Grant/Worker 接入 | 每次 occurrence/retry 重新收集参数和权限审阅；进入 RunInstanceRuntimeCoordinator 后才启动 Worker；不绕过 4+16/InputArbiter | NOT RUN（M14） |
+| M13-03-12 | 配置持久化和损坏保护 | schemaVersion 校验、原子替换、.bak 备份、未知 schema/损坏文件不静默覆盖 | NOT RUN（M14） |
+| M13-03-13 | 关闭/托盘服务生命周期 | 隐藏到托盘时调度继续；明确退出先停止 scheduler 投递再 StopAll；需 Windows UI 手测 | NOT RUN（M14） |
+
+- M13-03 新增 ScheduledTaskSchedulerTests（TimeProvider deterministic tests）；最终 Windows Actions 成功结果将在本节追加准确 HEAD/run/测试总数。
+- M13-03 不增加 Lua API，registry 仍为 1.2 / 103；不修改 VERSION / AssemblyVersion / FileVersion；不创建 tag/Release。CI PASS 不等于 Windows 10/11 桌面实机验收。

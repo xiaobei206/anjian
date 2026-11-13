@@ -126,6 +126,15 @@ public sealed class RunInstanceCoordinator
         }
     }
 
+    public RunInstanceId GetInstanceIdForRequestId(string startRequestId)
+    {
+        ValidateRequestId(startRequestId);
+        lock (_sync)
+            return _requestIds.TryGetValue(startRequestId, out var instanceId)
+                ? instanceId
+                : throw new KeyNotFoundException($"启动请求不存在：{startRequestId}");
+    }
+
     public RunInstanceSnapshot GetSnapshot(RunInstanceId instanceId)
     {
         ArgumentNullException.ThrowIfNull(instanceId);

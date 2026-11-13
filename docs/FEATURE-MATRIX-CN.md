@@ -43,7 +43,7 @@ M1–M13 的 Windows 桌面实机验收统一延期至 M14 全部功能开发完
 | F19 | OCR | 本地识字、语言/字库配置、文本/边界框/置信度 | 已实现（Windows CI PASS，桌面验收延期至 M14 后）：PaddleOcrNet 2.4.0 App 适配层（CPU）、显式 ch/en/japan 模型管理、默认严格离线、OCR/FindText/WaitText（API 0.7/81 项）；run 43363150335 通过 90/90 Core tests、Build 0 warning/error、API check、self-contained publish 与 artifact 上传；尚未发布到 preview.4 | M9 | 语言模型下载与 SHA-256、断网识别、文本/置信度/矩形/多边形、FindText exact/contains、WaitText Pause/Stop/timeout、输入限制与多屏坐标在集中 Windows 10/11 实测通过 |
 | F20 | 脚本参数 | 参数声明、类型/默认值/范围/选项/校验/持久化 | DONE（实现/自动化）：Core schema/validator/store、Worker typed JSON、递归只读 Args、运行时脚本相对路径解析和未来 schema 防覆盖已完成；Windows CI run 43368224862 的 102/102 tests PASS；WinForms/Windows 桌面验收 M14 后 | M10 | 启动前校验，参数 UI 与脚本取值一致，配置可迁移 |
 | F21 | 变量与流程 | Lua 原生变量/表/循环/函数、模块与可复用函数库 | Lua 原生语法可用；模块/工程集成部分 | M3/M10 | 示例库、模块查找和错误传播测试通过 |
-| F22 | 运行选项 | 次数、轮间隔、热键、超时、错误策略和运行实例状态 | 部分实现：次数/轮间隔、F10/F11/F12；M13-02 已提供选中实例 Pause/Resume/Stop 与 4+16 容量反馈；用户超时/错误重试策略待 M13-03，完整实例列表待 M13-04 | M1/M10/M13 | 主/悬浮窗同步、持久化、独立实例停止/暂停、超时和失败策略通过 |
+| F22 | 运行选项 | 次数、轮间隔、热键、超时、错误策略和运行实例状态 | 部分实现（M13-01..03）：次数/轮间隔、F10/F11/F12；手动播放超时分钟数持久化；超时从 Worker 首次 Running 起算，Paused 仍计入；定时任务可单独配置超时、Stop/Continue/有限 Retry 与连续失败上限；选中实例 Pause/Resume/Stop 和 4+16 容量反馈已实现；完整实例列表待 M13-04 | M1/M10/M13 | 主/悬浮窗同步、持久化、独立实例停止/暂停、超时和失败策略通过 |
 | F23 | 日志与诊断 | 结构化日志、级别/脚本/行号、导出、轮转、可复制错误报告 | 部分实现 | M2/M10 | Lua 运行失败可关联行号，日志脱敏且可导出 |
 | F24 | 小精灵打包器 | 独立运行包/EXE 入口、独立 UI、参数表单、图标、资源依赖 | DONE（M11 + M12-11 main；Windows Actions run 43436997492 的 self-contained 包/Worker smoke PASS；权限审阅 UI/DPI 实机验收仍留 M14） | M11/M12 | 干净 Windows 用户环境无需 IDE 即能运行生成包；每个入口权限请求不串用且逐次审阅 |
 | F25 | 打包完整性 | manifest、依赖检查、SHA256、版本/API 最低要求、配置迁移 | DONE（逐文件 SHA256、清单闭合校验、路径/资源/schema/OCR 验证、稳定 PackageId/EntryId；M12-11 侧车按入口绑定并纳入 manifest/hash，启动时复核；Windows Actions run 43436997492 全 PASS） | M11/M12 | 损坏/缺失资源与权限侧车篡改能被检测；manifest、SHA256 和授权审阅依据一致 |
@@ -52,7 +52,7 @@ M1–M13 的 Windows 桌面实机验收统一延期至 M14 全部功能开发完
 | F28 | 文件/目录/剪贴板 | 受控文件操作、剪贴板、对话框与常用数据 API | PARTIAL：受控文件/目录 13 项与剪贴板/对话框 5 项 API 已实现；均使用本次 Grant 双层校验；Windows Actions run 43408020908 的 147/147 tests、Build、API handbook、自包含发布与 Sprite/Worker smoke 全 PASS；真实桌面交互待 M14 | M12 | 文件权限/链接/上限/取消契约测试；剪贴板读写、三类对话框、默认拒绝、伪造 IPC 与主线程/停止路径验证 |
 | F29 | 进程/应用控制 | 启动、等待、查询、明确权限的结束操作 | PARTIAL：StartProcess/WaitProcess/GetProcessInfo 已实现；Windows Actions run 43414530292 的 152/152 tests、0 warnings/errors、API handbook、win-x64 发布、Sprite/Worker smoke、ZIP/SHA 与 artifact 上传全 PASS；不提供任意进程终止/Shell，桌面验收 M14 | M12 | 精确路径默认拒绝；参数边界；超时/Stop/Pause；查询退出码；句柄不可跨会话或查询任意 PID |
 | F30 | 网络/JSON | 显式 HTTP(S)、超时、状态码、JSON、上传/下载 | PARTIAL：HttpRequest 已实现；Windows Actions run 43427860126 的 161/161 Core tests、0 warnings/0 errors、API handbook 与自包含包 smoke 全 PASS；精确主机/方法逐次授权、HTTPS 默认、HTTP 单独批准、逐跳重定向授权、超时/Stop、1 MiB 请求体与 4 MiB 响应体上限；大文件流式上传/下载尚未实现 | M12 | 默认不自动联网；未批准主机/方法/HTTP/重定向拒绝；超时/Stop/响应上限可靠；无网络时其余功能正常 |
-| F31 | 定时与多实例 | 定时运行、独立实例、任务状态、超时和失败策略 | 部分实现（M13-01/02）：Core/App 协调器已实现 4 active + 16 FIFO、同脚本独立 Start/请求幂等、每实例 Worker/Lua/参数/源码/Grant/进程句柄隔离、Worker IPC 身份+PID 绑定、全局 FIFO InputArbiter、选中实例 Pause/Stop 和发布包 Worker 并发/崩溃 smoke；定时/周期触发、用户运行超时/重试与完整实例列表待 M13-03/04 | M13 | 实例状态、参数、日志、Lua state、权限 Grant 与句柄隔离；全局输入串行并能逐实例 Stop/清理；定时/失败策略可验证 |
+| F31 | 定时与多实例 | 定时运行、独立实例、任务状态、超时和失败策略 | 部分实现（M13-01..03）：4+16 实例协调、Worker/Grant/IPC/InputArbiter 隔离；指定时刻/延迟/每日/每周任务、本地时区与 DST、misfire、重启游标恢复、Skip/QueueOne/Parallel 重叠策略、每实例运行超时、Stop/Continue/Retry 策略已落地；完整实例列表/筛选/按实例日志/恢复 UI 留 M13-04；M14 桌面验收未执行 | M13 | 实例状态、参数、日志、Lua state、权限 Grant 与句柄隔离；全局输入串行并能逐实例 Stop/清理；定时/失败策略可验证 |
 | F32 | 扩展兼容性 | 稳定 API 版本、弃用策略、迁移说明、插件 API 约束 | 插件 manifest min/max API 兼容已实现；贡献 schema v1；运行期 extension view 不改静态内置 registry（1.2 / 103）与静态手册；Windows Actions Run 43441156420 PASS | M12 | API 不兼容、未知/未来 schema、保留名/重复名拒绝；内置公开 API 语义不静默改变 |
 | F33 | 离线文档 | 用户手册、函数手册、打包/插件开发说明和离线 HTML | 部分实现：现有 Markdown 文档分散 | M2/M14 | 发布包内文档与发行版本匹配，可断网查阅 |
 | F34 | 发布/测试 | Windows 10/11、长时稳定性、DPI/多屏、依赖许可和 SHA256 | CI 流程已接入；实机验收未完成 | M1/M14 | 测试报告、版本、ZIP、SHA256 和 release 一致 |
@@ -93,4 +93,4 @@ F31 从 M13-01 的“契约/状态模型部分实现”更新为 M13-02“运行
 
 - F31 的多实例运行时部分已完成：Windows Actions [43461688129](https://github.com/xiaobei206/anjian/actions/runs/43461688129) 对代码 HEAD d6854f872a36263f6e3658eb9cf2b7e9f252c947 SUCCESS，202/202 Core tests、0 warnings/errors、自包含 win-x64 发布、Sprite/Plugin/MultiInstance Worker smoke 3/3、ZIP/SHA256 与 artifact upload 全 PASS。
 - 发布包 smoke 覆盖真实 Worker 并行、单实例 Stop 隔离及 Worker crash 隔离；InputArbiter 的公平 FIFO/故障锁定仍由 Core 测试验证，真实 SendInput/KeyUp 则留 M14。
-- F31 仍为 PARTIAL：定时/周期触发、可配置运行超时与失败重试属于 M13-03；完整实例列表/筛选/按实例日志属于 M13-04。Windows 10/11 桌面验收 NOT RUN（M14）。
+- F31 仍为 PARTIAL：M13-03 已实现延迟/指定时刻/每日/每周触发、时区/DST/misfire、重叠、持久化游标、实例超时与 Stop/Continue/Retry；M13-04 仍负责完整实例列表/筛选/按实例日志/恢复 UI。Windows 10/11 桌面验收 NOT RUN（M14）。

@@ -7,6 +7,7 @@ using Anjian.Core;
 using Anjian.Core.Api;
 using Anjian.Core.Editor;
 using Anjian.Core.Recorder;
+using Anjian.Core.Runtime;
 using System.Diagnostics;
 using System.Text;
 
@@ -18,6 +19,8 @@ internal sealed class MainForm : Form
     private readonly AppSettingsStore _settingsStore = new();
     private readonly GlobalRecorder _recorder = new();
     private readonly RunInstanceRuntimeCoordinator _playback = new();
+    private ScheduledTaskService? _scheduledTasks;
+    private string? _scheduledTaskLoadError;
     private readonly ListBox _scripts = new();
     private LuaApiRegistry _apiRegistry = LuaApiRegistry.Load();
     private readonly TabControl _editorTabs = new() { Dock = DockStyle.Fill };
@@ -28,6 +31,7 @@ internal sealed class MainForm : Form
     private readonly RichTextBox _log = new();
     private readonly NumericUpDown _repeatCount = new();
     private readonly NumericUpDown _repeatInterval = new();
+    private readonly NumericUpDown _runtimeTimeoutMinutes = new();
     private readonly Label _status = new();
     private readonly Label _progress = new();
     private readonly Button _recordButton = new();
@@ -131,12 +135,14 @@ internal sealed class MainForm : Form
         LoadSettings();
         RefreshScripts();
         InitializeFloatingAndTray();
+        InitializeScheduledTaskService();
         UpdateFloatingState();
         Shown += (_, _) =>
         {
             Hide();
             Opacity = 1;
             ShowFloatingWindow();
+            _scheduledTasks?.Start();
         };
         AppendLog("就绪。脚本保存在：" + _repository.RootDirectory);
         AppendLog("播放设置：次数 1=执行一次，0=无限；间隔只在每轮之间等待。");
@@ -174,6 +180,7 @@ internal sealed class MainForm : Form
         _playButton.Text = "▶ 播放";
         _playButton.Click += async (_, _) => await StartPlaybackAsync();
         toolbar.Controls.Add(_playButton);
+        toolbar.Controls.Add(MakeButton("定时任务", (_, _) => OpenScheduledTasks()));
 
         _pauseButton.Text = "暂停";
         _pauseButton.Enabled = false;
@@ -229,6 +236,17 @@ internal sealed class MainForm : Form
         _repeatInterval.Width = 88;
         _repeatInterval.Margin = new Padding(0, 1, 2, 0);
         toolbar.Controls.Add(_repeatInterval);
+        toolbar.Controls.Add(new Label
+        {
+            Text = "超时(分钟，0=关闭)",
+            AutoSize = true,
+            Margin = new Padding(8, 8, 2, 0)
+        });
+        _runtimeTimeoutMinutes.Minimum = 0;
+        _runtimeTimeoutMinutes.Maximum = 10_080;
+        _runtimeTimeoutMinutes.Width = 72;
+        _runtimeTimeoutMinutes.ValueChanged += (_, _) => SaveSettings();
+        toolbar.Controls.Add(_runtimeTimeoutMinutes);
         toolbar.Controls.Add(new Label
         {
             Text = "全局热键：F10 播放 / F11 暂停继续 / F12 中止",
@@ -537,6 +555,8 @@ internal sealed class MainForm : Form
         var settings = _settingsStore.Load();
         _repeatCount.Value = Math.Clamp(settings.RepeatCount, (int)_repeatCount.Minimum, (int)_repeatCount.Maximum);
         _repeatInterval.Value = Math.Clamp(settings.IntervalMilliseconds, (int)_repeatInterval.Minimum, (int)_repeatInterval.Maximum);
+        _runtimeTimeoutMinutes.Value = Math.Clamp(settings.RuntimeTimeoutMinutes,
+            (int)_runtimeTimeoutMinutes.Minimum, (int)_runtimeTimeoutMinutes.Maximum);
         _clickOnlyCheck.Checked = settings.ClickOnlyRecording;
         _alwaysOnTopCheck.Checked = settings.AlwaysOnTop;
         _loadingSettings = false;
@@ -551,6 +571,7 @@ internal sealed class MainForm : Form
             {
                 RepeatCount = (int)_repeatCount.Value,
                 IntervalMilliseconds = (int)_repeatInterval.Value,
+                RuntimeTimeoutMinutes = (int)_runtimeTimeoutMinutes.Value,
                 ClickOnlyRecording = _clickOnlyCheck.Checked,
                 AlwaysOnTop = _alwaysOnTopCheck.Checked
             });
@@ -1167,6 +1188,163 @@ internal sealed class MainForm : Form
         UpdateActionEditorButton();
     }
 
+    private void InitializeScheduledTaskService()
+    {
+        try
+        {
+            _scheduledTasks = new ScheduledTaskService(
+                ExecuteScheduledTaskAsync,
+                canAccept: () => _playback.CanAccept);
+            _scheduledTasks.Log += message => Ui(() => AppendLog(message));
+            AppendLog("定时任务配置已加载；触发时会重新收集参数并逐次审阅脚本权限。");
+        }
+        catch (Exception ex)
+        {
+            _scheduledTaskLoadError = ex.Message;
+            AppendLog("定时任务未启动：" + ex.Message);
+        }
+    }
+
+    private void OpenScheduledTasks()
+    {
+        if (_scheduledTasks is null)
+        {
+            MessageBox.Show(this,
+                "定时任务配置无法加载，原文件已保留且未自动重置。\n" + _scheduledTaskLoadError,
+                "定时任务不可用", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            return;
+        }
+
+        using var manager = new ScheduledTaskManagerForm(_scheduledTasks);
+        manager.ShowDialog(this);
+    }
+
+    private Task<RunInstanceSnapshot?> ExecuteScheduledTaskAsync(
+        ScheduledTaskOccurrence occurrence,
+        int attemptNumber,
+        CancellationToken cancellationToken)
+    {
+        var completion = new TaskCompletionSource<RunInstanceSnapshot?>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
+        void StartOnUiThread()
+        {
+            if (cancellationToken.IsCancellationRequested || _shutdownStarted || IsDisposed)
+            {
+                completion.TrySetResult(null);
+                return;
+            }
+
+            ShowMainWindow();
+            var scriptPath = occurrence.Task.ScriptPath;
+            if (_current is not null &&
+                string.Equals(Path.GetFullPath(_current.FullPath), Path.GetFullPath(scriptPath),
+                    StringComparison.OrdinalIgnoreCase) &&
+                !SaveCurrent())
+            {
+                completion.TrySetResult(null);
+                return;
+            }
+            try
+            {
+                if (!File.Exists(scriptPath))
+                {
+                    AppendLog($"定时任务“{occurrence.Task.Name}”脚本不存在：{scriptPath}");
+                    completion.TrySetResult(CreateScheduledFailureResult());
+                    return;
+                }
+                if (string.IsNullOrWhiteSpace(File.ReadAllText(scriptPath)))
+                {
+                    AppendLog($"定时任务“{occurrence.Task.Name}”脚本内容为空：{scriptPath}");
+                    completion.TrySetResult(CreateScheduledFailureResult());
+                    return;
+                }
+
+                if (!TryCollectScriptParameters(scriptPath, out var parameters))
+                {
+                    AppendLog($"定时任务“{occurrence.Task.Name}”参数表单已取消，本次触发不执行。");
+                    completion.TrySetResult(null);
+                    return;
+                }
+
+                // A fresh review is mandatory for every occurrence and every retry.
+                if (!ScriptPermissionService.TryReview(this, scriptPath, out var permissions))
+                {
+                    AppendLog($"定时任务“{occurrence.Task.Name}”权限审阅未获批准，本次触发不执行。");
+                    completion.TrySetResult(null);
+                    return;
+                }
+
+                var requestId = occurrence.GetStartRequestId(attemptNumber);
+                var options = new PlaybackOptions
+                {
+                    RepeatCount = 1,
+                    IntervalMilliseconds = 0
+                };
+                AppendLog(
+                    $"定时任务触发：{occurrence.Task.Name}；计划时间 UTC={occurrence.ScheduledForUtc:O}；" +
+                    $"attempt={attemptNumber + 1}；每次触发按一次性 Start 创建独立实例。");
+
+                var run = _playback.StartAndWaitAsync(
+                    requestId,
+                    scriptPath,
+                    options,
+                    occurrence.Task.RuntimeTimeout,
+                    parameters,
+                    permissions,
+                    cancellationToken);
+                _ = CompleteScheduledTaskRunAsync(run, completion);
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"定时任务“{occurrence.Task.Name}”启动前检查失败：{ex.Message}");
+                completion.TrySetResult(CreateScheduledFailureResult());
+            }
+        }
+
+        if (IsDisposed)
+        {
+            completion.TrySetResult(null);
+        }
+        else if (InvokeRequired)
+        {
+            try { BeginInvoke((Action)StartOnUiThread); }
+            catch (InvalidOperationException) { completion.TrySetResult(null); }
+        }
+        else
+        {
+            StartOnUiThread();
+        }
+
+        return completion.Task;
+    }
+
+    private static async Task CompleteScheduledTaskRunAsync(
+        Task<RunInstanceSnapshot> execution,
+        TaskCompletionSource<RunInstanceSnapshot?> completion)
+    {
+        try
+        {
+            completion.TrySetResult(await execution.ConfigureAwait(false));
+        }
+        catch (OperationCanceledException)
+        {
+            completion.TrySetResult(null);
+        }
+        catch (Exception ex)
+        {
+            completion.TrySetException(ex);
+        }
+    }
+
+    private static RunInstanceSnapshot CreateScheduledFailureResult() =>
+        new(
+            RunInstanceId.Create(),
+            RunInstanceState.Cleaned,
+            RunInstanceOutcome.Failed,
+            RunInstanceTerminationMode.None,
+            RunInstanceCleanupStatus.Succeeded);
+
     private async Task StartPlaybackAsync()
     {
         if (_recordSessionActive)
@@ -1182,6 +1360,9 @@ internal sealed class MainForm : Form
             RepeatCount = (int)_repeatCount.Value,
             IntervalMilliseconds = (int)_repeatInterval.Value
         };
+        var runtimeTimeout = _runtimeTimeoutMinutes.Value > 0
+            ? TimeSpan.FromMinutes((double)_runtimeTimeoutMinutes.Value)
+            : (TimeSpan?)null;
         try { options.Validate(); }
         catch (Exception ex) { MessageBox.Show(this, ex.Message); return; }
         if (string.IsNullOrWhiteSpace(_editor.Text))
@@ -1204,7 +1385,11 @@ internal sealed class MainForm : Form
 
         try
         {
-            var runTask = _playback.RunAsync(scriptPath, options, parameters: launchParameters, permissions: launchPermissions);
+            var runTask = _playback.RunAsync(
+                scriptPath, options,
+                parameters: launchParameters,
+                permissions: launchPermissions,
+                runtimeTimeout: runtimeTimeout);
             UpdateFloatingState();
             await runTask;
         }
@@ -1786,6 +1971,8 @@ internal sealed class MainForm : Form
             try
             {
                 if (_recordSessionActive) StopRecording();
+                if (_scheduledTasks is not null)
+                    await _scheduledTasks.StopAsync();
                 await _playback.StopAllAsync();
             }
             catch (Exception ex)
@@ -1804,6 +1991,8 @@ internal sealed class MainForm : Form
         _visualDebugOverlay?.Close();
         _visualDebugOverlay?.Dispose();
         _visualDebugOverlay = null;
+        if (_scheduledTasks is not null)
+            await _scheduledTasks.DisposeAsync();
         _playback.Dispose();
         _recorder.Dispose();
 

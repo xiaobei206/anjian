@@ -475,7 +475,7 @@ M13-01 先冻结契约；新增 Core 类型只负责身份、状态转换和并�
 
 ### 19.4 当前可机读契约与下一步
 
-- Core：`Anjian.Core.Runtime.RunInstanceLifecycle`、`RunInstanceId`、`RunInstanceSnapshot`、`RunInstanceLimits`。契约常量：4 active、16 queued、30,000 ms Worker startup watchdog、2,000 ms cancellation grace；这些常量尚未由运行时协调器强制执行。
+- Core：`Anjian.Core.Runtime.RunInstanceLifecycle`、`RunInstanceId`、`RunInstanceSnapshot`、`RunInstanceLimits`。契约常量：4 active、16 queued、30,000 ms Worker startup watchdog、2,000 ms cancellation grace；M13-02 RunInstanceRuntimeCoordinator 已执行 active/queue、startup watchdog、Stop grace、owner cleanup；M13-03 另以 TimeProvider 管理用户运行超时。
 - 自动化测试覆盖 GUID-N 与 IPC identity/nonce 伪造拒绝、同脚本多实例/Start 幂等、4+16 容量/FIFO 晋升/排队取消、独立状态、跨实例进程句柄拒绝、输入仲裁 FIFO/取消/故障锁定/人工恢复，以及启动超时结果不被 Worker 后续失败覆盖。发布包 smoke 验证多个真实 Worker 同时存活、单独 Stop 和 Worker crash 不影响兄弟实例。
 - M13-02 已落地 coordinator、Worker payload/IPC identity、全局 InputArbiter 与 owner-only cleanup。M13-03 负责用户运行超时/定时触发/失败策略；M13-04 负责完整多实例 UI、日志筛选与恢复；M14 负责真实 Windows 10/11 桌面验收。
 
@@ -486,10 +486,21 @@ M13-01 先冻结契约；新增 Core 类型只负责身份、状态转换和并�
 - 每个 PlaybackRunner 的 Worker/Lua、pipe、attempt、nonce、CTS、pause gate、ScriptProcessSession、HTTP session、Window/Image/debug 资源均独立；普通脚本源码、参数、播放选项、Grant 和 plugin runtime options 在实例启动时复制。每次 Start 继续执行独立权限审阅，不按路径共享审批。
 - Worker pipe 使用 current-user ACL、OS client PID 绑定、identity policy 逐消息检查和响应检查；无效、跨实例、跨 attempt 或 nonce 不匹配均拒绝。
 - 全局 InputArbiter 在故障时拒绝新 lease，Input release failure 需人工恢复；这不解决宿主进程崩溃/断电下操作系统无法收到 KeyUp 的边界。
-- MainForm 目前仅提供选中/最新实例的基础 Pause/Resume/Stop、容量状态与输入故障恢复；没有完整运行实例列表、筛选和实例日志独立视图。定时/用户配置运行超时/重试尚未实现。
+- MainForm 目前提供选中/最新实例的基础 Pause/Resume/Stop、容量状态与输入故障恢复，以及 M13-03 定时任务入口和手动运行超时；没有完整运行实例列表、筛选和实例日志独立视图（留 M13-04）。
 
 ### 19.6 M13-02 最终验证记录（2026-11-14）
 
 - Windows Actions [43461688129](https://github.com/xiaobei206/anjian/actions/runs/43461688129) 对代码 HEAD d6854f872a36263f6e3658eb9cf2b7e9f252c947 SUCCESS：Release Build 0 warnings / 0 errors、202/202 Core tests、API handbook 103 项、自包含 win-x64 publish、Sprite/Plugin/MultiInstance smoke 3/3、ZIP/SHA256 与 artifact upload 全 PASS。
 - MultiInstance 发布包 smoke 先确认两个 Worker PID 不同且同时存活，停止其中一个后另一个保持运行；再杀掉另一个 Worker，第三个 Worker 保持运行并完成，验证进程级故障隔离。
 - Worker crash while host dispatching IPC 现在由 Worker exit monitor 及时取消宿主 dispatch；connect、ready handshake、执行 IPC 三段均监视对应 Worker 进程退出。真实 SendInput/KeyUp 和 WinForms 桌面交互仍 NOT RUN（M14）。
+
+### 19.7 M13-03 定时调度与运行超时
+
+- ScheduledTaskDefinition 封存任务 ID、脚本路径、触发类型、本地时区 ID、weekday/TimeOnly、misfire/overlap/failure policy 和可选 RuntimeTimeout。任务数据与 cursor 使用 schemaVersion=1 持久化到用户 LocalAppData；不把任务计划写入 Lua API registry。
+- ScheduledTaskEngine 是无 UI、可注入 TimeProvider 的确定性计算层。ScheduledTaskCalculator 负责本地时刻到 UTC 的解析、DST gap/overlap 规则、每日/每周下一次 occurrence 与 misfire 的最近一次收敛。持久化 cursor 的 LastHandledOccurrenceUtc / NextOccurrenceUtc / Exhausted 是重启去重来源。
+- Scheduler Service 每秒 tick，先持久化 cursor，再将 occurrence 投递到 WinForms UI context；UI 重新收集参数并逐次显示权限审阅，然后才调用 RunInstanceRuntimeCoordinator.StartAndWaitAsync。调度器不可绕过现有 Grant 审阅、InputArbiter 或 4+16 admission。
+- Overlap 与 failure 策略在 Core policy 层可单测；service 维护 per-task in-flight/pending-one，并再次检查全局容量。QueueOne 只保留一个并合并后续触发；Parallel 仍受 admission limits 约束。
+- RunInstanceTimeoutTracker 在首次 worker-ready / Running 时记录 TimeProvider monotonic timestamp；runtime coordinator 用相同 TimeProvider 的 cancellable delay 计时。Pause 不暂停 timer；自然结束/用户 Stop/StopAll 会取消 timeout watcher；timeout 与 user Stop 在 _sync 下由最先提交到 Core coordinator 的转换获胜。
+- 手动播放 timeout 分钟项持久化在 settings.json；定时任务可独立配置 1 秒至 7 天 timeout。timeout 通过 RunInstanceCoordinator.RequestTimeout，随即 PlaybackRunner.Stop()，沿用 worker grace、force terminate 和 owner-only held-input cleanup。
+- 停止策略：参数表单取消或权限拒绝属于用户取消，不计入失败；脚本 Failed/TimedOut 进入指定 failure policy；InputArbiter/Cleanup fault 禁止自动重试并禁用任务，需人工核验输入状态。
+- MainForm 隐藏到托盘不停止 Scheduler；明确退出先取消调度投递，再 StopAll 所有运行实例，最后释放 service/coordinator。完整运行实例列表/筛选/日志浏览仍留 M13-04；真实桌面验收留 M14。

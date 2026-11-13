@@ -21,9 +21,13 @@ internal sealed class RunInstanceRuntimeCoordinator : IDisposable
         IReadOnlyDictionary<string, JsonElement> parameters,
         ScriptPermissionGrant permissions,
         SpriteWorkerRuntimeOptions? spriteRuntimeOptions,
-        PluginWorkerRuntimeOptions? pluginRuntimeOptions)
+        PluginWorkerRuntimeOptions? pluginRuntimeOptions,
+        TimeSpan? runtimeTimeout)
     {
         public RunInstanceId InstanceId { get; } = instanceId;
+        public TimeSpan? RuntimeTimeout { get; } = runtimeTimeout;
+        public CancellationTokenSource TimeoutCancellation { get; } = new();
+        public int TimeoutWatchStarted;
         public PlaybackRunner Runner { get; } = runner;
         public TaskCompletionSource Completion { get; } = completion;
         public PlaybackOptions Options { get; } = options;
@@ -39,10 +43,18 @@ internal sealed class RunInstanceRuntimeCoordinator : IDisposable
     private readonly object _sync = new();
     private readonly Anjian.Core.Runtime.RunInstanceCoordinator _model = new();
     private readonly InputArbiter _inputArbiter = new();
+    private readonly TimeProvider _timeProvider;
+    private readonly RunInstanceTimeoutTracker _timeoutTracker;
     private readonly Dictionary<RunInstanceId, Entry> _entries = [];
     private RunInstanceId? _selected;
     private bool _shuttingDown;
     private bool _disposed;
+
+    public RunInstanceRuntimeCoordinator(TimeProvider? timeProvider = null)
+    {
+        _timeProvider = timeProvider ?? TimeProvider.System;
+        _timeoutTracker = new RunInstanceTimeoutTracker(_timeProvider);
+    }
 
     public event Action<PlaybackRunner>? RunnerCreated;
     private Control? _uiOwner;
@@ -70,7 +82,8 @@ internal sealed class RunInstanceRuntimeCoordinator : IDisposable
         IReadOnlyDictionary<string, JsonElement>? parameters = null,
         SpriteWorkerRuntimeOptions? spriteRuntimeOptions = null,
         ScriptPermissionGrant? permissions = null,
-        PluginWorkerRuntimeOptions? pluginRuntimeOptions = null) =>
+        PluginWorkerRuntimeOptions? pluginRuntimeOptions = null,
+        TimeSpan? runtimeTimeout = null) =>
         StartAsync(
             Guid.NewGuid().ToString("N"),
             scriptPath,
@@ -79,7 +92,8 @@ internal sealed class RunInstanceRuntimeCoordinator : IDisposable
             parameters,
             permissions,
             spriteRuntimeOptions,
-            pluginRuntimeOptions);
+            pluginRuntimeOptions,
+            runtimeTimeout);
 
     public void Pause() => PauseSelected();
     public void Resume() => ResumeSelected();
@@ -155,10 +169,14 @@ internal sealed class RunInstanceRuntimeCoordinator : IDisposable
         IReadOnlyDictionary<string, JsonElement>? parameters = null,
         ScriptPermissionGrant? permissions = null,
         SpriteWorkerRuntimeOptions? spriteRuntimeOptions = null,
-        PluginWorkerRuntimeOptions? pluginRuntimeOptions = null)
+        PluginWorkerRuntimeOptions? pluginRuntimeOptions = null,
+        TimeSpan? runtimeTimeout = null)
     {
         ArgumentNullException.ThrowIfNull(options);
         options.Validate();
+        if (runtimeTimeout is { } timeout &&
+            (timeout < TimeSpan.FromSeconds(1) || timeout > TimeSpan.FromDays(7)))
+            throw new ArgumentOutOfRangeException(nameof(runtimeTimeout), "实例运行超时必须在 1 秒至 7 天之间。");
         if (debugOptions is not null && (options.RepeatCount != 1 || options.IntervalMilliseconds != 0))
             throw new ArgumentException("调试运行固定执行单轮，不支持循环次数和轮间隔。", nameof(options));
         if (spriteRuntimeOptions is not null && pluginRuntimeOptions is not null)
@@ -191,7 +209,8 @@ internal sealed class RunInstanceRuntimeCoordinator : IDisposable
                 CloneParameters(parameters),
                 CloneGrant(permissions ?? ScriptPermissionGrant.Empty),
                 spriteRuntimeOptions,
-                ClonePluginRuntimeOptions(pluginRuntimeOptions));
+                ClonePluginRuntimeOptions(pluginRuntimeOptions),
+                runtimeTimeout);
             _entries.Add(entry.InstanceId, entry);
             _selected = entry.InstanceId;
             WireRunner(entry);
@@ -207,6 +226,30 @@ internal sealed class RunInstanceRuntimeCoordinator : IDisposable
 
             return completion.Task;
         }
+    }
+
+    public async Task<RunInstanceSnapshot> StartAndWaitAsync(
+        string startRequestId,
+        string scriptPath,
+        PlaybackOptions options,
+        TimeSpan? runtimeTimeout,
+        IReadOnlyDictionary<string, JsonElement>? parameters = null,
+        ScriptPermissionGrant? permissions = null,
+        CancellationToken cancellationToken = default)
+    {
+        var execution = StartAsync(
+            startRequestId,
+            scriptPath,
+            options,
+            parameters: parameters,
+            permissions: permissions,
+            runtimeTimeout: runtimeTimeout);
+        RunInstanceId instanceId;
+        lock (_sync)
+            instanceId = _model.GetInstanceIdForRequestId(startRequestId);
+
+        await execution.WaitAsync(cancellationToken).ConfigureAwait(false);
+        return _model.GetSnapshot(instanceId);
     }
 
     public void PauseSelected()
@@ -253,11 +296,15 @@ internal sealed class RunInstanceRuntimeCoordinator : IDisposable
 
             if (stop.WasQueued)
             {
+                entry.TimeoutCancellation.Cancel();
+                _timeoutTracker.Remove(entry.InstanceId);
                 entry.Runner.Dispose();
                 entry.Completion.TrySetResult();
             }
             else
             {
+                entry.TimeoutCancellation.Cancel();
+                _timeoutTracker.Remove(entry.InstanceId);
                 entry.Runner.Stop();
             }
         }
@@ -294,11 +341,15 @@ internal sealed class RunInstanceRuntimeCoordinator : IDisposable
                     notifications.Add(stop.Snapshot);
                     if (stop.WasQueued)
                     {
+                        entry.TimeoutCancellation.Cancel();
+                        _timeoutTracker.Remove(entry.InstanceId);
                         entry.Runner.Dispose();
                         entry.Completion.TrySetResult();
                     }
                     else
                     {
+                        entry.TimeoutCancellation.Cancel();
+                        _timeoutTracker.Remove(entry.InstanceId);
                         entry.Runner.Stop();
                     }
                 }
@@ -350,13 +401,21 @@ internal sealed class RunInstanceRuntimeCoordinator : IDisposable
         runner.WorkerReady += () =>
         {
             RunInstanceSnapshot? snapshot = null;
+            var startTimeoutWatch = false;
             lock (_sync)
             {
                 if (_model.TryMarkRunning(entry.InstanceId, out var current))
+                {
                     snapshot = current;
+                    _timeoutTracker.MarkRunning(entry.InstanceId);
+                    startTimeoutWatch = entry.RuntimeTimeout is not null &&
+                        Interlocked.CompareExchange(ref entry.TimeoutWatchStarted, 1, 0) == 0;
+                }
             }
             if (snapshot is not null)
                 StateChanged?.Invoke(snapshot);
+            if (startTimeoutWatch)
+                _ = WatchRuntimeTimeoutAsync(entry);
         };
         runner.WorkerForceTerminating += () =>
         {
@@ -374,6 +433,45 @@ internal sealed class RunInstanceRuntimeCoordinator : IDisposable
         };
     }
 
+    private async Task WatchRuntimeTimeoutAsync(Entry entry)
+    {
+        if (entry.RuntimeTimeout is not { } timeout)
+            return;
+
+        try
+        {
+            await Task.Delay(timeout, _timeProvider, entry.TimeoutCancellation.Token).ConfigureAwait(false);
+            if (!_timeoutTracker.IsExpired(entry.InstanceId, timeout))
+                return;
+
+            RunInstanceStopResult? requested = null;
+            lock (_sync)
+            {
+                var current = _model.GetSnapshot(entry.InstanceId);
+                if (current.State is RunInstanceState.Running or RunInstanceState.Paused)
+                {
+                    requested = _model.RequestTimeout(entry.InstanceId);
+                    if (requested.Changed)
+                        entry.Runner.Stop();
+                }
+            }
+
+            if (requested is { Changed: true })
+            {
+                PublishLog(entry.InstanceId, $"达到运行超时 {timeout}，已请求停止并清理本实例。");
+                StateChanged?.Invoke(requested.Snapshot);
+            }
+        }
+        catch (OperationCanceledException) when (entry.TimeoutCancellation.IsCancellationRequested)
+        {
+            // 正常完成或用户 Stop 已赢得生命周期竞争。
+        }
+        catch (Exception ex)
+        {
+            PublishLog(entry.InstanceId, "运行超时监视器异常：" + ex);
+        }
+    }
+
     private async Task StartEntryAsync(Entry entry)
     {
         Task execution;
@@ -386,6 +484,8 @@ internal sealed class RunInstanceRuntimeCoordinator : IDisposable
             {
                 var stop = _model.RequestStop(entry.InstanceId);
                 StateChanged?.Invoke(stop.Snapshot);
+                entry.TimeoutCancellation.Cancel();
+                _timeoutTracker.Remove(entry.InstanceId);
                 entry.Runner.Dispose();
                 entry.Completion.TrySetResult();
                 return;
@@ -429,6 +529,8 @@ internal sealed class RunInstanceRuntimeCoordinator : IDisposable
         }
         finally
         {
+            entry.TimeoutCancellation.Cancel();
+            _timeoutTracker.Remove(entry.InstanceId);
             try { entry.Runner.Dispose(); }
             catch (Exception ex) { PublishLog(entry.InstanceId, "实例释放资源失败：" + ex.Message); }
 
@@ -476,6 +578,8 @@ internal sealed class RunInstanceRuntimeCoordinator : IDisposable
                 return;
             if (stop.WasQueued)
             {
+                entry.TimeoutCancellation.Cancel();
+                _timeoutTracker.Remove(entry.InstanceId);
                 entry.Runner.Dispose();
                 entry.Completion.TrySetResult();
             }
@@ -580,7 +684,11 @@ internal sealed class RunInstanceRuntimeCoordinator : IDisposable
         }
 
         foreach (var entry in _entries.Values)
+        {
+            entry.TimeoutCancellation.Cancel();
             entry.Runner.Dispose();
+            _timeoutTracker.Remove(entry.InstanceId);
+        }
         _inputArbiter.Dispose();
     }
 }

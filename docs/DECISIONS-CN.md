@@ -306,3 +306,16 @@
 - Windows Actions [43461688129](https://github.com/xiaobei206/anjian/actions/runs/43461688129) 对代码 HEAD d6854f872a36263f6e3658eb9cf2b7e9f252c947 SUCCESS：Release Build 0 warnings / 0 errors、202/202 Core tests、API handbook 103 项、自包含 win-x64 publish、Sprite/Plugin/MultiInstance smoke 3/3、ZIP/SHA256 和 artifact upload 全 PASS。
 - Artifact ID 14056846918，87,318,097 bytes，SHA-256 393bd08c9da97368cb9ddb39c0de790000befa9ecad27ce161accaf8892987c8；这是临时 Actions artifact，不是正式 Release。
 - Worker crash-in-flight-IPC 故障已修复：宿主并行观察 process exit 与当前 dispatch；Worker 提前退出会取消 host token，阻止向断开的 pipe 写响应，并将失败限制在所属实例。停止/崩溃清理仍受 OS 进程崩溃边界约束。
+
+## ADR-034：定时任务的时间、重复投递与恢复语义（M13-03）
+
+- 状态：ACCEPTED（M13-03 Core/App 实现；Windows Actions 待最终验证）。
+- 任务触发统一以 UTC instant 持久化；每日/每周只保存本地 TimeZoneId、TimeOnly 和 weekday 集合。时区解析必须成功，禁止静默回退到系统本地时区。
+- DST gap（本地时间不存在）向前移动到首个有效本地分钟；DST overlap（本地时间出现两次）固定选择较大 UTC offset，即较早的 UTC instant，同一日不在第二个重复小时再次触发。
+- Scheduler 以 1 秒轮询；超过 2 分钟正常容差视为 misfire。Skip 丢弃；RunOnce 只在 MisfireGracePeriod 内补最近一次。一次 sleep/restart 跨过多个周期也只处理最近一次，不追赶执行全部历史周期。
+- 任务游标在将 occurrence 交给执行层前原子持久化，重启后不重复处理已标记 occurrence。该策略明确是 at-most-once，不宣称 exactly-once；persist 与实际 coordinator admission 之间崩溃可能丢一次，不允许为了补偿而盲目重复桌面操作。
+- Overlap：Skip 不排队；QueueOne 至多留一个，多个后续 occurrence 合并成一个 pending；Parallel 请求新实例但必须经过 M13-02 全局容量/队列 admission。全局容量竞争时最多暂存一个触发并等待下一次容量检查。
+- 禁用/删除任务清除尚未 admission 的 pending 并阻止尚未开始的 retry；已经进入 RunInstanceCoordinator 的运行实例不被回溯取消。编辑任务只影响未来 occurrence；正在执行/已投递的 occurrence 保留 immutable task snapshot。
+- occurrence key = taskId + scheduled UTC ticks；attempt 的 startRequestId 使用 taskId + occurrence key + attempt number 稳定哈希。重试一律创建新的逻辑实例和 Worker attempt，并再次审阅脚本权限。
+- RuntimeTimeout 允许 1 秒至 7 天，从每个 RunInstance 第一次 WorkerReady/Running 起算；审阅、Starting 和 FIFO queue 不计入；Pause 不暂停计时。Stop 与 timeout 由 coordinator 同步锁内的第一个成功状态转换胜出，二者均复用相同 Worker/输入清理链。
+- Failure Stop 在一次失败后禁用任务；Continue 保留下一计划；Retry 限次并使用 capped exponential backoff；连续失败上限触发禁用。用户取消参数/拒绝权限不当作脚本运行失败；清理失败不再继续自动任务。

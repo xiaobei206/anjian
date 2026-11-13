@@ -512,3 +512,18 @@ end
     dotnet run --project tools/Anjian.ApiDocsGenerator -- --write-plugin-reference "$env:LOCALAPPDATA\\Anjian2026\\Plugins" .\\PLUGIN-API-REFERENCE-CN.md
 
 该命令不修改仓库中的内置静态 FUNCTION-REFERENCE-CN.md；它仍只反映随应用编译的 103 个内置函数。Windows 10/11 插件管理、命令面板、权限窗口、DPI/多屏和完整用户交互仍为 M14 NOT RUN。CI 通过不代表实机验收通过。
+
+
+## M13-03 定时任务与运行超时（main 开发版，不包含在 preview.4）
+
+主窗口工具栏可设置“超时（分钟，0=关闭）”，该设置会保存到本机 settings.json。手动播放超时范围 1 分钟至 7 天，0 表示关闭；定时任务可单独设置 1 分钟至 7 天的实例超时（Core 契约允许 1 秒至 7 天，当前界面以分钟为单位）。时间从 Worker 第一次进入 Running 起算，权限审阅、启动和 FIFO 排队不计时；暂停仍计入，避免暂停无限占用运行实例或键鼠租约。
+
+点击“定时任务”可新建、编辑、启用/禁用和删除计划。当前支持指定本地日期/时间的一次性任务、从创建时刻起算的一次性延迟任务、每日和每周指定本地时间的任务；必须选择有效 Windows TimeZone ID，列表中的下次触发按该时区显示。
+
+夏令时切换时，不存在的本地时间会向前调整到第一个有效分钟；重复出现的本地时间只选择较早 UTC 对应的一次。应用错过触发时可选择跳过，或仅在宽限期内补跑最近一次。任务游标保存在 %LOCALAPPDATA%\Anjian2026\scheduled-tasks.json，重启后不重复投递已登记 occurrence。游标在投递前保存，因此这是 at-most-once 恢复保证，不是 exactly-once；断电可能丢失处于持久化与 Worker admission 之间的一次触发。
+
+同一计划重叠时可选择跳过、最多保留一个待执行触发（后续合并），或允许并行；所有 Worker 仍受全局 4 active + 16 queued 限额。失败策略为 Stop（禁用任务）、Continue（等下一次计划）或有限 Retry（新实例、新 Worker attempt，并再次收集参数和审阅权限）。清理/键鼠释放失败时不会自动重试，任务会被禁用，需先人工核验。
+
+禁用或删除只取消尚未启动的计划触发和 retry，不会强制终止已经进入运行协调器的实例；编辑仅影响未来计划，已投递 occurrence 使用启动快照。关闭主窗口只隐藏到托盘，调度继续；从托盘明确退出才会停止调度并按 StopAll 流程结束实例。
+
+本节功能只存在于 main 开发版，不包含在已发布 v0.1.0-preview.4。M13-03 的自动化测试与 Windows Actions 结果按验收文档记录；Windows 10/11 的 WinForms、权限提示、DPI、多屏和实际键鼠操作仍需 M14 桌面实测。
