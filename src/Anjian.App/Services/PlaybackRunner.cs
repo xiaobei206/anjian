@@ -6,6 +6,7 @@ using Anjian.Core;
 using Anjian.Core.Editor;
 using Anjian.Core.Imaging;
 using Anjian.Core.Parameters;
+using Anjian.Core.Permissions;
 using Anjian.Core.Windows;
 
 namespace Anjian.App.Services;
@@ -21,6 +22,7 @@ internal sealed class PlaybackRunner : IDisposable
     private LuaDebugLaunchOptions? _debugLaunchOptions;
     private IReadOnlyDictionary<string, JsonElement> _launchParameters = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
     private SpriteWorkerRuntimeOptions? _spriteRuntimeOptions;
+    private ScriptPermissionGrant _launchPermissions = ScriptPermissionGrant.Empty;
     private TaskCompletionSource<LuaDebugCommand>? _debugCommandSource;
 
     public PlaybackRunner()
@@ -53,7 +55,8 @@ internal sealed class PlaybackRunner : IDisposable
         PlaybackOptions options,
         LuaDebugLaunchOptions? debugOptions = null,
         IReadOnlyDictionary<string, JsonElement>? parameters = null,
-        SpriteWorkerRuntimeOptions? spriteRuntimeOptions = null)
+        SpriteWorkerRuntimeOptions? spriteRuntimeOptions = null,
+        ScriptPermissionGrant? permissions = null)
     {
         options.Validate();
         if (_runCts is not null)
@@ -66,6 +69,7 @@ internal sealed class PlaybackRunner : IDisposable
         _debugLaunchOptions = debugOptions;
         _launchParameters = parameters ?? new Dictionary<string, JsonElement>(StringComparer.Ordinal);
         _spriteRuntimeOptions = spriteRuntimeOptions;
+        _launchPermissions = permissions ?? ScriptPermissionGrant.Empty;
         _gate.Resume();
         var token = cts.Token;
         var completed = 0;
@@ -104,6 +108,7 @@ internal sealed class PlaybackRunner : IDisposable
             _debugLaunchOptions = null;
             _launchParameters = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
             _spriteRuntimeOptions = null;
+            _launchPermissions = ScriptPermissionGrant.Empty;
             _runCts = null;
             _gate.Resume();
             DebugSessionCompleted?.Invoke();
@@ -185,7 +190,8 @@ internal sealed class PlaybackRunner : IDisposable
                 DebugOptions = debugOptions,
                 Parameters = _launchParameters.ToDictionary(x => x.Key, x => x.Value, StringComparer.Ordinal),
                 ModuleRootPath = _spriteRuntimeOptions?.ModuleRootPath,
-                OcrModelDirectory = _spriteRuntimeOptions?.OcrModelDirectory
+                OcrModelDirectory = _spriteRuntimeOptions?.OcrModelDirectory,
+                Permissions = _launchPermissions
             });
 
         if (message.Type == "debug-break")

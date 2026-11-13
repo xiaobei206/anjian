@@ -1178,6 +1178,7 @@ internal sealed class MainForm : Form
             MessageBox.Show(this, "脚本内容为空。");
             return;
         }
+        if (!ScriptPermissionService.TryReview(this, scriptPath, out var launchPermissions)) return;
 
         SaveSettings();
         _playButton.Enabled = false;
@@ -1192,7 +1193,7 @@ internal sealed class MainForm : Form
 
         try
         {
-            _runTask = _playback.RunAsync(scriptPath, options, parameters: launchParameters);
+            _runTask = _playback.RunAsync(scriptPath, options, parameters: launchParameters, permissions: launchPermissions);
             UpdateFloatingState();
             await _runTask;
         }
@@ -1413,6 +1414,7 @@ internal sealed class MainForm : Form
         var tab = _activeTab;
         var scriptPath = tab.Entry.FullPath;
         if (!TryCollectScriptParameters(scriptPath, out var launchParameters)) return;
+        if (!ScriptPermissionService.TryReview(this, scriptPath, out var launchPermissions)) return;
         var breakpoints = tab.Breakpoints
             .Order()
             .Select(line => new LuaDebugBreakpoint(scriptPath, line))
@@ -1434,7 +1436,7 @@ internal sealed class MainForm : Form
 
         try
         {
-            _runTask = _playback.RunAsync(scriptPath, playbackOptions, launchOptions, launchParameters);
+            _runTask = _playback.RunAsync(scriptPath, playbackOptions, launchOptions, launchParameters, permissions: launchPermissions);
             UpdateFloatingState();
             await _runTask;
         }
