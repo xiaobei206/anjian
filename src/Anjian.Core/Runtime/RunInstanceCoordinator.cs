@@ -86,6 +86,12 @@ public sealed class RunInstanceCoordinator
             if (_requestIds.TryGetValue(startRequestId, out var existingId))
             {
                 var existing = _instances[existingId];
+                var pathComparison = OperatingSystem.IsWindows()
+                    ? StringComparison.OrdinalIgnoreCase
+                    : StringComparison.Ordinal;
+                if (!string.Equals(existing.ScriptPath, scriptPath, pathComparison))
+                    throw new InvalidOperationException(
+                        "相同 startRequestId 不能用于不同脚本路径；请为新的 Start 意图生成新的请求 ID。");
                 return new RunInstanceAdmission(existingId, true, false, existing.Snapshot);
             }
 
