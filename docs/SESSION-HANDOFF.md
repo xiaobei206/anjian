@@ -298,3 +298,13 @@ M4 基础调试器已在 main 实现并通过 Windows CI。具体实现提交与
 3. 实测视觉调试覆盖层置顶、点击穿透、关闭后不拦截输入、截图区域/像素颜色/命中相似度/耗时、多屏负坐标；核实 SetWindowDisplayAffinity 返回值与实际截图内容，失败要记录。
 4. 实测 RgbToHex、HexToRgb、ColorDifference、FindColorBlocks 八邻域/step/minPixels/maxResults/取消，并回归 Capture/FindColor/FindImage/Wait 相关 API。
 5. 只有通过真实桌面验收的项目才可标 PASS；失败项记 FAIL，未测项保持 NOT RUN。全部关键范围通过后才可把 M8 标 DONE，再由后续 handoff 决定是否进入 M9。不要修改 VERSION，不创建 Release，preview.4 官方资产保持不变。
+## 2026-11-13 会话执行记录：M8-DESKTOP-ACCEPTANCE 环境阻塞
+
+- 本轮重新核对的 main 起始 HEAD：`b06910f93a40780c3ffa10a04d64d41d176b2767`。当前唯一任务仍是 M8-01..M8-18 的 Windows 10/11 桌面实机验收；没有擅自进入 M9 或增加新功能。
+- 已核查 M8 代码基线 `c2b30c1d9aabd876cd848d6203376060f294c34e` 对应的 Windows Actions run [43358188770](https://github.com/xiaobei206/anjian/actions/runs/43358188770)：Windows Server 2025 runner，Restore、Release Build（0 warnings / 0 errors）、85/85 Core tests、API handbook check、win-x64 self-contained publish、ZIP/SHA256 与 artifact upload 全部 SUCCESS。Artifact ID `14006903094`，76,460,671 bytes；该 artifact 于 2026-12-13 UTC 到期。该 CI 仅验证构建与自动化测试，不是桌面实机证据。
+- 本轮执行容器为 Debian 13 x86_64；`dotnet` 不存在，且没有 Windows / PowerShell 桌面会话，也没有对用户 Windows 桌面的交互访问。因此本轮没有运行程序或执行任何 M8 手工步骤。**M8-01..M8-18 全部保持 NOT RUN；没有项目可标 PASS，也没有因未执行而标 FAIL。**
+- 未修改源码、API、VERSION 或 preview.4 Release 资产。M8 仍为 IN_PROGRESS；桌面实测门槛未满足。
+
+### 下一会话唯一任务（保持不变）
+
+继续 M8-DESKTOP-ACCEPTANCE。执行前先核对 main HEAD 和本文件，再读取 `docs/ACCEPTANCE-TEST-CN.md` 的 M8-01..M8-18 全部步骤。只有在获得可交互的 Windows 10/11 桌面（或收到可追溯的用户实测环境、步骤、日志/截图证据）后，才能逐项执行并改变状态。若仍只有远程 GitHub/CI 能力，必须继续保持全部 NOT RUN，不得用 Windows Server CI、静态代码审查或理论推断替代；不要进入 M9，不修改 VERSION，不创建 Release。
