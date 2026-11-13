@@ -214,7 +214,11 @@ public sealed class RunInstanceCoordinator
             if (entry.Snapshot.State is RunInstanceState.StopRequested or RunInstanceState.TimeoutRequested)
                 entry.Snapshot = RunInstanceLifecycle.Transition(entry.Snapshot, RunInstanceState.Cancelling);
 
-            entry.Snapshot = RunInstanceLifecycle.Transition(entry.Snapshot, RunInstanceState.ForceTerminating);
+            var forcedOutcome = entry.Snapshot.Outcome == RunInstanceOutcome.None
+                ? RunInstanceOutcome.Failed
+                : RunInstanceOutcome.None;
+            entry.Snapshot = RunInstanceLifecycle.Transition(
+                entry.Snapshot, RunInstanceState.ForceTerminating, outcome: forcedOutcome);
             return entry.Snapshot;
         }
     }
