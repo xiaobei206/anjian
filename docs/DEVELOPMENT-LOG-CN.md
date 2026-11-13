@@ -487,17 +487,20 @@ M4 基础调试器与 M5 可视化录制/动作列表均已完成 Windows CI 验
 - M5 sidecar schemaVersion 1 的坐标字段仍固定为 `virtual-desktop-physical-pixels`，动作生成继续用 `MoveTo`。持久窗口选择器和相对窗口坐标录制/回放重定位尚未实现；这是明确保留的产品缺口，不纳入本次 M6 API/Win32 交付完成声明。
 
 
-## 2026-11-13 — M7 — 控件自动化与前后台能力适配（实现中；待最新完整 CI）
+## 2026-11-13 — M7 — 控件自动化与前后台能力适配（代码与 CI 完成；桌面实机待验）
 
-### 本轮实现
-- API registry 从 0.3 升为 0.4，新增 14 个公开 API，合计 54 项；同步生成函数参考、Lua API 说明、用户指南、架构说明、功能矩阵和 M7-01..M7-10 桌面验收清单。
-- 增加 UI Automation Control View 遍历和 Value/Text/Selection/SelectionItem/Toggle/Invoke Pattern 探测、值/文本/选择/勾选/Invoke 操作、密码字段 Value/Text 读取保护、控件缓存上限和元素失效后重新枚举策略。
-- UIA 与 COM AutomationElement 保存在独立 Lua worker。主进程通过本轮唯一命名管道把经过 M6 校验的窗口目标身份描述送给 worker；worker 每次操作前再向主进程复核原 M6 窗口 ID。脚本只能得到随机 binding/control ID，无法读取 HWND/COM 对象。Stop 通过杀死 worker 处理中途卡住的 UIA provider 调用。
-- WindowInput 留在主进程执行 SendInput，只接受 auto/foreground；校验窗口可见、非最小化、前台、键盘焦点与客户区坐标。通用后台鼠标/键盘/文本注入明确 unsupported；不静默回退、不伪造后台消息、不绕过权限边界。
-- 增加 `--automation-probe` 自建 WinForms 测试窗口，含文本框、密码框、复选框、组合框、列表和 Invoke 按钮，供真实 Windows 桌面手验。
+### 实现内容
+- API registry 从 0.3 升至 0.4；新增 14 项公开 API，合计 54 项。函数参考手册从同一 registry 生成，Lua API/架构/用户指南/Feature Matrix/Acceptance/Roadmap/README/handoff 同步。
+- 新增 UI Automation Control View 遍历；能力探测当前控件的 Value、Text、Selection、SelectionItem、Toggle、Invoke Pattern；实现对应读取/设置/选择/切换/调用 API。限制控件遍历深度 16 层、单次结果 512 项、每绑定缓存最多 4096 个控件引用；控件失效后需重新枚举。
+- 密码字段的 Value/Text 读取被拒绝。只读/不支持的 Pattern 明确报错，不假报成功。
+- UIA/COM AutomationElement 缓存放在每轮独立 Lua worker。主进程通过随机命名管道发送短期窗口目标描述，Lua 脚本只拿随机 binding/control ID；worker 每次控件操作前再次通过 M6 不透明引用向主进程确认窗口 identity。Stop 通过终止 worker 处理卡在 UIA/COM provider 中的情况。
+- WindowInput 留在主进程使用 SendInput，仅 auto/foreground 两个后端；校验可见/非最小化/前台、键盘焦点及客户区。通用后台鼠标/键盘/文本注入明确 unsupported；不自动抢焦点，不伪造 PostMessage 输入，不绕过 UIPI/UAC/安全桌面。
+- 增加 `--automation-probe` WinForms 测试目标，包括文本框、密码框、复选框、组合框、列表和按钮，用于 M7-01..M7-10 的实机验证。
 
-### CI 与修正记录
-- run `43350032217` 在首次 worker-provider 实现上 Build 失败：测试缺少 System.Text.Json 引用、provider 的能力对象用了错误变量名、JSON 序列化导入和窗口类名读取函数缺失。修复已提交至主线，最新候选 commit `3092e690a84b37503b47c037829ffd010ac2a6fc` 的 run `43350367379` 已通过 Restore、Release Build、Core Tests 和 API handbook check；publish/package 进行中。
-- 最新主线后续修正测试顺序，commit `7624763610ae83a74d73b71c048e179a98f0cd6f`，run `43350412493` 当前排队。最终完整 CI 结果待补。
-- Windows 桌面 M7-01..M7-10 全部 NOT RUN；CI 结果不能替代 UIA Pattern/焦点/UIPI/Stop 响应实机验证。
-- 本阶段未升级 VERSION、未创建 Release，已发布 v0.1.0-preview.4 资产不变。
+### Windows CI
+- 初次 worker-provider Build run `43350032217` 失败，原因是缺少 JSON 导入、能力结果变量名错误和窗口类名读取函数缺失；修复已提交，未隐藏失败记录。
+- 最终代码验收 commit `7624763610ae83a74d73b71c048e179a98f0cd6f`，run `43350412493` SUCCESS：Restore PASS；Build 0 warnings / 0 errors；64 passed / 0 failed / 0 skipped；API handbook check PASS；self-contained win-x64 publish PASS；ZIP/SHA256 与 artifact upload PASS。Artifact ID `14003911442`，76,394,920 bytes，SHA256 `2054fcea5cde979d1edb59d884f932a2d5f7d8da4e3ac2cfe97c12cd713b047b`。
+- 同步函数手册/架构/用户指南等的 commit `b9110f03e105a30f0d7609a66b7415a54474d9f3`，run `43350563985` SUCCESS：64 tests、无 warning/error、API check、publish、package/upload 全 PASS。
+- 状态更新 commit `52ef72957bb0202b116e8459261604bf2dc1da6d` 已把 M7 标记为代码/CI 范围 DONE；run `43350753487` 生成本日志更新时仍在运行，必须在下一次接手时核对最终状态和最新 HEAD。
+- M7-01..M7-10 Windows 桌面人工验收仍全部 NOT RUN；CI 不代表 UIA Pattern、焦点权限、后台语义操作或 Stop 响应已经实机通过。
+- 未升级 VERSION/csproj 预览版本、未创建 Release；v0.1.0-preview.4 正式 Release/ZIP/SHA256 未变化。

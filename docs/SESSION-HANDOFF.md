@@ -234,30 +234,26 @@ M4 基础调试器已在 main 实现并通过 Windows CI。具体实现提交与
 - M5 Recorder 当前 schemaVersion 1 仍固定 `virtual-desktop-physical-pixels`；Lua generated block 使用 `MoveTo`。窗口相对录制/回放绑定尚未实现，切勿将其描述为支持窗口移动后自动跟随。
 - M6 不提供后台输入、控件值读写、UI Automation、图像/OCR，不绕过 UIPI/UAC/安全桌面。
 
-## M7 当前进度与接手指令
+## M7 交付结果与下一阶段接手指令（2026-11-13）
 
-- 当前 main 开发头（开始本次文档更新前）为 `7624763610ae83a74d73b71c048e179a98f0cd6f`；继续操作前必须重新核对 main 最新 HEAD。
-- API registry version `0.4`，共 54 个公开函数（原 40 个 + M7 新增 14 个）。新增函数：WindowBind、WindowUnbind、WindowGetCapabilities、ControlEnumerate、ControlGetInfo、ControlGetValue、ControlSetValue、ControlGetText、ControlGetSelection、ControlSelect、ControlGetToggleState、ControlToggle、ControlInvoke、WindowInput。
-- UI Automation 已隔离到独立 Lua worker，标准 Pattern 的绑定层/能力探测、密码读取保护、M6 窗口身份二次验证与前台 WindowInput 边界已接入；自建 WinForms `--automation-probe` 可用于手工验证。
-- Windows Actions run `43350367379` 对代码 commit `3092e690a84b37503b47c037829ffd010ac2a6fc` 已完成 Restore、Release Build、Core Tests 和 API handbook check；win-x64 publish/package 进行中。最新 main commit `7624763610ae83a74d73b71c048e179a98f0cd6f` 已修正契约测试里 WindowInput/Unbind 的调用顺序，run `43350412493` 排队待验。
-- **仍未结项**：必须等待最新 main 的完整 Windows CI 通过；若再失败，检查完整日志并修复后重跑。确认 registry->function reference 的 `--check` 通过后，更新 run ID / commit / 结果并把 ROADMAP M7 状态改为 DONE（仅代码/CI范围），保留 M7-01..M7-10 桌面验收 NOT RUN。
-- 后台语义操作限于目标 provider 实际暴露的 UIA Pattern。通用后台鼠标/键盘/文本注入当前明确 unsupported；不要补入无验证的 PostMessage 假后台。不得绕过 UIPI/UAC/安全桌面。
+### M7 代码与 API 范围
 
-### M7 实施范围
-1. **能力探测与报告**：建立后端能力模型，明确每个目标窗口对控件树、读取/设置文本、选择项、勾选状态、Invoke、前台鼠标/键盘、后台消息/自动化的逐项支持状态；不得只返回一个模糊的“支持后台”布尔值。API 查询目标窗口当前支持能力、后端名称、拒绝原因与限制。
-2. **标准控件自动化**：优先评估 Windows UI Automation / Accessibility 的公开能力；对真实支持的标准控件实现枚举、控件类型/名称/自动化 ID/矩形/可用模式，及 Text/Value/Selection/Toggle/Invoke 等适用模式的读取和操作。对不支持的控件返回明确 Unsupported/NotAvailable，不伪造成功。
-3. **前台/后台输入适配**：把既有 SendInput 前台实现作为明确的 foreground backend；仅在技术验证和目标控件类型确实支持时增加后台 provider（例如公开 UIA pattern 或经过测试的窗口消息 provider）。每个 provider 声明支持的窗口/控件类别与 mouse/key/text 能力，操作后返回真实结果和错误码。
-4. **窗口绑定与生命周期**：复用 M6 不透明 window ID；提供绑定/解绑与失效通知。不得把 HWND 暴露为用户脚本长期 ID。目标关闭/重建后必须重新查找并验证进程身份。
-5. **显式回退策略**：自动模式必须先探测能力；不支持时抛出明确错误，或仅在用户显式允许时切换到前台可见输入。禁止静默把后台调用假报成功。
-6. **安全边界**：普通用户权限运行；绝不绕过 UIPI/UAC、安全桌面、反作弊、DRM、受保护窗口或安全软件。高完整性目标不支持时如实返回拒绝原因。
-7. **测试与文档**：使用可控的自建测试窗体验证标准控件、不同控件 Pattern、前后台能力探测、绑定失效、回退、超时/取消、权限拒绝与错误码。更新 API 注册表、中文函数参考手册、LUA-API、架构、Feature Matrix、Acceptance、Roadmap、Development Log 和本文件。Windows CI 通过不等于桌面实机验收通过。
+- API registry version `0.4`，公开 Lua API 共 54 项，M7 新增 14 项：WindowBind、WindowUnbind、WindowGetCapabilities、ControlEnumerate、ControlGetInfo、ControlGetValue、ControlSetValue、ControlGetText、ControlGetSelection、ControlSelect、ControlGetToggleState、ControlToggle、ControlInvoke、WindowInput。
+- UI Automation Control View 和 Value/Text/Selection/SelectionItem/Toggle/Invoke 标准 Pattern 已接入。能力按模式明确报告，控件操作只在目标 provider 实际暴露对应 Pattern 时调用。不支持的模式明确失败；密码字段 Value/Text 读取被拒绝。
+- UIA/COM 与 AutomationElement 全部位于每轮独立 Lua worker。主进程通过本轮唯一 named pipe 把经过 M6 校验的短期窗口目标描述送给 worker；worker 每次控件操作前再次复核原 M6 window ID 和窗口身份。Lua 只获得随机 binding/control ID，不获得 HWND 或 UIA 对象。Stop 可以终止卡住的 worker。
+- WindowInput 仍由主进程执行 SendInput，只接受 auto/foreground；验证窗口可见、未最小化、前台、键盘焦点和客户区坐标。通用后台鼠标/键盘/文本注入明确 unsupported，不静默回退、不伪造 PostMessage 输入，也不绕过 UIPI/UAC/安全桌面。
+- 自建 WinForms `--automation-probe` 提供文本框、密码框、复选框、组合框、列表和 Invoke 按钮，供 Windows 桌面人工测试。
 
-### M7 明确不做
-- 不实现图像找图、找色、OCR 或截图调试层（后续 M8–M10）。
-- 不实现插件系统、参数 UI、独立小精灵或云同步（后续阶段）。
-- 不绕过任何 Windows 安全边界，不注入高权限进程、不使用内核驱动。
-- 不重写 M6 坐标系统；M7 复用既有窗口引用与 screen/window/client/anchor/ratio 合约。
-- 不擅自把 M5 Recorder 的屏幕绝对坐标改成相对窗口坐标；若要增加目标窗口随动录制，必须先设计可持久化窗口选择器和 sidecar schema 迁移，作为独立验收项处理。
+### 自动化验收
 
-完成 M7 后，必须按 Roadmap 的 M7 验收条件实际构建/测试、更新交接和全部相关文档，再直接提交 main；不创建 Release，除非产品版本流程明确要求。
+- **代码验收基线**：commit `7624763610ae83a74d73b71c048e179a98f0cd6f`，Windows Actions run [43350412493](https://github.com/xiaobei206/anjian/actions/runs/43350412493) SUCCESS。Restore PASS；Release Build 0 warnings / 0 errors；Core Tests 64 passed / 0 failed / 0 skipped；API handbook `--check` PASS；self-contained win-x64 publish、ZIP/SHA256 和 artifact upload PASS。Artifact ID `14003911442`，76,394,920 bytes；SHA256 `2054fcea5cde979d1edb59d884f932a2d5f7d8da4e3ac2cfe97c12cd713b047b`。
+- 函数手册、架构、用户指南、Feature Matrix、Acceptance、README 与路线图的同步提交 `b9110f03e105a30f0d7609a66b7415a54474d9f3` 的完整 Windows Actions run [43350563985](https://github.com/xiaobei206/anjian/actions/runs/43350563985) 也 SUCCESS：64/64 tests；Build 0 warning/error；API handbook check、publish、package 和 upload 均 PASS。
+- 当前状态更新提交（Roadmap M7 标记 DONE，用户指南调整了 M7 章节顺序）为 `52ef72957bb0202b116e8459261604bf2dc1da6d`，其重新验证的 Windows Actions run 为 `43350753487`；生成本 handoff 时该 run 正在运行。继续开发前核对该 run 最终状态和最新 main HEAD。
+- **桌面验收仍未完成**：M7-01..M7-10 在 `docs/ACCEPTANCE-TEST-CN.md` 全部保持 NOT RUN。不要将 GitHub Actions CI 当成 Windows 10/11 UIA Pattern、焦点、UIPI、Stop 响应的实机通过证明。
+- 本阶段未更新 VERSION/csproj 预览版本、未创建 Release；已发布的 v0.1.0-preview.4 资产未改变。
 
+## 下一会话唯一开发任务：M8 — 截图、图色与模板资源
+
+严格以 `docs/PRD-CN.md` 第 2.8 节、`docs/FEATURE-MATRIX-CN.md` F16/F17/F18、`docs/ROADMAP-CN.md` 的 M8 与验收清单为准。开始前重新核对 main 最新 HEAD，并读取 `AGENTS.md`、`README.md`、本 handoff、路线图、PRD、功能矩阵和当前截图/图色相关源码。
+
+M8 应形成截图资源生命周期、区域/窗口/客户区截图、像素与颜色比较、多点找色、模板找图、阈值、多结果、未命中/超时和资源释放的可验证闭环。必须复用既有 screen/window/client/anchor/ratio 坐标契约；不改写 MoveTo 旧语义，不把后台截图/受保护窗口截图保证成通用能力，不纳入 OCR（M9）。先梳理当前源码、依赖与离线授权/包体积，再实现 API、注册表/函数手册、自动化样例、Windows CI 和桌面验收说明；直接在 main 小步提交，不创建长期分支/PR或无要求的 Release。
