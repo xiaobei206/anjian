@@ -382,7 +382,7 @@ internal sealed class PlaybackRunner : IDisposable
             token.ThrowIfCancellationRequested();
             await _gate.WaitUntilRunnableAsync(token).ConfigureAwait(false);
             var match = ImageSearchEngine.FindImage(_images.CaptureScreenPixels(), template,
-                request.Similarity, request.Tolerance);
+                request.Similarity, request.Tolerance, cancellationToken: token);
             if (match is null)
                 return true;
             var remaining = request.TimeoutMilliseconds - (int)Math.Min(int.MaxValue, timer.ElapsedMilliseconds);
@@ -416,7 +416,7 @@ internal sealed class PlaybackRunner : IDisposable
         {
             token.ThrowIfCancellationRequested();
             await _gate.WaitUntilRunnableAsync(token).ConfigureAwait(false);
-            var match = ImageSearchEngine.FindColor(_images.CaptureScreenPixels(), request.Color, request.Tolerance);
+            var match = ImageSearchEngine.FindColor(_images.CaptureScreenPixels(), request.Color, request.Tolerance, cancellationToken: token);
             if (match is null)
                 return true;
             var remaining = request.TimeoutMilliseconds - (int)Math.Min(int.MaxValue, timer.ElapsedMilliseconds);

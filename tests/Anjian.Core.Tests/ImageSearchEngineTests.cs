@@ -89,6 +89,28 @@ public sealed class ImageSearchEngineTests
     }
 
     [Fact]
+    public void LongImageSearchOperationsObserveCancellation()
+    {
+        var image = new PixelImage(2, 2, [Rgb(1), Rgb(2), Rgb(3), Rgb(4)]);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        Assert.Throws<OperationCanceledException>(() =>
+            ImageSearchEngine.FindColor(image, 99, cancellationToken: cancellation.Token));
+        Assert.Throws<OperationCanceledException>(() =>
+            ImageSearchEngine.FindMultiColor(image, 99, [new ImageColorProbe(1, 0, 2)],
+                cancellationToken: cancellation.Token));
+        Assert.Throws<OperationCanceledException>(() =>
+            ImageSearchEngine.CountColors(image, 99, cancellationToken: cancellation.Token));
+        Assert.Throws<OperationCanceledException>(() =>
+            ImageSearchEngine.FindImage(image, new PixelImage(1, 1, [Rgb(1)]),
+                cancellationToken: cancellation.Token));
+        Assert.Throws<OperationCanceledException>(() =>
+            ImageSearchEngine.FindImages(image, new PixelImage(1, 1, [Rgb(1)]),
+                cancellationToken: cancellation.Token));
+    }
+
+    [Fact]
     public void CountColorAndImageRegionsAreValidated()
     {
         var image = new PixelImage(3, 2, [Rgb(1), Rgb(1), Rgb(1), Rgb(2), Rgb(1), Rgb(2)]);
