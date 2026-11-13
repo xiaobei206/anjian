@@ -163,7 +163,7 @@
 - 环境信息、屏幕/显示器信息、路径、应用版本、运行实例信息和诊断信息。
 - API 必须尊重路径边界、超时、错误处理和用户权限；不暴露任意 .NET 反射或不受控 Shell 执行作为默认脚本能力。
 
-**实现状态注记（main 开发版，2026-11-13；不缩减冻结范围）：** M12-02 已落地 13 项受控文件 API：ReadTextFile、WriteTextFile、AppendTextFile、FileExists、DirectoryExists、ListFiles、ListDirectories、CreateDirectory、CopyFile、MoveFile、RenameFile、CreateTempFile、CreateTempDirectory。Worker 与主进程 IPC 双层检查每次 Grant；Windows no-follow 句柄拒绝 reparse point/符号链接和多硬链接文件。文本严格 UTF-8、4 MiB 上限；目录枚举非递归、最多 1000 项；Copy/跨卷 Move 限 64 MiB，复制到目标同目录临时文件后 flush、SHA-256 校验再提交；同卷 Move/Rename 使用句柄级重命名。临时文件/目录由调用者明确指定已批准写入目录，不自动使用系统 TEMP。仅支持普通文件，目录复制/移动/重命名不在本批范围。剪贴板/对话框、进程和 HTTP API 仍待后续 M12 子任务。当前 main API registry 为 0.9 / 94 项；Windows Actions run 43385033936 的 Release Build、142/142 Core tests、API 手册校验和 win-x64/Sprite/Worker 包内 smoke 全 PASS。该开发版未改变已发布的 v0.1.0-preview.4；M14 Windows 10/11 桌面实机验收仍 NOT RUN。
+**实现状态注记（main 开发版，2026-11-13；不缩减冻结范围）：** M12-02 已落地 13 项受控文件 API：ReadTextFile、WriteTextFile、AppendTextFile、FileExists、DirectoryExists、ListFiles、ListDirectories、CreateDirectory、CopyFile、MoveFile、RenameFile、CreateTempFile、CreateTempDirectory。Worker 与主进程 IPC 双层检查每次 Grant；Windows no-follow 句柄拒绝 reparse point/符号链接和多硬链接文件。文本严格 UTF-8、4 MiB 上限；目录枚举非递归、最多 1000 项；Copy/跨卷 Move 限 64 MiB，复制到目标同目录临时文件后 flush、SHA-256 校验再提交；同卷 Move/Rename 使用句柄级重命名。临时文件/目录由调用者明确指定已批准写入目录，不自动使用系统 TEMP。仅支持普通文件，目录复制/移动/重命名不在本批范围。M12-07 已在 main 实现剪贴板/对话框 API（GetClipboardText、SetClipboardText、MessageBox、InputBox、Confirm），权限默认拒绝并由 Worker/主进程双层校验；Windows CI/桌面验收状态以交接与开发日志为准。进程、HTTP/JSON 和插件仍待后续 M12 子任务。当前 main API registry 为 1.0 / 99 项；Windows Actions run 43385033936 的 Release Build、142/142 Core tests、API 手册校验和 win-x64/Sprite/Worker 包内 smoke 全 PASS。该开发版未改变已发布的 v0.1.0-preview.4；M14 Windows 10/11 桌面实机验收仍 NOT RUN。
 
 ### 2.12 插件与扩展命令
 

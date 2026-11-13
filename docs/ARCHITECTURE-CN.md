@@ -367,9 +367,9 @@ preview.4 当前采用低级鼠标/键盘 Hook，已纳入 Windows CI 编译与�
 
 ### 17.2 权限与 IPC 运行边界
 - 主程序普通播放/调试在启动前取得本次 Grant，并将其写入 worker-ready 握手载荷；WorkerProgram 注入 WorkerLuaApi。SpriteLauncherForm 复用 PlaybackRunner 的相同 IPC dispatcher；当前小精灵没有 sidecar 审阅，RunAsync 未提供 Grant 时使用 ScriptPermissionGrant.Empty，默认拒绝。
-- 对文件类命令，Worker bridge 在发送前执行 Grant 检查；PlaybackRunner.DispatchAsync 对每个 file/directory IPC 再次从当前运行 _launchPermissions 检查。命令不在文件白名单时不会进入文件 dispatcher；文件 dispatcher 对未知命令默认拒绝。Worker 伪造 IpcMessage 不会绕过 host 检查。
+- 对文件类命令，Worker bridge 在发送前执行 Grant 检查；PlaybackRunner.DispatchAsync 对每个 file/directory IPC 再次从当前运行 _launchPermissions 检查。M12-07 的 clipboard/dialog 命令使用独立的 ScriptClipboardDialogPolicy.ValidateCommand 在 Worker 与 host 两侧分别校验 clipboardRead、clipboardWrite、message/input/confirm 权限与载荷限制；未知命令默认拒绝。Worker 伪造 IpcMessage 不会绕过 host 检查。
 - 权限仍不是恶意 Lua 的 OS 级沙箱：Lua 只能调用受注册表约束的桥接函数，但同用户本地进程、内核驱动或其他进程能力不在这层文件 API 的完全隔离承诺内。不得宣传为容器或沙箱。
-- 剪贴板、对话框、进程、HTTP 与插件 API 尚未开放；权限 sidecar 在小精灵包内的收集/逐次审阅尚未实现。权限窗体和真实桌面交互继续留 M14。
+- M12-07 已接入剪贴板/对话框 API；进程、HTTP 与插件 API仍待后续子任务。权限 sidecar 在小精灵包内的收集/逐次审阅尚未实现。权限窗体、真实剪贴板/对话框与桌面交互继续留 M14。
 
 ### 17.3 文件系统首批适配器与 Lua API（M12-02 部分完成）
 - ScriptFileSystem.ResolvePath 把相对路径以脚本所在目录为基准解析为完整路径；拒绝 Windows 设备/扩展设备路径、盘符相对路径、NTFS 备用数据流和超长路径。最终授权由 ScriptPermissionGrant 的文件读取/写入根执行 Path.GetRelativePath 边界判断。
@@ -378,3 +378,13 @@ preview.4 当前采用低级鼠标/键盘 Hook，已纳入 Windows CI 编译与�
 - WorkerLuaApi.Files.cs 负责 Worker Grant 检查与 IPC 参数/返回值转换；ScriptFileSystemHostDispatcher 在主进程以本轮 Grant 再检查一次，独立反序列化 IPC 请求；PlaybackRunner 只将上述明确白名单命令送入 dispatcher。文件/目录 API 无审批即拒绝。
 - 本批未覆盖复制、移动、重命名、临时文件/目录 API；追加不是事务性原子替换；路径适配器只在 Windows 10/11 工作。大小/项目上限是安全边界，不是可配置项。M12-02 仍为 PARTIAL。
 - Windows Actions run [241](https://github.com/xiaobei206/anjian/actions/runs/43381018127)：Release Build 0 warnings / 0 errors、134/134 Core tests、API handbook check、自包含 win-x64 publish 与包内 Sprite/Worker smoke 全 PASS；权限 UI 实机体验 NOT RUN（M14）。
+
+
+### 17.4 剪贴板与对话框的 UI/取消边界（M12-07）
+
+- Core 的 `ScriptClipboardDialogPolicy` 是 IPC 命令和载荷的共享契约；它在 Worker bridge 发请求前检查本次 Grant，PlaybackRunner 对接收的命令重新检查，不能只依赖 UI 是否显示某个按钮。
+- Clipboard 读取/写入和模态窗体由 App 层 `ClipboardDialogHost` 通过所属 WinForms Control 的 `BeginInvoke` 调度到 UI STA 线程。对话框采用自定义窗体而非不可控的原生 MessageBox，以便 Stop 时关闭当前窗体。
+- 剪贴板文本上限为 1,048,576 个 UTF-16 字符；消息/提示文本和 InputBox 默认值/输入上限为 32,768 个 UTF-16 字符；标题上限为 256 个字符。内容不会自动进入应用日志。
+- Pause 在调用前的 Runner 命令边界生效；打开对话框期间进入 Pause 时，当前对话框继续显示，脚本在下一命令边界等待恢复。Stop 取消等待任务并尝试关闭挂起窗体；如果剪贴板写入已由 Windows 接受，不承诺回滚副作用。
+- 小精灵尚未接入逐次 permissions sidecar 审阅，故启动其 Worker 时未传入 Grant 仍然使用 Empty，所有剪贴板/对话框 API 默认拒绝。CI 自动化不能代替 M14 实际 Windows 10/11 权限/DPI/交互验收。
+

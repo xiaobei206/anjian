@@ -238,7 +238,7 @@ M7 实现/CI 已完成不代表 M7-01..M7-10 Windows 桌面验收通过；这些
 ## M12–M13 — 扩展 API、插件和自动运行
 
 
-### M12 当前进度（2026-11-13；M12-02 文件/目录 API 已实现，M12 整体仍进行中）
+### M12 当前进度（2026-11-13；M12-02 文件/目录 API 已实现；M12-07 剪贴板/对话框已编码，待最新 Windows CI 结果确认）
 
 - M12-01 已完成并进入 main：Core 权限请求/批准/Grant 数据模型、schema v1 解析和范围校验；每脚本可选 sidecar 为脚本文件全名后缀 .permissions.json，最大 256 KiB，声明本身不代表授权。
 - 主程序普通播放/调试启动前逐项审阅本次请求，默认全不勾选、取消不启动 Worker；缺少 sidecar 使用空 Grant，损坏/未来 schema/重解析点 sidecar 拒绝启动。
@@ -250,9 +250,17 @@ M7 实现/CI 已完成不代表 M7-01..M7-10 Windows 桌面验收通过；这些
 - Windows 桌面权限窗口、小精灵逐次 sidecar 审阅和 Windows 10/11 真实桌面文件操作均 NOT RUN，统一留到 M14；CI PASS 不代表实机验收。
 - 未修改 VERSION / AssemblyVersion / FileVersion；不创建 tag/Release；已发布的 v0.1.0-preview.4 资产保持不变。
 
+
+### M12-07 剪贴板与对话框（实现进入 main；Windows CI 待确认）
+
+- 新增 `GetClipboardText()`、`SetClipboardText(text)`、`MessageBox(text,title?)`、`InputBox(prompt,title?,defaultValue?)`、`Confirm(text,title?)`，registry 从 0.9/94 升为 1.0/99。
+- 权限使用既有 sidecar：`clipboardRead`、`clipboardWrite` 与 `dialogs: ["message","input","confirm"]`；每次运行由用户明确批准。Worker 侧和 PlaybackRunner 主进程分别按本次 Grant 验证，未知命令 fail-closed。
+- Clipboard 与自定义模态对话框都调度到 WinForms 主 UI/STA 线程；输入/提示/标题/剪贴板文本有长度上限；InputBox 取消返回 nil，Confirm 否/关闭返回 false；Stop 会关闭挂起的自定义对话框。暂停在命令边界应用；剪贴板已提交的外部副作用不承诺回滚。
+- 当前提交：实现 `7c561f9d342d7d6f64a9a14535898b8790bb08f6`，API 契约与函数手册 `bd316e26c34f6ddf3198036875baba06cb568d9a`。Windows Actions run 43407639817 对代码 HEAD 的初步验证仍需以最终 CI 收尾为准；所有真实 Windows 10/11 权限、剪贴板和窗口交互继续 NOT RUN，统一留 M14。
+
 ### M12 后续实施顺序（必须按安全依赖推进）
 
-1. M12-07：剪贴板读写与消息/输入/确认对话框，明确长度限制、STA/主 UI 线程调度、暂停/取消和主进程二次权限检查。
+1. M12-07：剪贴板读写与消息/输入/确认对话框；当前已编码，须先确认 Windows CI 全通过并修复任何失败。
 2. M12-08：精确 EXE 启动/等待/查询及退出状态，严格按批准路径，不开放任意 Shell。
 3. M12-09：HTTP(S)/JSON，精确主机/方法授权，HTTPS 默认，HTTP 单独审批，重定向重新授权、超时、响应上限和 Stop 取消。
 4. M12-10：本地插件目录/ZIP manifest、稳定 ID、版本/API 兼容、文件清单/hash、脚本声明/插件声明/用户批准权限取交集，启停/卸载及错误隔离；不加载任意 DLL，不在主 UI 执行插件 Lua。

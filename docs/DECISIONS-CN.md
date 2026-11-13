@@ -192,3 +192,15 @@
 - 临时 API：仅在调用者明确指定且已批准写入的目录中创建随机名称文件/目录，返回完整路径；通过 CREATE_NEW/单级目录创建处理竞态，名称碰撞只重试，不打开或覆盖既有对象。不会自动使用或授权系统 TEMP。
 - 句柄边界：父目录链在操作期间以 OPEN_REPARSE_POINT 打开且不共享删除；源/已有目标以 no-follow 句柄验证 reparse 属性与硬链接数。FileRenameInfo 使用 RootDirectory=NULL 和 Windows verbatim 完整目标路径，补充 UTF-16 NUL 终止符，父目录句柄仍用于锁定路径链。
 - 限制：此设计降低路径替换竞态，但不是对恶意同用户进程的完整 OS 沙箱；本批不提供递归目录操作，也不提供临时对象自动清理 API。
+
+
+## ADR-027：剪贴板与对话框 API 使用 UI STA 调度和双层授权
+
+- 状态：ACCEPTED（M12-07；自动化结果待最终 Windows Actions 确认，真实桌面验收留 M14）。
+- 公开 API：`GetClipboardText()`、`SetClipboardText(text)`、`MessageBox(text,title?)`、`InputBox(prompt,title?,defaultValue?)`、`Confirm(text,title?)`。API registry 从 0.9 / 94 项递增为 1.0 / 99 项，函数手册继续由 registry 生成。
+- 授权字段沿用 ADR-024：剪贴板读写分别要求 `clipboardRead` / `clipboardWrite`；对话框分别要求 `dialogs` 中精确的 `message`、`input`、`confirm`。声明不等于批准，用户每次运行可批准子集；Worker 和 PlaybackRunner host dispatcher 各自验证。
+- Core 的 `ScriptClipboardDialogPolicy.ValidateCommand` 校验命令 allowlist、Grant 和请求载荷。剪贴板文本限制 1,048,576 个 UTF-16 字符；对话框正文/提示与 InputBox 默认值/输入限制 32,768 字符，标题 256 字符；未知命令及损坏/超限 payload fail-closed。
+- App 使用 `ClipboardDialogHost`，通过主 Form 的 `BeginInvoke` 在 WinForms UI STA 线程调用 Clipboard，创建可取消的自定义模态窗体。InputBox 取消/关闭返回 nil；Confirm 点否/关闭返回 false；MessageBox 点确定返回 true，关闭返回 false。
+- Stop 取消挂起 IPC，并关闭正在显示的自定义对话框；Pause 在命令边界生效，打开模态对话框时不强制关闭。Windows 已接受的剪贴板写入无法保证回滚。剪贴板/对话框内容不自动进入应用日志。
+- 小精灵未接入 permissions sidecar 审阅，缺少 Grant 仍为空授权；禁止把这批 API 视为默认开放。M14 仍需在 Windows 10/11 实机验收权限审阅、剪贴板占用/错误、对话框停止、DPI 与多显示器布局。
+
