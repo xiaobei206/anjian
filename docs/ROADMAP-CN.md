@@ -273,7 +273,7 @@ M7 实现/CI 已完成不代表 M7-01..M7-10 Windows 桌面验收通过；这些
 - 上游包规模较小，保留 Core/App 适配边界；若 CI、许可或实际质量不达标，替换 App adapter，不改变稳定 Lua DTO/API 契约。
 
 
-## M10 — 参数、配置与脚本自定义 UI（下一开发阶段）
+## M10 — 参数、配置与脚本自定义 UI（范围冻结与实施记录；当前已完成）
 
 以 PRD 2.9、2.13、F20/F26 为完整范围，先设计稳定 schema，再实现闭环。M10 不得把脚本运行时变量误当作用户启动参数。
 
@@ -302,7 +302,7 @@ M7 实现/CI 已完成不代表 M7-01..M7-10 Windows 桌面验收通过；这些
 - Windows CI Restore/Build/Core Tests/API handbook/self-contained win-x64 publish/ZIP/SHA256 必须全 PASS。真实 WinForms 表单、DPI 和交互仍延后至 M14 集中验收。
 
 
-## M10 — 参数、配置与脚本自定义 UI（IN_PROGRESS）
+## M10 — 参数、配置与脚本自定义 UI（DONE：实现/自动化；桌面验收待 M14）
 
 ### 首轮规格冻结（2026-11-13）
 - ADR-022 决定脚本 sidecar `<script>.params.json` schemaVersion=1；不执行 Lua 读取声明。用户值与参数定义分离，配置存放用户数据目录并按脚本规范化路径派生稳定键。
@@ -323,5 +323,5 @@ M7 实现/CI 已完成不代表 M7-01..M7-10 Windows 桌面验收通过；这些
 - Core：`ScriptParameterSchema`、`ScriptParameterValidator`、`ParameterConfigurationStore` 和 `LuaParameterInjector`；类型校验保留 JSON 原生类型，覆盖必填、范围、选项、多选重复、路径存在性、热键、颜色、正则和未来 schema 保护。
 - App：`ScriptParameterService`、`ScriptParameterDialog`、`ScriptParameterDesignerForm`；`<script>.params.json` 与 LocalAppData 运行配置分离，播放/调试启动前统一读取/校验，用户取消或校验失败不启动 Worker。
 - Worker：通过 `worker-ready` 握手接收结构化 JSON 参数，构建 Lua 原生值；`Args` 使用递归代理拦截常规写入，不把用户输入拼接为代码。该只读代理不是恶意脚本沙箱。
-- 上一次完整 Windows CI run [43366381240](https://github.com/xiaobei206/anjian/actions/runs/43366381240) 对代码基线通过：Restore、Build 0 warnings/errors、98/98 tests、API handbook check、win-x64 自包含发布和 ZIP/SHA256；artifact ID 14011010562，87,098,604 bytes，digest `7d5f988b7cdaabd3f0c3db2fe3f9b8c1ecb2fb205ee9963ca3614c745dc12b17`。之后补充数值/路径/正则和可选空值测试，最新 run [43366600434](https://github.com/xiaobei206/anjian/actions/runs/43366600434) 已 SUCCESS：100/100 Core tests、Build 0 warnings/errors、API handbook check、自包含发布、ZIP/SHA256 与 artifact upload 全 PASS；artifact ID 14009953905，digest `da291400de9917568941c927d441e1df7cec3e6daf6a2ca877b9ec83cce7cd88`。
+- M10 最终代码 HEAD `a923f1e02dce73629514da39bb10925b1271fc15` 的 Windows CI run [43368224862](https://github.com/xiaobei206/anjian/actions/runs/43368224862) SUCCESS：Restore PASS、Release Build 0 warnings/0 errors、102/102 Core tests、API handbook check、自包含 win-x64 publish、ZIP/SHA256 与 artifact upload 全 PASS。artifact ID `14010789337`，87,099,638 bytes，SHA-256 `324ed884d9938548d2d35b94cd372a4bc46bf081f7abd1c77e17b28d1acf1323`（有效至 2026-12-13；非 Release）。
 - M10-01..M10-10 的桌面实测保持 NOT RUN；按统一策略延期至 M14 后。
