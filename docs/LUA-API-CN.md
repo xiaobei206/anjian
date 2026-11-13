@@ -3,7 +3,7 @@
 > 这是当前运行时 API 契约与完整目标 API 设计的技术规格。当前函数与目标函数的状态以 [中文函数/参数参考手册](FUNCTION-REFERENCE-CN.md) 和 [完整功能矩阵](FEATURE-MATRIX-CN.md) 为准。
 
 - Lua 版本：5.4
-- API 版本：0.3（M6 新增坐标与窗口管理函数；以 main 开发版为准，尚未发布到 preview.4）
+- API 版本：0.4（M7 新增 UI Automation 控件 API 与显式前台输入；仅 main 开发版，尚未发布到 preview.4）
 - 命令风格：全局英文函数名 + 标准 Lua 函数调用语法
 - 时间单位：毫秒
 - 坐标单位：虚拟桌面物理像素
@@ -155,7 +155,37 @@ M6 已在 main 开发版提供以下显式坐标空间：
 
 这些函数仅处理当前交互桌面的 Win32 窗口元数据与窗口布局；不读取/设置控件值、不提供后台输入、不绕过 UIPI/UAC 或安全桌面，也不承诺跨用户会话访问。Windows 实机 DPI、多显示器和权限验收仍需单独进行。
 
-### 5.4 录制与回放要求
+### 5.4 M7 控件自动化与输入后端
+
+以下 API 只在 main 开发版可用，未包含在已发布的 `v0.1.0-preview.4` 包中。
+
+```lua
+local w = WindowFind("目标窗口", "", "notepad", 0, true)
+if not w then error("窗口未找到") end
+
+local binding = WindowBind(w.id)
+local caps = WindowGetCapabilities(binding)
+for _, cap in ipairs(caps.capabilities) do
+    Log(cap.name .. ": " .. cap.status .. " / " .. cap.backend)
+end
+
+local controls = ControlEnumerate(binding, 256)
+for _, c in ipairs(controls) do
+    Log(c.name .. " / " .. c.controlType .. " / " .. table.concat(c.supportedPatterns, ","))
+end
+WindowUnbind(binding)
+```
+
+- `WindowBind(id)` 接收当前运行内的 M6 不透明窗口 ID，返回本轮随机 `bindingId`；脚本不会得到 HWND 或 .NET/UIA 对象。
+- `ControlEnumerate(bindingId, maxResults?)` 最多返回 512 项、遍历深度最多 16 层。每项包括 `controlId`、名称、AutomationId、类名、类型、物理像素矩形、启用/屏外/焦点状态、密码标记和当前 provider 暴露的 Pattern。
+- `WindowGetCapabilities(bindingId)` 逐项报告控件树、Value/Text、Selection/SelectionItem、Toggle、Invoke、前台鼠标/键盘/文本与通用后台注入能力。状态包含 `available`、`conditional` 或 `unsupported`，并附带原因与限制。能力报告不是对每个控件都支持所有 Pattern 的保证。
+- `ControlGetInfo`、`ControlGetValue`、`ControlSetValue`、`ControlGetText`、`ControlGetSelection`、`ControlSelect`、`ControlGetToggleState`、`ControlToggle` 和 `ControlInvoke` 只调用该控件实际暴露的 UIA Pattern。不支持时明确报错；控件销毁/重建后必须重新枚举。为避免凭据泄露，密码字段的 Value/Text 读取会被拒绝。
+- UIA 的 Value/Selection/Toggle/Invoke 是**控件语义操作**，在目标 provider 允许时可以对非前台窗口操作；它们不等于后台键盘/鼠标消息注入。
+- `WindowInput(bindingId, backend, action, name?, x?, y?, value?, holdMs?)` 的 `backend` 只能是 `auto` 或 `foreground`；两者在 M7 均明确使用前台 SendInput。目标窗口必须可见、未最小化且在前台；键盘/文本还要求目标窗口中已有键盘焦点。move/click 的屏幕物理像素坐标必须位于该窗口客户区。不会自动激活/抢焦点，也不会静默回退。
+- 通用后台鼠标、键盘和文本注入当前明确不支持；能力表会返回 `unsupported`。不使用伪造 PostMessage 冒充后台输入，不绕过 UIPI、UAC、安全桌面或更高完整性级别的限制。
+- UIA 运行在每轮独立 Lua worker 进程内。若第三方 provider/COM 调用挂起，主进程仍能终止该 worker；主进程仍负责验证 M6 窗口引用和执行前台 SendInput。窗口身份在每次控件 API 调用前复核，控件/binding ID 不跨脚本轮次持久化。
+
+### 5.5 录制与回放要求
 
 当前 M5 的 `RecorderDocument.CoordinateSpace` 固定为 `virtual-desktop-physical-pixels`；`RecorderDocumentBuilder` 保存全局 Hook 捕获到的虚拟桌面屏幕物理像素，`RecorderLuaGenerator` 生成 `MoveTo(x, y)`。M6 没有改变该 sidecar schemaVersion 1 或既有录制文件的含义，也没有把临时窗口 GUID 写入文件（该 GUID 只在当前脚本运行期间有效）。因此目前录制/回放的定义是明确的 screen 绝对坐标模式；按键/鼠标原有动作不回归，但窗口移动后不会自动跟随窗口。持久窗口选择器、窗口/客户区/ratio 坐标录制及回放重定位仍未实现，后续需要设计可持久化的窗口匹配条件和 schema 迁移。`CoordinateToScreen` / `CoordinateFromScreen` 可供脚本在运行时显式换算，不能视为 Recorder 已支持相对录制。窗口坐标转换成功也不代表后台输入成功；后台输入属于后续阶段独立能力和权限契约。
 
@@ -178,7 +208,7 @@ M6 已在 main 开发版提供以下显式坐标空间：
 
 ## 8. API 注册与兼容
 
-- 唯一机器可读来源：`src/Anjian.Core/Api/lua-api-registry.json`，登记 40 个当前公开函数的稳定 ID、分类、签名、参数 schema、默认值/范围、返回值/错误、暂停/取消、坐标/权限、示例、实现状态和版本。
+- 唯一机器可读来源：`src/Anjian.Core/Api/lua-api-registry.json`，登记 54 个当前公开函数的稳定 ID、分类、签名、参数 schema、默认值/范围、返回值/错误、暂停/取消、坐标/权限、示例、实现状态和版本。
 - `Anjian.Core.Api.LuaApiRuntime` 从该注册表生成 Lua 全局包装；内部 `__...` 桥接绑定在包装闭包建立后隐藏。
 - `docs/FUNCTION-REFERENCE-CN.md` 第 2 节由 `tools/Anjian.ApiDocsGenerator` 生成；使用 `--write` 更新，`--check` 验证是否漂移。
 - 注册表只包含真实当前实现。窗口、图色、OCR 等候选仍在目标设计区，不会被标记为当前可用。

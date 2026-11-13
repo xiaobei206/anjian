@@ -149,6 +149,8 @@ Lua 环境默认不开放任意 .NET 类型导入、程序集加载、文件系�
 - 既有 MoveTo(x, y) 仍只使用虚拟桌面绝对物理像素，原点和范围以 Windows 虚拟桌面指标为准；负坐标合法。
 - M6 Core 提供 screen/window/client/anchor/ratio 纯转换算法；window 基于外框，client/ratio 基于客户区，anchor 基于外框九宫格。
 - M6 Win32 窗口管理器位于 Anjian.App.Services.WindowsWindowManager；Lua Worker 只传递不透明窗口 ID 与 JSON IPC，主进程执行 HWND 枚举/状态/布局/等待。窗口引用每轮运行清除，并结合 EVENT_OBJECT_DESTROY 与 PID/线程/类/进程启动时间验证。顶层/子窗口区分写入 `WindowInfo.isChild`；子窗口 Move/Resize/Align 的公开坐标仍是虚拟桌面屏幕物理像素，调用 SetWindowPos 前转换为父窗口客户区坐标。
+- M7 UI Automation provider 位于 Lua worker 进程，而不在主 UI 进程中。主进程仅响应本轮私有命名管道的 `window-automation-target` 请求，把已通过 M6 引用校验的窗口身份描述发给 worker；该描述内部包含短期 HWND，但公开 Lua API 仍只暴露随机 binding/control ID。每次控件调用前 worker 再请求主进程复核同一个 M6 引用，并检查 PID、线程、类名和进程启动时间。UIA AutomationElement/COM 代理只保存在 worker，绑定随 worker 退出释放。这样 Stop 可以终止被第三方 provider 阻塞的 worker，而不会让主 UI 因同步 COM 调用卡死。
+- UIA 的后台能力定义为标准控件语义：ValuePattern.SetValue、Selection/SelectionItem、Toggle 与 Invoke。M7 不把这类操作描述成后台键盘输入；通用后台鼠标/键盘/文本注入明确为 unsupported。前台 WindowInput 仍由主进程调用 SendInput，并检查可见/未最小化/前台/焦点/客户区范围，不自动抢焦点或静默回退。密码字段禁止读取 Value/Text。
 - 不假设 SendInput 或 SetWindowPos 对任何权限等级、受保护应用、游戏或安全桌面都有效；不绕过 UIPI/UAC/安全桌面。
 - 程序默认普通用户权限运行；发生 UIPI/权限限制时向用户说明。
 - 追踪本程序模拟的按键/鼠标按下状态，结束时发出对应释放动作。

@@ -2419,7 +2419,7 @@
       "name": "WindowBind",
       "category": "automation",
       "title": "绑定自动化窗口",
-      "description": "将当前运行期有效的 M6 不透明窗口引用绑定为控件自动化会话，返回新的运行期不透明 bindingId；不暴露 HWND。",
+      "description": "将经过 M6 身份校验的不透明窗口引用绑定到本轮独立 Lua worker 的 UI Automation 会话。脚本只获得随机 bindingId，不获得 HWND。",
       "signature": "WindowBind(id)",
       "parameters": [
         {
@@ -2438,7 +2438,7 @@
       ],
       "behavior": {
         "pauseBehavior": "在 Lua 命令边界遵循暂停状态；UI Automation 同步调用期间无法被中途抢占。",
-        "cancellationBehavior": "Stop 会终止 worker；UI Automation provider 的同步 COM 调用无法保证被硬中断，停止会在调用返回后的下一个边界生效。",
+        "cancellationBehavior": "UI Automation 在独立 Lua worker 进程内运行；Stop 可直接终止卡在 provider/COM 调用中的 worker，主进程 UI 不会被该 COM 调用阻塞。",
         "sideEffects": [],
         "coordinateSpace": "none",
         "permissionNotes": "仅使用公开 Windows UI Automation API；受 UIPI、UAC、安全桌面、用户会话和目标 provider 能力约束，不提升权限或绕过访问控制。"
@@ -2446,7 +2446,7 @@
       "example": "local w = WindowFind(\"记事本\")\nif w then local binding = WindowBind(w.id) end",
       "implementationStatus": "implemented",
       "verificationStatus": "automated-contract-test;desktop-unverified",
-      "introducedIn": "0.3.0-dev.1",
+      "introducedIn": "0.4.0-dev.1",
       "runtime": {
         "definition": "function(id) return __AnjianBridge_WindowBind(id) end",
         "bindings": [
@@ -2482,7 +2482,7 @@
       ],
       "behavior": {
         "pauseBehavior": "在 Lua 命令边界遵循暂停状态；UI Automation 同步调用期间无法被中途抢占。",
-        "cancellationBehavior": "Stop 会终止 worker；UI Automation provider 的同步 COM 调用无法保证被硬中断，停止会在调用返回后的下一个边界生效。",
+        "cancellationBehavior": "UI Automation 在独立 Lua worker 进程内运行；Stop 可直接终止卡在 provider/COM 调用中的 worker，主进程 UI 不会被该 COM 调用阻塞。",
         "sideEffects": [],
         "coordinateSpace": "none",
         "permissionNotes": "仅使用公开 Windows UI Automation API；受 UIPI、UAC、安全桌面、用户会话和目标 provider 能力约束，不提升权限或绕过访问控制。"
@@ -2490,7 +2490,7 @@
       "example": "local binding = WindowBind(w.id)\nWindowUnbind(binding)",
       "implementationStatus": "implemented",
       "verificationStatus": "automated-contract-test;desktop-unverified",
-      "introducedIn": "0.3.0-dev.1",
+      "introducedIn": "0.4.0-dev.1",
       "runtime": {
         "definition": "function(bindingId) return __AnjianBridge_WindowUnbind(bindingId) end",
         "bindings": [
@@ -2507,7 +2507,7 @@
       "name": "WindowGetCapabilities",
       "category": "automation",
       "title": "查询窗口自动化能力",
-      "description": "逐项返回控件树、UIA Pattern、前台 SendInput 和后台输入能力、使用后端、限制及拒绝原因。",
+      "description": "逐项报告目标窗口的 UIA 控件树/标准 Pattern、可用前台 SendInput，以及尚不支持的通用后台鼠标/键盘/文本输入能力；包含后端、状态、原因和限制。",
       "signature": "WindowGetCapabilities(bindingId)",
       "parameters": [
         {
@@ -2526,7 +2526,7 @@
       ],
       "behavior": {
         "pauseBehavior": "在 Lua 命令边界遵循暂停状态；UI Automation 同步调用期间无法被中途抢占。",
-        "cancellationBehavior": "Stop 会终止 worker；UI Automation provider 的同步 COM 调用无法保证被硬中断，停止会在调用返回后的下一个边界生效。",
+        "cancellationBehavior": "UI Automation 在独立 Lua worker 进程内运行；Stop 可直接终止卡在 provider/COM 调用中的 worker，主进程 UI 不会被该 COM 调用阻塞。",
         "sideEffects": [],
         "coordinateSpace": "none",
         "permissionNotes": "仅使用公开 Windows UI Automation API；受 UIPI、UAC、安全桌面、用户会话和目标 provider 能力约束，不提升权限或绕过访问控制。"
@@ -2534,7 +2534,7 @@
       "example": "local caps = WindowGetCapabilities(binding)\nfor i, item in ipairs(caps.capabilities) do Log(item.name .. \":\" .. item.status) end",
       "implementationStatus": "implemented",
       "verificationStatus": "automated-contract-test;desktop-unverified",
-      "introducedIn": "0.3.0-dev.1",
+      "introducedIn": "0.4.0-dev.1",
       "runtime": {
         "definition": "function(bindingId) return __AnjianBridge_WindowGetCapabilities(bindingId) end",
         "bindings": [
@@ -2579,7 +2579,7 @@
       ],
       "behavior": {
         "pauseBehavior": "在 Lua 命令边界遵循暂停状态；UI Automation 同步调用期间无法被中途抢占。",
-        "cancellationBehavior": "Stop 会终止 worker；UI Automation provider 的同步 COM 调用无法保证被硬中断，停止会在调用返回后的下一个边界生效。",
+        "cancellationBehavior": "UI Automation 在独立 Lua worker 进程内运行；Stop 可直接终止卡在 provider/COM 调用中的 worker，主进程 UI 不会被该 COM 调用阻塞。",
         "sideEffects": [],
         "coordinateSpace": "none",
         "permissionNotes": "仅使用公开 Windows UI Automation API；受 UIPI、UAC、安全桌面、用户会话和目标 provider 能力约束，不提升权限或绕过访问控制。"
@@ -2587,7 +2587,7 @@
       "example": "local controls = ControlEnumerate(binding, 256)\nfor i, c in ipairs(controls) do Log(c.name .. \" \" .. c.controlType) end",
       "implementationStatus": "implemented",
       "verificationStatus": "automated-contract-test;desktop-unverified",
-      "introducedIn": "0.3.0-dev.1",
+      "introducedIn": "0.4.0-dev.1",
       "runtime": {
         "definition": "function(bindingId, maxResults) return __AnjianBridge_ControlEnumerate(bindingId, maxResults == nil and 256 or maxResults) end",
         "bindings": [
@@ -2629,7 +2629,7 @@
       ],
       "behavior": {
         "pauseBehavior": "在 Lua 命令边界遵循暂停状态；UI Automation 同步调用期间无法被中途抢占。",
-        "cancellationBehavior": "Stop 会终止 worker；UI Automation provider 的同步 COM 调用无法保证被硬中断，停止会在调用返回后的下一个边界生效。",
+        "cancellationBehavior": "UI Automation 在独立 Lua worker 进程内运行；Stop 可直接终止卡在 provider/COM 调用中的 worker，主进程 UI 不会被该 COM 调用阻塞。",
         "sideEffects": [],
         "coordinateSpace": "none",
         "permissionNotes": "仅使用公开 Windows UI Automation API；受 UIPI、UAC、安全桌面、用户会话和目标 provider 能力约束，不提升权限或绕过访问控制。"
@@ -2637,7 +2637,7 @@
       "example": "local info = ControlGetInfo(binding, control.controlId)",
       "implementationStatus": "implemented",
       "verificationStatus": "automated-contract-test;desktop-unverified",
-      "introducedIn": "0.3.0-dev.1",
+      "introducedIn": "0.4.0-dev.1",
       "runtime": {
         "definition": "function(bindingId, controlId) return __AnjianBridge_ControlGetInfo(bindingId, controlId) end",
         "bindings": [
@@ -2679,7 +2679,7 @@
       ],
       "behavior": {
         "pauseBehavior": "在 Lua 命令边界遵循暂停状态；UI Automation 同步调用期间无法被中途抢占。",
-        "cancellationBehavior": "Stop 会终止 worker；UI Automation provider 的同步 COM 调用无法保证被硬中断，停止会在调用返回后的下一个边界生效。",
+        "cancellationBehavior": "UI Automation 在独立 Lua worker 进程内运行；Stop 可直接终止卡在 provider/COM 调用中的 worker，主进程 UI 不会被该 COM 调用阻塞。",
         "sideEffects": [],
         "coordinateSpace": "none",
         "permissionNotes": "仅使用公开 Windows UI Automation API；受 UIPI、UAC、安全桌面、用户会话和目标 provider 能力约束，不提升权限或绕过访问控制。"
@@ -2687,7 +2687,7 @@
       "example": "local value = ControlGetValue(binding, edit.controlId)",
       "implementationStatus": "implemented",
       "verificationStatus": "automated-contract-test;desktop-unverified",
-      "introducedIn": "0.3.0-dev.1",
+      "introducedIn": "0.4.0-dev.1",
       "runtime": {
         "definition": "function(bindingId, controlId) return __AnjianBridge_ControlGetValue(bindingId, controlId) end",
         "bindings": [
@@ -2735,7 +2735,7 @@
       ],
       "behavior": {
         "pauseBehavior": "在 Lua 命令边界遵循暂停状态；UI Automation 同步调用期间无法被中途抢占。",
-        "cancellationBehavior": "Stop 会终止 worker；UI Automation provider 的同步 COM 调用无法保证被硬中断，停止会在调用返回后的下一个边界生效。",
+        "cancellationBehavior": "UI Automation 在独立 Lua worker 进程内运行；Stop 可直接终止卡在 provider/COM 调用中的 worker，主进程 UI 不会被该 COM 调用阻塞。",
         "sideEffects": [],
         "coordinateSpace": "none",
         "permissionNotes": "仅使用公开 Windows UI Automation API；受 UIPI、UAC、安全桌面、用户会话和目标 provider 能力约束，不提升权限或绕过访问控制。"
@@ -2743,7 +2743,7 @@
       "example": "ControlSetValue(binding, edit.controlId, \"hello\")",
       "implementationStatus": "implemented",
       "verificationStatus": "automated-contract-test;desktop-unverified",
-      "introducedIn": "0.3.0-dev.1",
+      "introducedIn": "0.4.0-dev.1",
       "runtime": {
         "definition": "function(bindingId, controlId, value) return __AnjianBridge_ControlSetValue(bindingId, controlId, value) end",
         "bindings": [
@@ -2785,7 +2785,7 @@
       ],
       "behavior": {
         "pauseBehavior": "在 Lua 命令边界遵循暂停状态；UI Automation 同步调用期间无法被中途抢占。",
-        "cancellationBehavior": "Stop 会终止 worker；UI Automation provider 的同步 COM 调用无法保证被硬中断，停止会在调用返回后的下一个边界生效。",
+        "cancellationBehavior": "UI Automation 在独立 Lua worker 进程内运行；Stop 可直接终止卡在 provider/COM 调用中的 worker，主进程 UI 不会被该 COM 调用阻塞。",
         "sideEffects": [],
         "coordinateSpace": "none",
         "permissionNotes": "仅使用公开 Windows UI Automation API；受 UIPI、UAC、安全桌面、用户会话和目标 provider 能力约束，不提升权限或绕过访问控制。"
@@ -2793,7 +2793,7 @@
       "example": "local text = ControlGetText(binding, edit.controlId)",
       "implementationStatus": "implemented",
       "verificationStatus": "automated-contract-test;desktop-unverified",
-      "introducedIn": "0.3.0-dev.1",
+      "introducedIn": "0.4.0-dev.1",
       "runtime": {
         "definition": "function(bindingId, controlId) return __AnjianBridge_ControlGetText(bindingId, controlId) end",
         "bindings": [
@@ -2835,7 +2835,7 @@
       ],
       "behavior": {
         "pauseBehavior": "在 Lua 命令边界遵循暂停状态；UI Automation 同步调用期间无法被中途抢占。",
-        "cancellationBehavior": "Stop 会终止 worker；UI Automation provider 的同步 COM 调用无法保证被硬中断，停止会在调用返回后的下一个边界生效。",
+        "cancellationBehavior": "UI Automation 在独立 Lua worker 进程内运行；Stop 可直接终止卡在 provider/COM 调用中的 worker，主进程 UI 不会被该 COM 调用阻塞。",
         "sideEffects": [],
         "coordinateSpace": "none",
         "permissionNotes": "仅使用公开 Windows UI Automation API；受 UIPI、UAC、安全桌面、用户会话和目标 provider 能力约束，不提升权限或绕过访问控制。"
@@ -2843,7 +2843,7 @@
       "example": "local selected = ControlGetSelection(binding, list.controlId)",
       "implementationStatus": "implemented",
       "verificationStatus": "automated-contract-test;desktop-unverified",
-      "introducedIn": "0.3.0-dev.1",
+      "introducedIn": "0.4.0-dev.1",
       "runtime": {
         "definition": "function(bindingId, controlId) return __AnjianBridge_ControlGetSelection(bindingId, controlId) end",
         "bindings": [
@@ -2885,7 +2885,7 @@
       ],
       "behavior": {
         "pauseBehavior": "在 Lua 命令边界遵循暂停状态；UI Automation 同步调用期间无法被中途抢占。",
-        "cancellationBehavior": "Stop 会终止 worker；UI Automation provider 的同步 COM 调用无法保证被硬中断，停止会在调用返回后的下一个边界生效。",
+        "cancellationBehavior": "UI Automation 在独立 Lua worker 进程内运行；Stop 可直接终止卡在 provider/COM 调用中的 worker，主进程 UI 不会被该 COM 调用阻塞。",
         "sideEffects": [],
         "coordinateSpace": "none",
         "permissionNotes": "仅使用公开 Windows UI Automation API；受 UIPI、UAC、安全桌面、用户会话和目标 provider 能力约束，不提升权限或绕过访问控制。"
@@ -2893,7 +2893,7 @@
       "example": "ControlSelect(binding, item.controlId)",
       "implementationStatus": "implemented",
       "verificationStatus": "automated-contract-test;desktop-unverified",
-      "introducedIn": "0.3.0-dev.1",
+      "introducedIn": "0.4.0-dev.1",
       "runtime": {
         "definition": "function(bindingId, controlId) return __AnjianBridge_ControlSelect(bindingId, controlId) end",
         "bindings": [
@@ -2935,7 +2935,7 @@
       ],
       "behavior": {
         "pauseBehavior": "在 Lua 命令边界遵循暂停状态；UI Automation 同步调用期间无法被中途抢占。",
-        "cancellationBehavior": "Stop 会终止 worker；UI Automation provider 的同步 COM 调用无法保证被硬中断，停止会在调用返回后的下一个边界生效。",
+        "cancellationBehavior": "UI Automation 在独立 Lua worker 进程内运行；Stop 可直接终止卡在 provider/COM 调用中的 worker，主进程 UI 不会被该 COM 调用阻塞。",
         "sideEffects": [],
         "coordinateSpace": "none",
         "permissionNotes": "仅使用公开 Windows UI Automation API；受 UIPI、UAC、安全桌面、用户会话和目标 provider 能力约束，不提升权限或绕过访问控制。"
@@ -2943,7 +2943,7 @@
       "example": "local state = ControlGetToggleState(binding, checkbox.controlId)",
       "implementationStatus": "implemented",
       "verificationStatus": "automated-contract-test;desktop-unverified",
-      "introducedIn": "0.3.0-dev.1",
+      "introducedIn": "0.4.0-dev.1",
       "runtime": {
         "definition": "function(bindingId, controlId) return __AnjianBridge_ControlGetToggleState(bindingId, controlId) end",
         "bindings": [
@@ -2985,7 +2985,7 @@
       ],
       "behavior": {
         "pauseBehavior": "在 Lua 命令边界遵循暂停状态；UI Automation 同步调用期间无法被中途抢占。",
-        "cancellationBehavior": "Stop 会终止 worker；UI Automation provider 的同步 COM 调用无法保证被硬中断，停止会在调用返回后的下一个边界生效。",
+        "cancellationBehavior": "UI Automation 在独立 Lua worker 进程内运行；Stop 可直接终止卡在 provider/COM 调用中的 worker，主进程 UI 不会被该 COM 调用阻塞。",
         "sideEffects": [],
         "coordinateSpace": "none",
         "permissionNotes": "仅使用公开 Windows UI Automation API；受 UIPI、UAC、安全桌面、用户会话和目标 provider 能力约束，不提升权限或绕过访问控制。"
@@ -2993,7 +2993,7 @@
       "example": "ControlToggle(binding, checkbox.controlId)",
       "implementationStatus": "implemented",
       "verificationStatus": "automated-contract-test;desktop-unverified",
-      "introducedIn": "0.3.0-dev.1",
+      "introducedIn": "0.4.0-dev.1",
       "runtime": {
         "definition": "function(bindingId, controlId) return __AnjianBridge_ControlToggle(bindingId, controlId) end",
         "bindings": [
@@ -3035,7 +3035,7 @@
       ],
       "behavior": {
         "pauseBehavior": "在 Lua 命令边界遵循暂停状态；UI Automation 同步调用期间无法被中途抢占。",
-        "cancellationBehavior": "Stop 会终止 worker；UI Automation provider 的同步 COM 调用无法保证被硬中断，停止会在调用返回后的下一个边界生效。",
+        "cancellationBehavior": "UI Automation 在独立 Lua worker 进程内运行；Stop 可直接终止卡在 provider/COM 调用中的 worker，主进程 UI 不会被该 COM 调用阻塞。",
         "sideEffects": [],
         "coordinateSpace": "none",
         "permissionNotes": "仅使用公开 Windows UI Automation API；受 UIPI、UAC、安全桌面、用户会话和目标 provider 能力约束，不提升权限或绕过访问控制。"
@@ -3043,7 +3043,7 @@
       "example": "ControlInvoke(binding, button.controlId)",
       "implementationStatus": "implemented",
       "verificationStatus": "automated-contract-test;desktop-unverified",
-      "introducedIn": "0.3.0-dev.1",
+      "introducedIn": "0.4.0-dev.1",
       "runtime": {
         "definition": "function(bindingId, controlId) return __AnjianBridge_ControlInvoke(bindingId, controlId) end",
         "bindings": [
@@ -3060,7 +3060,7 @@
       "name": "WindowInput",
       "category": "automation",
       "title": "按能力执行窗口输入",
-      "description": "按目标绑定和明确后端执行可见前台输入。auto/foreground 均要求目标窗口可见、未最小化且当前在前台；键盘/文本还要求窗口内已有键盘焦点，move/click 坐标必须在客户区内。不会自动激活或静默切换后端。后台鼠标/键盘/文本注入当前明确不支持。",
+      "description": "执行经过显式能力边界约束的前台输入。目标窗口必须可见、未最小化且处于前台；键盘/文本还要求窗口内有键盘焦点，鼠标坐标必须位于客户区。通用后台鼠标/键盘/文本注入明确不支持，且不会静默回退。",
       "signature": "WindowInput(bindingId, backend, action, name?, x?, y?, value?, holdMs?)",
       "parameters": [
         {
@@ -3145,7 +3145,7 @@
       ],
       "behavior": {
         "pauseBehavior": "在 Lua 命令边界遵循暂停状态；UI Automation 同步调用期间无法被中途抢占。",
-        "cancellationBehavior": "click/key-press 复用统一输入跟踪和释放清理；text 在 Unicode 字符边界响应停止。停止/异常仍执行 ReleaseAllOwnedInputs。",
+        "cancellationBehavior": "前台输入在每个动作边界检查窗口状态；统一输入控制器跟踪按下状态，Stop/异常时由主进程执行 ReleaseAllOwnedInputs。",
         "sideEffects": [],
         "coordinateSpace": "move/click 使用绑定窗口客户区内的虚拟桌面绝对物理像素；key-press/text 无坐标。",
         "permissionNotes": "SendInput 前台输入；目标窗口必须可见、未最小化并保持前台。键盘/文本还要求目标窗口内有键盘焦点。move/click 的坐标必须位于绑定窗口客户区。遵守 UIPI、UAC 和交互桌面限制；不注入后台窗口，不自动抢占焦点。"
@@ -3153,7 +3153,7 @@
       "example": "WindowInput(binding, \"auto\", \"click\", \"left\", 400, 300, \"\", 50)",
       "implementationStatus": "implemented",
       "verificationStatus": "automated-contract-test;desktop-unverified",
-      "introducedIn": "0.3.0-dev.1",
+      "introducedIn": "0.4.0-dev.1",
       "runtime": {
         "definition": "function(bindingId, backend, action, name, x, y, value, holdMs)\n  action = string.lower(action or \"\")\n  if (action == \"move\" or action == \"click\") and (x == nil or y == nil) then error(\"WindowInput move/click 必须提供 x 和 y。\", 2) end\n  if (action == \"click\" or action == \"key-press\") and (name == nil or name == \"\") then error(\"WindowInput click/key-press 必须提供 name。\", 2) end\n  if action == \"text\" and value == nil then error(\"WindowInput text 必须提供 value。\", 2) end\n  return __AnjianBridge_WindowInput(bindingId, backend, action, name or \"\", x or 0, y or 0, value or \"\", holdMs == nil and 50 or holdMs)\nend",
         "bindings": [

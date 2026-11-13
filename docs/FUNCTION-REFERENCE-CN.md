@@ -865,7 +865,7 @@ local w = WindowFind("目标窗口")\nif w then\n  local p = CoordinateFromScree
 
 - **稳定 ID：** `anjian.automation.window-bind`
 - **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
-- **说明：** 将当前运行期有效的 M6 不透明窗口引用绑定为控件自动化会话，返回新的运行期不透明 bindingId；不暴露 HWND。
+- **说明：** 将经过 M6 身份校验的不透明窗口引用绑定到本轮独立 Lua worker 的 UI Automation 会话。脚本只获得随机 bindingId，不获得 HWND。
 
 | 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
 |---|---|---|---|---|---|
@@ -873,7 +873,7 @@ local w = WindowFind("目标窗口")\nif w then\n  local p = CoordinateFromScree
 
 **返回值：** `string` — 新的运行期窗口绑定 ID。
 **错误：** 窗口引用不存在、已失效或目标进程身份无法验证时产生错误。
-**执行/取消语义：** 在 Lua 命令边界遵循暂停状态；UI Automation 同步调用期间无法被中途抢占。 Stop 会终止 worker；UI Automation provider 的同步 COM 调用无法保证被硬中断，停止会在调用返回后的下一个边界生效。
+**执行/取消语义：** 在 Lua 命令边界遵循暂停状态；UI Automation 同步调用期间无法被中途抢占。 UI Automation 在独立 Lua worker 进程内运行；Stop 可直接终止卡在 provider/COM 调用中的 worker，主进程 UI 不会被该 COM 调用阻塞。
 **坐标/权限：** 坐标空间：none。仅使用公开 Windows UI Automation API；受 UIPI、UAC、安全桌面、用户会话和目标 provider 能力约束，不提升权限或绕过访问控制。
 
 **示例：**
@@ -894,7 +894,7 @@ if w then local binding = WindowBind(w.id) end
 
 **返回值：** `boolean` — 解绑成功返回 true；不存在或已经解绑返回 false。
 **错误：** 绑定 ID 为空时产生参数错误。
-**执行/取消语义：** 在 Lua 命令边界遵循暂停状态；UI Automation 同步调用期间无法被中途抢占。 Stop 会终止 worker；UI Automation provider 的同步 COM 调用无法保证被硬中断，停止会在调用返回后的下一个边界生效。
+**执行/取消语义：** 在 Lua 命令边界遵循暂停状态；UI Automation 同步调用期间无法被中途抢占。 UI Automation 在独立 Lua worker 进程内运行；Stop 可直接终止卡在 provider/COM 调用中的 worker，主进程 UI 不会被该 COM 调用阻塞。
 **坐标/权限：** 坐标空间：none。仅使用公开 Windows UI Automation API；受 UIPI、UAC、安全桌面、用户会话和目标 provider 能力约束，不提升权限或绕过访问控制。
 
 **示例：**
@@ -907,7 +907,7 @@ WindowUnbind(binding)
 
 - **稳定 ID：** `anjian.automation.window-capabilities`
 - **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
-- **说明：** 逐项返回控件树、UIA Pattern、前台 SendInput 和后台输入能力、使用后端、限制及拒绝原因。
+- **说明：** 逐项报告目标窗口的 UIA 控件树/标准 Pattern、可用前台 SendInput，以及尚不支持的通用后台鼠标/键盘/文本输入能力；包含后端、状态、原因和限制。
 
 | 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
 |---|---|---|---|---|---|
@@ -915,7 +915,7 @@ WindowUnbind(binding)
 
 **返回值：** `table` — 返回 provider、目标 PID、前台状态以及 capabilities 数组；每项含 name/status/backend/reason/limitations。
 **错误：** 绑定失效或窗口关闭时产生错误。
-**执行/取消语义：** 在 Lua 命令边界遵循暂停状态；UI Automation 同步调用期间无法被中途抢占。 Stop 会终止 worker；UI Automation provider 的同步 COM 调用无法保证被硬中断，停止会在调用返回后的下一个边界生效。
+**执行/取消语义：** 在 Lua 命令边界遵循暂停状态；UI Automation 同步调用期间无法被中途抢占。 UI Automation 在独立 Lua worker 进程内运行；Stop 可直接终止卡在 provider/COM 调用中的 worker，主进程 UI 不会被该 COM 调用阻塞。
 **坐标/权限：** 坐标空间：none。仅使用公开 Windows UI Automation API；受 UIPI、UAC、安全桌面、用户会话和目标 provider 能力约束，不提升权限或绕过访问控制。
 
 **示例：**
@@ -937,7 +937,7 @@ for i, item in ipairs(caps.capabilities) do Log(item.name .. ":" .. item.status)
 
 **返回值：** `table` — 返回控件信息数组；每项含 controlId/name/automationId/className/controlType/bounds/isEnabled/isOffscreen/isKeyboardFocusable/isPassword/supportedPatterns。
 **错误：** 数量超出范围、绑定失效或 UI Automation 无法访问目标窗口时产生错误。
-**执行/取消语义：** 在 Lua 命令边界遵循暂停状态；UI Automation 同步调用期间无法被中途抢占。 Stop 会终止 worker；UI Automation provider 的同步 COM 调用无法保证被硬中断，停止会在调用返回后的下一个边界生效。
+**执行/取消语义：** 在 Lua 命令边界遵循暂停状态；UI Automation 同步调用期间无法被中途抢占。 UI Automation 在独立 Lua worker 进程内运行；Stop 可直接终止卡在 provider/COM 调用中的 worker，主进程 UI 不会被该 COM 调用阻塞。
 **坐标/权限：** 坐标空间：none。仅使用公开 Windows UI Automation API；受 UIPI、UAC、安全桌面、用户会话和目标 provider 能力约束，不提升权限或绕过访问控制。
 
 **示例：**
@@ -959,7 +959,7 @@ for i, c in ipairs(controls) do Log(c.name .. " " .. c.controlType) end
 
 **返回值：** `table` — 返回与 ControlEnumerate 相同结构的单个控件信息表。
 **错误：** 绑定/控件 ID 失效或控件已销毁时产生明确错误。
-**执行/取消语义：** 在 Lua 命令边界遵循暂停状态；UI Automation 同步调用期间无法被中途抢占。 Stop 会终止 worker；UI Automation provider 的同步 COM 调用无法保证被硬中断，停止会在调用返回后的下一个边界生效。
+**执行/取消语义：** 在 Lua 命令边界遵循暂停状态；UI Automation 同步调用期间无法被中途抢占。 UI Automation 在独立 Lua worker 进程内运行；Stop 可直接终止卡在 provider/COM 调用中的 worker，主进程 UI 不会被该 COM 调用阻塞。
 **坐标/权限：** 坐标空间：none。仅使用公开 Windows UI Automation API；受 UIPI、UAC、安全桌面、用户会话和目标 provider 能力约束，不提升权限或绕过访问控制。
 
 **示例：**
@@ -980,7 +980,7 @@ local info = ControlGetInfo(binding, control.controlId)
 
 **返回值：** `string` — ValuePattern 当前字符串值。
 **错误：** 控件未实现 ValuePattern、绑定失效或控件销毁时产生错误。
-**执行/取消语义：** 在 Lua 命令边界遵循暂停状态；UI Automation 同步调用期间无法被中途抢占。 Stop 会终止 worker；UI Automation provider 的同步 COM 调用无法保证被硬中断，停止会在调用返回后的下一个边界生效。
+**执行/取消语义：** 在 Lua 命令边界遵循暂停状态；UI Automation 同步调用期间无法被中途抢占。 UI Automation 在独立 Lua worker 进程内运行；Stop 可直接终止卡在 provider/COM 调用中的 worker，主进程 UI 不会被该 COM 调用阻塞。
 **坐标/权限：** 坐标空间：none。仅使用公开 Windows UI Automation API；受 UIPI、UAC、安全桌面、用户会话和目标 provider 能力约束，不提升权限或绕过访问控制。
 
 **示例：**
@@ -1002,7 +1002,7 @@ local value = ControlGetValue(binding, edit.controlId)
 
 **返回值：** `boolean` — UIA provider 的 SetValue 调用成功返回 true。
 **错误：** 不支持 ValuePattern、只读、控件失效、权限拒绝或值超过 32768 字符时产生错误。
-**执行/取消语义：** 在 Lua 命令边界遵循暂停状态；UI Automation 同步调用期间无法被中途抢占。 Stop 会终止 worker；UI Automation provider 的同步 COM 调用无法保证被硬中断，停止会在调用返回后的下一个边界生效。
+**执行/取消语义：** 在 Lua 命令边界遵循暂停状态；UI Automation 同步调用期间无法被中途抢占。 UI Automation 在独立 Lua worker 进程内运行；Stop 可直接终止卡在 provider/COM 调用中的 worker，主进程 UI 不会被该 COM 调用阻塞。
 **坐标/权限：** 坐标空间：none。仅使用公开 Windows UI Automation API；受 UIPI、UAC、安全桌面、用户会话和目标 provider 能力约束，不提升权限或绕过访问控制。
 
 **示例：**
@@ -1023,7 +1023,7 @@ ControlSetValue(binding, edit.controlId, "hello")
 
 **返回值：** `string` — 最多 32768 个字符的控件文本。
 **错误：** 控件未实现 TextPattern/ValuePattern、绑定失效或控件销毁时产生错误。
-**执行/取消语义：** 在 Lua 命令边界遵循暂停状态；UI Automation 同步调用期间无法被中途抢占。 Stop 会终止 worker；UI Automation provider 的同步 COM 调用无法保证被硬中断，停止会在调用返回后的下一个边界生效。
+**执行/取消语义：** 在 Lua 命令边界遵循暂停状态；UI Automation 同步调用期间无法被中途抢占。 UI Automation 在独立 Lua worker 进程内运行；Stop 可直接终止卡在 provider/COM 调用中的 worker，主进程 UI 不会被该 COM 调用阻塞。
 **坐标/权限：** 坐标空间：none。仅使用公开 Windows UI Automation API；受 UIPI、UAC、安全桌面、用户会话和目标 provider 能力约束，不提升权限或绕过访问控制。
 
 **示例：**
@@ -1044,7 +1044,7 @@ local text = ControlGetText(binding, edit.controlId)
 
 **返回值：** `table` — 返回 Lua 数组，数组元素是 provider 报告的已选控件名称。
 **错误：** 控件未实现 SelectionPattern、绑定失效或控件销毁时产生错误。
-**执行/取消语义：** 在 Lua 命令边界遵循暂停状态；UI Automation 同步调用期间无法被中途抢占。 Stop 会终止 worker；UI Automation provider 的同步 COM 调用无法保证被硬中断，停止会在调用返回后的下一个边界生效。
+**执行/取消语义：** 在 Lua 命令边界遵循暂停状态；UI Automation 同步调用期间无法被中途抢占。 UI Automation 在独立 Lua worker 进程内运行；Stop 可直接终止卡在 provider/COM 调用中的 worker，主进程 UI 不会被该 COM 调用阻塞。
 **坐标/权限：** 坐标空间：none。仅使用公开 Windows UI Automation API；受 UIPI、UAC、安全桌面、用户会话和目标 provider 能力约束，不提升权限或绕过访问控制。
 
 **示例：**
@@ -1065,7 +1065,7 @@ local selected = ControlGetSelection(binding, list.controlId)
 
 **返回值：** `boolean` — SelectionItemPattern.Select 调用成功返回 true。
 **错误：** 控件未实现 SelectionItemPattern、选择被容器拒绝或控件失效时产生错误。
-**执行/取消语义：** 在 Lua 命令边界遵循暂停状态；UI Automation 同步调用期间无法被中途抢占。 Stop 会终止 worker；UI Automation provider 的同步 COM 调用无法保证被硬中断，停止会在调用返回后的下一个边界生效。
+**执行/取消语义：** 在 Lua 命令边界遵循暂停状态；UI Automation 同步调用期间无法被中途抢占。 UI Automation 在独立 Lua worker 进程内运行；Stop 可直接终止卡在 provider/COM 调用中的 worker，主进程 UI 不会被该 COM 调用阻塞。
 **坐标/权限：** 坐标空间：none。仅使用公开 Windows UI Automation API；受 UIPI、UAC、安全桌面、用户会话和目标 provider 能力约束，不提升权限或绕过访问控制。
 
 **示例：**
@@ -1086,7 +1086,7 @@ ControlSelect(binding, item.controlId)
 
 **返回值：** `string` — Off、On 或 Indeterminate。
 **错误：** 控件未实现 TogglePattern、绑定失效或控件销毁时产生错误。
-**执行/取消语义：** 在 Lua 命令边界遵循暂停状态；UI Automation 同步调用期间无法被中途抢占。 Stop 会终止 worker；UI Automation provider 的同步 COM 调用无法保证被硬中断，停止会在调用返回后的下一个边界生效。
+**执行/取消语义：** 在 Lua 命令边界遵循暂停状态；UI Automation 同步调用期间无法被中途抢占。 UI Automation 在独立 Lua worker 进程内运行；Stop 可直接终止卡在 provider/COM 调用中的 worker，主进程 UI 不会被该 COM 调用阻塞。
 **坐标/权限：** 坐标空间：none。仅使用公开 Windows UI Automation API；受 UIPI、UAC、安全桌面、用户会话和目标 provider 能力约束，不提升权限或绕过访问控制。
 
 **示例：**
@@ -1107,7 +1107,7 @@ local state = ControlGetToggleState(binding, checkbox.controlId)
 
 **返回值：** `boolean` — TogglePattern.Toggle 调用成功返回 true。
 **错误：** 控件未实现 TogglePattern、provider 拒绝或控件失效时产生错误。
-**执行/取消语义：** 在 Lua 命令边界遵循暂停状态；UI Automation 同步调用期间无法被中途抢占。 Stop 会终止 worker；UI Automation provider 的同步 COM 调用无法保证被硬中断，停止会在调用返回后的下一个边界生效。
+**执行/取消语义：** 在 Lua 命令边界遵循暂停状态；UI Automation 同步调用期间无法被中途抢占。 UI Automation 在独立 Lua worker 进程内运行；Stop 可直接终止卡在 provider/COM 调用中的 worker，主进程 UI 不会被该 COM 调用阻塞。
 **坐标/权限：** 坐标空间：none。仅使用公开 Windows UI Automation API；受 UIPI、UAC、安全桌面、用户会话和目标 provider 能力约束，不提升权限或绕过访问控制。
 
 **示例：**
@@ -1128,7 +1128,7 @@ ControlToggle(binding, checkbox.controlId)
 
 **返回值：** `boolean` — InvokePattern.Invoke 调用成功返回 true。
 **错误：** 控件未实现 InvokePattern、provider 拒绝或控件失效时产生错误。
-**执行/取消语义：** 在 Lua 命令边界遵循暂停状态；UI Automation 同步调用期间无法被中途抢占。 Stop 会终止 worker；UI Automation provider 的同步 COM 调用无法保证被硬中断，停止会在调用返回后的下一个边界生效。
+**执行/取消语义：** 在 Lua 命令边界遵循暂停状态；UI Automation 同步调用期间无法被中途抢占。 UI Automation 在独立 Lua worker 进程内运行；Stop 可直接终止卡在 provider/COM 调用中的 worker，主进程 UI 不会被该 COM 调用阻塞。
 **坐标/权限：** 坐标空间：none。仅使用公开 Windows UI Automation API；受 UIPI、UAC、安全桌面、用户会话和目标 provider 能力约束，不提升权限或绕过访问控制。
 
 **示例：**
@@ -1140,23 +1140,23 @@ ControlInvoke(binding, button.controlId)
 
 - **稳定 ID：** `anjian.automation.window-input`
 - **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
-- **说明：** 按目标绑定和明确后端执行可见前台输入。auto/foreground 均要求目标窗口已经在前台；不会自动激活或静默切换后端。后台鼠标/键盘/文本注入当前明确不支持。
+- **说明：** 执行经过显式能力边界约束的前台输入。目标窗口必须可见、未最小化且处于前台；键盘/文本还要求窗口内有键盘焦点，鼠标坐标必须位于客户区。通用后台鼠标/键盘/文本注入明确不支持，且不会静默回退。
 
 | 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
 |---|---|---|---|---|---|
 | `bindingId` | `string` | 是 | — | — | 窗口绑定 ID。 |
 | `backend` | `string` | 是 | — | 固定值：auto、foreground | auto 或 foreground。 |
 | `action` | `string` | 是 | — | 固定值：move、click、key-press、text | move、click、key-press 或 text。 |
-| `name` | `string` | 否 | `` | — | click 的 left/right/middle，或 key-press 的键名。 |
-| `x` | `integer` | 否 | `0` | -2147483648–2147483647 物理像素 | move/click 的屏幕绝对物理像素 X 坐标。 |
-| `y` | `integer` | 否 | `0` | -2147483648–2147483647 物理像素 | move/click 的屏幕绝对物理像素 Y 坐标。 |
-| `value` | `string` | 否 | `` | — | text 动作的 Unicode 文本，最多 100000 个字符。 |
+| `name` | `string` | 否 | `` | — | click/key-press 必填；click 为 left/right/middle，key-press 为现有规范键名。 |
+| `x` | `integer` | 否 | `0` | -2147483648–2147483647 物理像素 | move/click 必填；绑定窗口客户区内的屏幕绝对物理像素 X 坐标。 |
+| `y` | `integer` | 否 | `0` | -2147483648–2147483647 物理像素 | move/click 必填；绑定窗口客户区内的屏幕绝对物理像素 Y 坐标。 |
+| `value` | `string` | 否 | `` | — | text 必填；Unicode 文本，最多 100000 个字符。 |
 | `holdMs` | `integer` | 否 | `50` | 0–600000 毫秒 | click/key-press 按下时长，范围 0 到 600000 毫秒。 |
 
 **返回值：** `boolean` — 输入 API 成功提交返回 true；实际目标控件是否响应仍取决于前台焦点、权限与应用状态。
 **错误：** backend 不支持、目标不是前台窗口、参数非法、SendInput 被 Windows 拒绝或停止取消时产生错误。
-**执行/取消语义：** 在 Lua 命令边界遵循暂停状态；UI Automation 同步调用期间无法被中途抢占。 Stop 会终止 worker；UI Automation provider 的同步 COM 调用无法保证被硬中断，停止会在调用返回后的下一个边界生效。
-**坐标/权限：** 坐标空间：none。仅使用公开 Windows UI Automation API；受 UIPI、UAC、安全桌面、用户会话和目标 provider 能力约束，不提升权限或绕过访问控制。
+**执行/取消语义：** 在 Lua 命令边界遵循暂停状态；UI Automation 同步调用期间无法被中途抢占。 前台输入在每个动作边界检查窗口状态；统一输入控制器跟踪按下状态，Stop/异常时由主进程执行 ReleaseAllOwnedInputs。
+**坐标/权限：** 坐标空间：move/click 使用绑定窗口客户区内的虚拟桌面绝对物理像素；key-press/text 无坐标。。SendInput 前台输入；目标窗口必须可见、未最小化并保持前台。键盘/文本还要求目标窗口内有键盘焦点。move/click 的坐标必须位于绑定窗口客户区。遵守 UIPI、UAC 和交互桌面限制；不注入后台窗口，不自动抢占焦点。
 
 **示例：**
 ```lua
