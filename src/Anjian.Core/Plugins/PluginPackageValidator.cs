@@ -1,0 +1,475 @@
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
+using Anjian.Core.Permissions;
+
+namespace Anjian.Core.Plugins;
+
+public sealed class PluginManifest
+{
+    public int SchemaVersion { get; set; } = 1;
+    public string PluginId { get; set; } = "";
+    public string Name { get; set; } = "";
+    public string Version { get; set; } = "";
+    public string Description { get; set; } = "";
+    public string Author { get; set; } = "";
+    public string MinApiVersion { get; set; } = "";
+    public string? MaxApiVersion { get; set; }
+    public string Entry { get; set; } = "entry.lua";
+    public string? ModulesRoot { get; set; } = "Modules";
+    public PluginPermissionManifest Permissions { get; set; } = new();
+    public List<PluginPackageFile> Files { get; set; } = [];
+}
+
+public sealed class PluginPermissionManifest
+{
+    public List<string> FileReadRoots { get; set; } = [];
+    public List<string> FileWriteRoots { get; set; } = [];
+    public bool ClipboardRead { get; set; }
+    public bool ClipboardWrite { get; set; }
+    public List<string> Dialogs { get; set; } = [];
+    public List<string> ProcessExecutables { get; set; } = [];
+    public List<string> HttpHosts { get; set; } = [];
+    public List<string> HttpMethods { get; set; } = [];
+    public bool AllowInsecureHttp { get; set; }
+}
+
+public sealed class PluginPackageFile
+{
+    public string Path { get; set; } = "";
+    public string Sha256 { get; set; } = "";
+}
+
+public sealed record PluginPackageInspection(
+    PluginManifest Manifest,
+    string PackageRoot,
+    string EntryPath,
+    string? ModulesRootPath,
+    IReadOnlyDictionary<string, string> FileHashes,
+    ScriptPermissionRequest ManifestPermissions,
+    ScriptPermissionRequest ScriptPermissions);
+
+public sealed record PluginExecutionPlan(
+    string PluginId,
+    string Version,
+    string PackageRoot,
+    string EntryPath,
+    string EntryRelativePath,
+    string EntrySha256,
+    string? ModulesRootPath,
+    string? ModulesRootRelativePath,
+    IReadOnlyDictionary<string, string> ModuleHashes,
+    ScriptPermissionGrant Permissions);
+
+public sealed record PluginPackageSummary(
+    string PluginId,
+    string Version,
+    bool Enabled,
+    string Name,
+    string Description,
+    string PackageDirectory,
+    string? EntryPath,
+    string? ValidationError);
+
+public static class PluginPackageValidator
+{
+    public const int CurrentManifestVersion = 1;
+    public const string ManifestFileName = "Anjian.Plugin.json";
+    public const string CatalogFileName = "Anjian.Plugins.json";
+    public const long MaximumPackageBytes = 64L * 1024 * 1024;
+    public const long MaximumFileBytes = 8L * 1024 * 1024;
+    public const int MaximumFiles = 2_048;
+    public const int MaximumManifestBytes = 256 * 1024;
+    private const int BufferSize = 64 * 1024;
+    private static readonly Regex PluginIdPattern = new("^[a-z0-9]+(?:[.-][a-z0-9]+)*$", RegexOptions.CultureInvariant);
+    private static readonly Regex SemanticVersionPattern = new("^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$", RegexOptions.CultureInvariant);
+    private static readonly Regex ApiVersionPattern = new("^[0-9]+\\.[0-9]+$", RegexOptions.CultureInvariant);
+    private static readonly Regex Sha256Pattern = new("^[0-9A-Fa-f]{64}$", RegexOptions.CultureInvariant);
+    private static readonly Regex ModuleSegmentPattern = new("^[A-Za-z0-9_-]+$", RegexOptions.CultureInvariant);
+    private static readonly HashSet<string> AllowedExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".lua", ".json", ".md", ".txt", ".png", ".jpg", ".jpeg", ".ico"
+    };
+
+    internal static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        PropertyNameCaseInsensitive = true,
+        UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
+        MaxDepth = 32,
+        WriteIndented = true
+    };
+
+    public static PluginPackageInspection Inspect(string packageDirectory, string currentApiVersion)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(packageDirectory);
+        var root = Path.GetFullPath(packageDirectory);
+        if (!Directory.Exists(root))
+            throw new DirectoryNotFoundException("插件包目录不存在：" + root);
+        RejectReparsePoint(root, "插件包根目录");
+
+        var manifestBytes = ReadBoundedFile(root, ManifestFileName, MaximumManifestBytes);
+        PluginManifest manifest;
+        try
+        {
+            manifest = JsonSerializer.Deserialize<PluginManifest>(
+                new UTF8Encoding(false, true).GetString(manifestBytes), JsonOptions)
+                ?? throw new InvalidDataException("插件 manifest 为空。");
+        }
+        catch (Exception ex) when (ex is JsonException or DecoderFallbackException)
+        {
+            throw new InvalidDataException("插件 manifest 不是有效 UTF-8 JSON，或包含未知字段。", ex);
+        }
+
+        ValidateManifestMetadata(manifest, currentApiVersion);
+        var hashes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var file in manifest.Files)
+        {
+            if (file is null)
+                throw new InvalidDataException("manifest files 不能包含 null 项。");
+            var relative = NormalizeRelativePath(file.Path);
+            if (relative.Equals(ManifestFileName, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException("manifest 本身不能列入 files。");
+            var sha256 = file.Sha256 ?? "";
+            if (!Sha256Pattern.IsMatch(sha256))
+                throw new InvalidDataException("文件 SHA-256 必须是 64 位十六进制：" + relative);
+            ValidateAllowedFileType(relative);
+            if (!hashes.TryAdd(relative, sha256.ToUpperInvariant()))
+                throw new InvalidDataException("manifest 存在重复文件路径：" + relative);
+        }
+
+        if (!hashes.ContainsKey(manifest.Entry))
+            throw new InvalidDataException("entry 必须列入 files 并提供 SHA-256：" + manifest.Entry);
+
+        string? modulesRootPath = null;
+        string? normalizedModulesRoot = null;
+        if (!string.IsNullOrWhiteSpace(manifest.ModulesRoot))
+        {
+            normalizedModulesRoot = NormalizeRelativePath(manifest.ModulesRoot);
+            if (normalizedModulesRoot.Contains('/') ||
+                normalizedModulesRoot.Equals(ManifestFileName, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException("modulesRoot 必须是包根目录下的单级目录名。");
+            modulesRootPath = GetSafeFullPath(root, normalizedModulesRoot);
+            ValidateModuleNames(hashes.Keys, normalizedModulesRoot);
+        }
+
+        var actualFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var actualDirectories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        EnumerateTree(root, root, actualFiles, actualDirectories);
+        if (!actualFiles.Contains(ManifestFileName))
+            throw new InvalidDataException("插件 manifest 缺失。");
+        var actualPayload = new HashSet<string>(actualFiles, StringComparer.OrdinalIgnoreCase);
+        actualPayload.Remove(ManifestFileName);
+        if (!actualPayload.SetEquals(hashes.Keys))
+        {
+            var missing = hashes.Keys.Except(actualPayload, StringComparer.OrdinalIgnoreCase).Take(8);
+            var extra = actualPayload.Except(hashes.Keys, StringComparer.OrdinalIgnoreCase).Take(8);
+            throw new InvalidDataException("插件文件集与 manifest 不闭合。缺失=[" +
+                string.Join(", ", missing) + "]；未登记=[" + string.Join(", ", extra) + "]。");
+        }
+        var expectedDirectories = ExpectedDirectories(hashes.Keys);
+        if (!actualDirectories.SetEquals(expectedDirectories))
+        {
+            var extra = actualDirectories.Except(expectedDirectories, StringComparer.OrdinalIgnoreCase).Take(8);
+            throw new InvalidDataException("插件包存在未声明的空目录或额外目录：" + string.Join(", ", extra));
+        }
+        if (hashes.Count > MaximumFiles)
+            throw new InvalidDataException($"插件文件数超过 {MaximumFiles} 上限。");
+
+        long totalBytes = 0;
+        foreach (var pair in hashes)
+        {
+            var path = GetSafeFullPath(root, pair.Key);
+            var actualHash = ComputeSha256(path, MaximumFileBytes, out var length);
+            totalBytes = checked(totalBytes + length);
+            if (totalBytes > MaximumPackageBytes)
+                throw new InvalidDataException($"插件内容总大小超过 {MaximumPackageBytes} 字节上限。");
+            if (!actualHash.Equals(pair.Value, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException("插件文件 SHA-256 不匹配：" + pair.Key);
+        }
+
+        ScriptPermissionRequest manifestPermissions;
+        try
+        {
+            ValidatePermissionManifest(manifest.Permissions);
+            var permissionJson = JsonSerializer.Serialize(manifest.Permissions, JsonOptions);
+            manifestPermissions = ScriptPermissionPolicy.ParseRequest(permissionJson, root);
+        }
+        catch (Exception ex) when (ex is InvalidDataException or ArgumentException or JsonException or NullReferenceException)
+        {
+            throw new InvalidDataException("插件 manifest 的 permissions 无效。", ex);
+        }
+
+        var scriptPermissions = ScriptPermissionRequest.Empty;
+        var sidecarRelative = manifest.Entry + ".permissions.json";
+        var sidecarPath = GetSafeFullPath(root, sidecarRelative);
+        if (File.Exists(sidecarPath))
+        {
+            if (!hashes.ContainsKey(sidecarRelative))
+                throw new InvalidDataException("入口权限 sidecar 必须包含在 manifest files 中：" + sidecarRelative);
+            try
+            {
+                var sidecar = new UTF8Encoding(false, true).GetString(
+                    ReadBoundedFile(root, sidecarRelative, ScriptPermissionPolicy.MaximumManifestBytes));
+                scriptPermissions = ScriptPermissionPolicy.ParseRequest(sidecar, root);
+            }
+            catch (Exception ex) when (ex is InvalidDataException or ArgumentException or JsonException or DecoderFallbackException)
+            {
+                throw new InvalidDataException("插件入口脚本权限 sidecar 无效。", ex);
+            }
+        }
+
+        return new PluginPackageInspection(
+            manifest, root, GetSafeFullPath(root, manifest.Entry), modulesRootPath,
+            new Dictionary<string, string>(hashes, StringComparer.OrdinalIgnoreCase),
+            manifestPermissions, scriptPermissions);
+    }
+
+    public static string NormalizeRelativePath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path) || path.Length > 1_024 ||
+            path.Contains('\\') || path.Contains(':') || path.StartsWith('/') ||
+            Path.IsPathRooted(path) || path.Any(char.IsControl))
+            throw new InvalidDataException("插件路径必须是安全的相对正斜线路径：" + path);
+        var parts = path.Split('/');
+        if (parts.Any(part => part.Length == 0 || part is "." or ".." ||
+            part.EndsWith(' ') || part.EndsWith('.') || part.Any(char.IsControl)))
+            throw new InvalidDataException("插件路径包含空段、点段或 Windows 非规范路径：" + path);
+        return string.Join('/', parts);
+    }
+
+    public static string GetSafeFullPath(string packageRoot, string relativePath)
+    {
+        var normalized = NormalizeRelativePath(relativePath);
+        var root = Path.GetFullPath(packageRoot);
+        var full = Path.GetFullPath(Path.Combine(root, normalized.Replace('/', Path.DirectorySeparatorChar)));
+        var prefix = root.EndsWith(Path.DirectorySeparatorChar) ? root : root + Path.DirectorySeparatorChar;
+        var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        if (!full.StartsWith(prefix, comparison) || full.Equals(root, comparison))
+            throw new InvalidDataException("插件路径越过包根目录：" + relativePath);
+        return full;
+    }
+
+    public static string ComputeSha256(string path) =>
+        ComputeSha256(path, MaximumFileBytes, out _);
+
+    public static string ReadVerifiedText(
+        string packageRoot, string relativePath, string expectedSha256, long maximumBytes = MaximumFileBytes)
+    {
+        try
+        {
+            return new UTF8Encoding(false, true).GetString(ReadVerifiedBytes(packageRoot, relativePath, expectedSha256, maximumBytes));
+        }
+        catch (DecoderFallbackException ex)
+        {
+            throw new InvalidDataException("插件 Lua/文本文件不是有效 UTF-8：" + relativePath, ex);
+        }
+    }
+
+    public static byte[] ReadVerifiedBytes(
+        string packageRoot, string relativePath, string expectedSha256, long maximumBytes = MaximumFileBytes)
+    {
+        var bytes = ReadBoundedFile(packageRoot, relativePath, maximumBytes);
+        var actual = Convert.ToHexString(SHA256.HashData(bytes));
+        if (!actual.Equals(expectedSha256, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidDataException("插件文件在安装后发生变化，SHA-256 校验失败：" + relativePath);
+        return bytes;
+    }
+
+    internal static byte[] ReadBoundedFile(string packageRoot, string relativePath, long maximumBytes)
+    {
+        var fullPath = GetSafeFullPath(packageRoot, relativePath);
+        RejectReparsePathChain(packageRoot, relativePath);
+        using var input = new FileStream(fullPath, FileMode.Open, FileAccess.Read, FileShare.Read,
+            BufferSize, FileOptions.SequentialScan);
+        using var output = new MemoryStream((int)Math.Min(maximumBytes, BufferSize));
+        var buffer = new byte[BufferSize];
+        long total = 0;
+        int count;
+        while ((count = input.Read(buffer, 0, buffer.Length)) > 0)
+        {
+            total = checked(total + count);
+            if (total > maximumBytes)
+                throw new InvalidDataException($"插件文件超过 {maximumBytes} 字节上限：" + relativePath);
+            output.Write(buffer, 0, count);
+        }
+        return output.ToArray();
+    }
+
+    internal static string ComputeSha256(string path, long maximumBytes, out long length)
+    {
+        RejectReparsePoint(path, "插件文件");
+        if ((File.GetAttributes(path) & FileAttributes.Directory) != 0)
+            throw new InvalidDataException("插件内容项必须为普通文件：" + path);
+        using var input = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read,
+            BufferSize, FileOptions.SequentialScan);
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        var buffer = new byte[BufferSize];
+        length = 0;
+        int count;
+        while ((count = input.Read(buffer, 0, buffer.Length)) > 0)
+        {
+            length = checked(length + count);
+            if (length > maximumBytes)
+                throw new InvalidDataException($"插件文件超过 {maximumBytes} 字节上限：" + path);
+            hash.AppendData(buffer, 0, count);
+        }
+        return Convert.ToHexString(hash.GetHashAndReset());
+    }
+
+    internal static void RejectReparsePathChain(string packageRoot, string relativePath)
+    {
+        var root = Path.GetFullPath(packageRoot);
+        RejectReparsePoint(root, "插件包目录");
+        var current = root;
+        foreach (var segment in NormalizeRelativePath(relativePath).Split('/'))
+        {
+            current = Path.Combine(current, segment);
+            if (File.Exists(current) || Directory.Exists(current))
+                RejectReparsePoint(current, "插件路径");
+        }
+    }
+
+    internal static void RejectReparsePoint(string path, string label)
+    {
+        var attributes = File.GetAttributes(path);
+        if ((attributes & FileAttributes.ReparsePoint) != 0)
+            throw new InvalidDataException(label + "不能是符号链接或重解析点：" + path);
+    }
+
+    private static void ValidateManifestMetadata(PluginManifest manifest, string currentApiVersion)
+    {
+        if (manifest.SchemaVersion != CurrentManifestVersion)
+            throw new InvalidDataException($"不支持插件 manifest schemaVersion：{manifest.SchemaVersion}。");
+        if (string.IsNullOrWhiteSpace(manifest.PluginId) || manifest.PluginId.Length > 160 || !PluginIdPattern.IsMatch(manifest.PluginId))
+            throw new InvalidDataException("pluginId 必须是稳定、全小写的 ASCII ID。");
+        if (string.IsNullOrWhiteSpace(manifest.Name) || manifest.Name.Length > 128 || manifest.Name.Any(char.IsControl))
+            throw new InvalidDataException("插件 name 不能为空、长度最多 128，且不能包含控制字符。");
+        if ((manifest.Description?.Length ?? 0) > 2_048 || (manifest.Author?.Length ?? 0) > 256 ||
+            manifest.Description?.Any(char.IsControl) == true || manifest.Author?.Any(char.IsControl) == true)
+            throw new InvalidDataException("插件 description/author 长度或字符不合法。");
+        if (string.IsNullOrWhiteSpace(manifest.Version) || manifest.Version.Length > 128 ||
+            !SemanticVersionPattern.IsMatch(manifest.Version))
+            throw new InvalidDataException("插件 version 必须使用 major.minor.patch 语义版本格式。");
+
+        var current = ParseApiVersion(currentApiVersion, "当前 API 版本");
+        var minimum = ParseApiVersion(manifest.MinApiVersion, "minApiVersion");
+        if (minimum.CompareTo(current) > 0)
+            throw new InvalidDataException($"插件要求最低 API {manifest.MinApiVersion}，当前仅有 {currentApiVersion}。");
+        if (!string.IsNullOrWhiteSpace(manifest.MaxApiVersion))
+        {
+            var maximum = ParseApiVersion(manifest.MaxApiVersion, "maxApiVersion");
+            if (maximum.CompareTo(minimum) < 0 || maximum.CompareTo(current) < 0)
+                throw new InvalidDataException($"插件 API 兼容区间与当前版本 {currentApiVersion} 不相交。");
+        }
+
+        var entry = NormalizeRelativePath(manifest.Entry);
+        if (!entry.Equals(manifest.Entry, StringComparison.Ordinal) || entry.Contains('/') ||
+            !Path.GetExtension(entry).Equals(".lua", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidDataException("entry 必须是包根目录下的单个 .lua 文件。");
+        if (manifest.Permissions is null || manifest.Files is null)
+            throw new InvalidDataException("manifest permissions/files 不能为 null。");
+        if (manifest.Files.Count is < 1 or > MaximumFiles)
+            throw new InvalidDataException($"manifest files 必须包含 1–{MaximumFiles} 个内容文件。");
+        if (!string.IsNullOrWhiteSpace(manifest.ModulesRoot))
+        {
+            var root = NormalizeRelativePath(manifest.ModulesRoot);
+            if (root.Contains('/') || root.Equals(ManifestFileName, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException("modulesRoot 必须是包根目录下的单级目录名。");
+        }
+    }
+
+    private static void ValidatePermissionManifest(PluginPermissionManifest permissions)
+    {
+        if (permissions.FileReadRoots is null || permissions.FileWriteRoots is null ||
+            permissions.Dialogs is null || permissions.ProcessExecutables is null ||
+            permissions.HttpHosts is null || permissions.HttpMethods is null)
+            throw new InvalidDataException("permissions 中的集合不能为 null。");
+        foreach (var value in permissions.FileReadRoots.Concat(permissions.FileWriteRoots))
+        {
+            if (value == ".")
+                continue;
+            _ = NormalizeRelativePath(value);
+        }
+        if (permissions.Dialogs.Any(string.IsNullOrWhiteSpace) ||
+            permissions.ProcessExecutables.Any(string.IsNullOrWhiteSpace) ||
+            permissions.HttpHosts.Any(string.IsNullOrWhiteSpace) ||
+            permissions.HttpMethods.Any(string.IsNullOrWhiteSpace))
+            throw new InvalidDataException("permissions 中不能包含空值。");
+    }
+
+    private static void ValidateAllowedFileType(string path)
+    {
+        if (!AllowedExtensions.Contains(Path.GetExtension(path)))
+            throw new InvalidDataException("插件包包含不允许的文件类型：" + path);
+    }
+
+    private static void ValidateModuleNames(IEnumerable<string> paths, string modulesRoot)
+    {
+        var prefix = modulesRoot + "/";
+        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var path in paths)
+        {
+            if (!path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                continue;
+            if (!Path.GetExtension(path).Equals(".lua", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException("modulesRoot 内只允许 Lua 模块：" + path);
+            var relative = path[prefix.Length..];
+            string name;
+            if (relative.EndsWith("/init.lua", StringComparison.OrdinalIgnoreCase))
+                name = relative[..^9].Replace('/', '.');
+            else if (relative.Equals("init.lua", StringComparison.OrdinalIgnoreCase))
+                name = "";
+            else
+                name = relative[..^4].Replace('/', '.');
+            if (name.Length == 0 || name.Split('.').Any(part => !ModuleSegmentPattern.IsMatch(part)))
+                throw new InvalidDataException("模块文件名无法映射到稳定的 require 名称：" + path);
+            if (!names.Add(name))
+                throw new InvalidDataException("插件模块名称冲突：" + name);
+        }
+    }
+
+    private static void EnumerateTree(
+        string root, string directory, HashSet<string> files, HashSet<string> directories)
+    {
+        foreach (var path in Directory.EnumerateFileSystemEntries(directory))
+        {
+            RejectReparsePoint(path, "插件包文件/目录");
+            var attrs = File.GetAttributes(path);
+            var relative = NormalizeRelativePath(Path.GetRelativePath(root, path).Replace(Path.DirectorySeparatorChar, '/'));
+            if ((attrs & FileAttributes.Directory) != 0)
+            {
+                if (!directories.Add(relative))
+                    throw new InvalidDataException("插件包存在重复目录路径：" + relative);
+                EnumerateTree(root, path, files, directories);
+            }
+            else if (!files.Add(relative))
+            {
+                throw new InvalidDataException("插件包存在重复文件路径：" + relative);
+            }
+        }
+    }
+
+    private static HashSet<string> ExpectedDirectories(IEnumerable<string> paths)
+    {
+        var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var path in paths.Append(ManifestFileName))
+        {
+            var pieces = path.Split('/');
+            for (var i = 1; i < pieces.Length; i++)
+                result.Add(string.Join('/', pieces.Take(i)));
+        }
+        return result;
+    }
+
+    private static (int Major, int Minor) ParseApiVersion(string value, string label)
+    {
+        if (string.IsNullOrWhiteSpace(value) || !ApiVersionPattern.IsMatch(value))
+            throw new InvalidDataException(label + " 必须是 major.minor 格式。");
+        var parts = value.Split('.');
+        if (!int.TryParse(parts[0], out var major) || !int.TryParse(parts[1], out var minor))
+            throw new InvalidDataException(label + " 数值无效。");
+        return (major, minor);
+    }
+}
