@@ -1738,6 +1738,83 @@ local d = ColorDifference(0x102030, 0x132638)
 local blocks = FindColorBlocks(screen, 0xFF0000, 8, 4, 0, 0, 800, 600, 2, 20)
 ```
 
+### 2.7 文字识别
+
+#### `OCR(imageId, language?, minConfidence?)` — 识别图像文字
+
+- **稳定 ID：** `anjian.ocr.recognize`
+- **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
+- **说明：** 对已加载/已捕获的图像进行离线文字检测与识别，按阅读顺序返回全文和逐行结果。每行包含 0–1 置信度、图像局部矩形及多边形；对桌面截图另提供 screenX/screenY。默认简体中文。模型缺失时明确报错，不在脚本执行期间自动联网下载。
+
+| 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
+|---|---|---|---|---|---|
+| `imageId` | `string` | 是 | — | — | 图像资源 ID。 |
+| `language` | `string` | 否 | `ch` | 固定值：ch、en、japan | 识别语言代码。 |
+| `minConfidence` | `number` | 否 | `0` | 0–1 | 低于该值的行不返回。 |
+
+**返回值：** `table` — 包含 text、lineCount、lines、languages、detectedLanguages、width、height、durationMs、hasScreenCoordinates；lines 为 1 起始的逐行数组，每项含 text/confidence/x/y/width/height/polygon，截图还含 screenX/screenY。
+**错误：** 图像 ID 无效/已释放、语言代码不支持、模型缺失或损坏、图像解码失败及引擎识别失败时产生明确错误。
+**执行/取消语义：** 识别计算在独立 Lua Worker 中执行；WaitText 在每次截图前经过主进程暂停检查点。 单次识别运行于独立 Worker；F12 停止会终止 Worker。图像资源由主进程在轮次结束时统一清理。
+**坐标/权限：** 坐标空间：图像局部零基像素；截图结果同时提供虚拟桌面绝对物理像素坐标。。使用当前轮次图像资源；不提升权限。仅处理已捕获/已加载的图像字节；默认仅读取本地模型缓存，不自动联网。
+
+**示例：**
+```lua
+local result = OCR(screen, "ch", 0.55)
+Log(result.text)
+for i, line in ipairs(result.lines) do Log(line.text .. " " .. line.confidence) end
+```
+
+#### `FindText(imageId, text, language?, minConfidence?, matchMode?)` — 查找文字
+
+- **稳定 ID：** `anjian.ocr.find-text`
+- **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
+- **说明：** 在图像 OCR 结果中按阅读顺序查找第一条匹配文本。matchMode 为 contains（默认，不区分大小写子串）或 exact（不区分大小写完全匹配）；只检查达到 minConfidence 的文本行，未命中返回 nil。
+
+| 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
+|---|---|---|---|---|---|
+| `imageId` | `string` | 是 | — | — | 图像资源 ID。 |
+| `text` | `string` | 是 | — | — | 要查找的非空文本。 |
+| `language` | `string` | 否 | `ch` | 固定值：ch、en、japan | 识别语言代码。 |
+| `minConfidence` | `number` | 否 | `0` | 0–1 | 最低识别置信度。 |
+| `matchMode` | `string` | 否 | `contains` | 固定值：contains、exact | contains 或 exact。 |
+
+**返回值：** `table\|nil` — 命中行的 text、confidence、x/y/width/height、polygon；桌面截图还含 screenX/screenY。未命中返回 nil。
+**错误：** 图像 ID 失效、文本为空、语言不支持、模型缺失/损坏或引擎识别失败时产生错误。
+**执行/取消语义：** 识别计算在独立 Lua Worker 中执行；WaitText 在每次截图前经过主进程暂停检查点。 执行于独立 Worker；F12 停止终止 Worker，并由主进程清理轮次资源。
+**坐标/权限：** 坐标空间：图像局部零基像素；截图结果同时提供虚拟桌面绝对物理像素坐标。。只读取调用者传入的图像资源和已安装的本地模型；不自动联网。
+
+**示例：**
+```lua
+local hit = FindText(screen, "登录", "ch", 0.7, "contains")
+if hit then MoveTo(hit.screenX, hit.screenY) end
+```
+
+#### `WaitText(text, timeoutMs?, intervalMs?, language?, minConfidence?, matchMode?)` — 等待文字出现
+
+- **稳定 ID：** `anjian.ocr.wait-text`
+- **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
+- **说明：** 反复截取当前可见虚拟桌面并执行 OCR，直到出现匹配文本或超时。每次轮询前检查暂停状态；F12 停止终止 Worker。timeoutMs=0 仍会立即执行一次检测。默认简体中文、contains、不自动下载模型。
+
+| 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
+|---|---|---|---|---|---|
+| `text` | `string` | 是 | — | — | 要等待的非空文本。 |
+| `timeoutMs` | `integer` | 否 | `10000` | 0–600000 毫秒 | 总等待超时。 |
+| `intervalMs` | `integer` | 否 | `300` | 10–5000 毫秒 | 两次截图识别间隔。 |
+| `language` | `string` | 否 | `ch` | 固定值：ch、en、japan | 识别语言代码。 |
+| `minConfidence` | `number` | 否 | `0` | 0–1 | 最低识别置信度。 |
+| `matchMode` | `string` | 否 | `contains` | 固定值：contains、exact | contains 或 exact。 |
+
+**返回值：** `table\|nil` — 命中行的文字、置信度、图像局部矩形、多边形与虚拟桌面绝对物理像素 screenX/screenY；超时返回 nil。
+**错误：** 文本/参数无效、桌面截图失败、模型缺失/损坏或引擎识别失败时产生错误；Stop 不作为超时返回。
+**执行/取消语义：** 识别计算在独立 Lua Worker 中执行；WaitText 在每次截图前经过主进程暂停检查点。 每次截图前通过主进程 checkpoint 遵循暂停；F12 终止 Worker，正在执行的原生推理随进程结束。
+**坐标/权限：** 坐标空间：虚拟桌面截图坐标；返回 screenX/screenY 为绝对物理像素，允许负坐标。。截图依赖当前交互桌面可见合成画面；不承诺被遮挡/最小化窗口或受保护表面的真实后台像素。不绕过 UIPI/UAC/安全桌面。模型只从本地缓存读取。
+
+**示例：**
+```lua
+local hit = WaitText("订单提交成功", 15000, 250, "ch", 0.65)
+if hit then Log("识别到：" .. hit.text) end
+```
+
 <!-- END GENERATED API REFERENCE -->
 
 ## 3. 当前参数约定
