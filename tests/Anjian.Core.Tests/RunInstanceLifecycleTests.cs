@@ -92,7 +92,7 @@ public sealed class RunInstanceLifecycleTests
             outcome: RunInstanceOutcome.Succeeded);
 
         Assert.Equal(RunInstanceCleanupStatus.InProgress, snapshot.CleanupStatus);
-        Assert.Equal(RunInstanceTerminationMode.Graceful, snapshot.TerminationMode);
+        Assert.Equal(RunInstanceTerminationMode.None, snapshot.TerminationMode);
         Assert.False(RunInstanceLifecycle.IsTerminal(snapshot));
 
         snapshot = RunInstanceLifecycle.Transition(snapshot, RunInstanceState.Cleaned,
