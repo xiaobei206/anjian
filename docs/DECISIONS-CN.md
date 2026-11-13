@@ -155,3 +155,16 @@
 - Launcher 启动前校验清单闭合、hash、入口、参数 schema、图像 manifest/assets、OCR 文件和 API/runtime 兼容性；验证失败时禁止执行 Worker。
 - 参数沿用 ADR-022；Worker 只增加可选包模块目录和 OCR 模型目录，不改变既有 typed Args 语义。
 - 包内包含 Markdown 函数参考；PRD 2.14 的离线 HTML 仍待帮助系统后续实现。Windows 自动化 smoke 不是桌面 UI/真实输入验收，后者统一留给 M14。
+
+
+## ADR-024：脚本权限采用声明与逐次运行批准分离的默认拒绝模型
+- 状态：ACCEPTED（M12 首阶段安全契约；OS API 与插件 Host 将按本 ADR 接入）。
+- 声明文件：每个脚本可选同目录 <script>.permissions.json，UTF-8 JSON、schemaVersion=1，最大 256 KiB。它只表达请求，不代表授权；未声明的能力一律拒绝。
+- 声明字段：fileReadRoots / fileWriteRoots 为脚本目录相对或绝对目录；clipboardRead / clipboardWrite 为布尔值；dialogs 仅允许 message、input、confirm；processExecutables 只允许明确 .exe 绝对/相对路径；httpHosts 为精确 DNS 主机名（不接受通配符），httpMethods 限 GET/POST/PUT/PATCH/DELETE/HEAD；明文 HTTP 需另有 allowInsecureHttp=true。
+- 授权时机：主进程在每次脚本启动前展示本次请求与具体资源范围，由用户明确选择批准子集；取消或关闭对话框即全拒绝。M12 不将同意默认为永久，也不从脚本声明自动授权。
+- 执行边界：Worker 与主进程共享同一份不可变 ScriptPermissionGrant。Lua bridge 在调用前检查一次；主进程 IPC dispatcher 对 OS 操作再次检查，Worker 伪造 IPC 也不能绕过主机权限。任何运行模式缺少审批对象即使用空权限集合。
+- 文件系统：路径先规范化为完整路径，检查目录边界时使用 Path.GetRelativePath，不使用字符串前缀。Windows 文件适配器还必须逐级拒绝 reparse point/符号链接，并在最终打开时防止检查-使用竞态；Core 纯路径策略本身不宣称解决符号链接攻击。
+- 进程：只允许启动用户批准的精确 .exe 路径；不提供任意 Shell、参数拼接执行或终止任意进程的初始能力。
+- 网络：HTTPS 默认允许；HTTP 只有独立明确批准才允许。主机和方法分别做精确 allowlist；不支持通配符、重定向到未批准域名或继承外部代理凭据。请求必须有超时与 Stop cancellation token。
+- 插件：M12 首版采用本地 ZIP/目录包和 manifest，不执行插件 DLL、不在 UI 进程执行第三方代码。插件 Lua entry/module 只能在独立 Worker 加载；manifest API 版本不兼容或文件清单/hash 不完整则拒绝启用。插件声明的权限与脚本声明取交集，用户批准取更小子集。
+- 权限 UI 与 OS 桌面体验留 M14 实机验收；CI 只验证策略和 IPC/资源适配，不把 CI 结果写成实机 PASS。
