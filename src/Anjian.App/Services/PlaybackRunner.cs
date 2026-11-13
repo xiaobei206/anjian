@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using Anjian.Core;
 using Anjian.Core.Editor;
+using Anjian.Core.Imaging;
 using Anjian.Core.Windows;
 
 namespace Anjian.App.Services;
@@ -12,11 +13,14 @@ internal sealed class PlaybackRunner : IDisposable
 {
     private readonly WindowsInputController _input = new();
     private readonly WindowsWindowManager _windows = new();
+    private readonly WindowsImageService _images;
     private readonly ExecutionGate _gate = new();
     private CancellationTokenSource? _runCts;
     private Process? _worker;
     private LuaDebugLaunchOptions? _debugLaunchOptions;
     private TaskCompletionSource<LuaDebugCommand>? _debugCommandSource;
+
+    public PlaybackRunner() => _images = new WindowsImageService(_windows);
 
     public event Action<string>? Log;
     public event Action<int, int>? IterationChanged;
@@ -104,6 +108,7 @@ internal sealed class PlaybackRunner : IDisposable
         LuaDebugLaunchOptions? debugOptions,
         CancellationToken token)
     {
+        _images.Clear();
         var pipeName = "Anjian2026_" + Guid.NewGuid().ToString("N");
         await using var server = new NamedPipeServerStream(pipeName, PipeDirection.InOut, 1,
             PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
@@ -148,6 +153,7 @@ internal sealed class PlaybackRunner : IDisposable
             worker.Dispose();
             _worker = null;
             _input.ReleaseAll();
+            _images.Clear();
             _windows.ClearReferences();
         }
     }
@@ -286,11 +292,138 @@ internal sealed class PlaybackRunner : IDisposable
                 var result = _windows.ConvertCoordinate(request, toScreen: message.Type == "coordinate-to-screen");
                 return JsonSerializer.Serialize(result, WindowApiJson.Options);
             }
+            case "image-capture-screen":
+                return _images.CaptureScreen();
+            case "image-capture-window":
+                return _images.CaptureWindow(ReadWindowPayload<ImageWindowRequest>(message.Text).WindowId);
+            case "image-capture-client":
+                return _images.CaptureClient(ReadWindowPayload<ImageWindowRequest>(message.Text).WindowId);
+            case "image-capture-region":
+                return _images.CaptureRegion(ReadWindowPayload<ImageCaptureRegionRequest>(message.Text));
+            case "image-load":
+                return _images.LoadImage(ReadWindowPayload<ImageFileRequest>(message.Text).Path);
+            case "image-save":
+                return JsonSerializer.Serialize(_images.SaveScreenshot(ReadWindowPayload<ImageSaveRequest>(message.Text)));
+            case "image-release":
+                return JsonSerializer.Serialize(_images.ReleaseImage(ReadWindowPayload<ImageIdRequest>(message.Text).ImageId));
+            case "image-size":
+                return JsonSerializer.Serialize(_images.GetSize(ReadWindowPayload<ImageIdRequest>(message.Text).ImageId), WindowApiJson.Options);
+            case "image-crop":
+                return _images.CropImage(ReadWindowPayload<ImageCropRequest>(message.Text));
+            case "image-pixel-color":
+                return JsonSerializer.Serialize((int)_images.GetPixelColor(ReadWindowPayload<ImagePixelRequest>(message.Text)));
+            case "image-compare-color":
+                return JsonSerializer.Serialize(_images.CompareColor(ReadWindowPayload<ImageCompareColorRequest>(message.Text)));
+            case "image-find-color":
+                return JsonSerializer.Serialize(_images.FindColor(ReadWindowPayload<ImageColorSearchRequest>(message.Text)), WindowApiJson.Options);
+            case "image-find-multi-color":
+                return JsonSerializer.Serialize(_images.FindMultiColor(ReadWindowPayload<ImageMultiColorSearchRequest>(message.Text)), WindowApiJson.Options);
+            case "image-count-colors":
+                return JsonSerializer.Serialize(_images.CountColors(ReadWindowPayload<ImageColorSearchRequest>(message.Text)));
+            case "image-find-image":
+                return JsonSerializer.Serialize(_images.FindImage(ReadWindowPayload<ImageTemplateSearchRequest>(message.Text)), WindowApiJson.Options);
+            case "image-find-images":
+                return JsonSerializer.Serialize(_images.FindImages(ReadWindowPayload<ImageTemplateSearchRequest>(message.Text)), WindowApiJson.Options);
+            case "image-wait-image":
+            {
+                var request = ReadWindowPayload<ImageWaitImageRequest>(message.Text);
+                var found = await WaitForImageAsync(request, token).ConfigureAwait(false);
+                return JsonSerializer.Serialize(found, WindowApiJson.Options);
+            }
+            case "image-wait-image-gone":
+            {
+                var request = ReadWindowPayload<ImageWaitImageRequest>(message.Text);
+                return JsonSerializer.Serialize(await WaitForImageGoneAsync(request, token).ConfigureAwait(false));
+            }
+            case "image-wait-color":
+            {
+                var request = ReadWindowPayload<ImageWaitColorRequest>(message.Text);
+                var found = await WaitForColorAsync(request, token).ConfigureAwait(false);
+                return JsonSerializer.Serialize(found, WindowApiJson.Options);
+            }
+            case "image-wait-color-gone":
+            {
+                var request = ReadWindowPayload<ImageWaitColorRequest>(message.Text);
+                return JsonSerializer.Serialize(await WaitForColorGoneAsync(request, token).ConfigureAwait(false));
+            }
             default:
                 throw new InvalidDataException($"未知执行命令：{message.Type}");
         }
 
         return null;
+    }
+
+    private async Task<ImageMatchPoint?> WaitForImageAsync(
+        ImageWaitImageRequest request, CancellationToken token)
+    {
+        var template = _images.Get(request.TemplateId);
+        var timer = Stopwatch.StartNew();
+        while (true)
+        {
+            token.ThrowIfCancellationRequested();
+            await _gate.WaitUntilRunnableAsync(token).ConfigureAwait(false);
+            var match = ImageSearchEngine.FindImage(_images.CaptureScreenPixels(), template,
+                request.Similarity, request.Tolerance);
+            if (match is not null)
+                return match;
+            var remaining = request.TimeoutMilliseconds - (int)Math.Min(int.MaxValue, timer.ElapsedMilliseconds);
+            if (remaining <= 0)
+                return null;
+            await _gate.DelayAsync(Math.Min(request.IntervalMilliseconds, remaining), token).ConfigureAwait(false);
+        }
+    }
+
+    private async Task<bool> WaitForImageGoneAsync(ImageWaitImageRequest request, CancellationToken token)
+    {
+        var template = _images.Get(request.TemplateId);
+        var timer = Stopwatch.StartNew();
+        while (true)
+        {
+            token.ThrowIfCancellationRequested();
+            await _gate.WaitUntilRunnableAsync(token).ConfigureAwait(false);
+            var match = ImageSearchEngine.FindImage(_images.CaptureScreenPixels(), template,
+                request.Similarity, request.Tolerance);
+            if (match is null)
+                return true;
+            var remaining = request.TimeoutMilliseconds - (int)Math.Min(int.MaxValue, timer.ElapsedMilliseconds);
+            if (remaining <= 0)
+                return false;
+            await _gate.DelayAsync(Math.Min(request.IntervalMilliseconds, remaining), token).ConfigureAwait(false);
+        }
+    }
+
+    private async Task<ImageMatchPoint?> WaitForColorAsync(ImageWaitColorRequest request, CancellationToken token)
+    {
+        var timer = Stopwatch.StartNew();
+        while (true)
+        {
+            token.ThrowIfCancellationRequested();
+            await _gate.WaitUntilRunnableAsync(token).ConfigureAwait(false);
+            var match = ImageSearchEngine.FindColor(_images.CaptureScreenPixels(), request.Color, request.Tolerance);
+            if (match is not null)
+                return match;
+            var remaining = request.TimeoutMilliseconds - (int)Math.Min(int.MaxValue, timer.ElapsedMilliseconds);
+            if (remaining <= 0)
+                return null;
+            await _gate.DelayAsync(Math.Min(request.IntervalMilliseconds, remaining), token).ConfigureAwait(false);
+        }
+    }
+
+    private async Task<bool> WaitForColorGoneAsync(ImageWaitColorRequest request, CancellationToken token)
+    {
+        var timer = Stopwatch.StartNew();
+        while (true)
+        {
+            token.ThrowIfCancellationRequested();
+            await _gate.WaitUntilRunnableAsync(token).ConfigureAwait(false);
+            var match = ImageSearchEngine.FindColor(_images.CaptureScreenPixels(), request.Color, request.Tolerance);
+            if (match is null)
+                return true;
+            var remaining = request.TimeoutMilliseconds - (int)Math.Min(int.MaxValue, timer.ElapsedMilliseconds);
+            if (remaining <= 0)
+                return false;
+            await _gate.DelayAsync(Math.Min(request.IntervalMilliseconds, remaining), token).ConfigureAwait(false);
+        }
     }
 
     private async Task SendWindowInputAsync(WindowInputRequest request, CancellationToken token)
@@ -395,6 +528,7 @@ internal sealed class PlaybackRunner : IDisposable
     public void Dispose()
     {
         Stop();
+        _images.Clear();
         _windows.Dispose();
     }
 }

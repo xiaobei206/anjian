@@ -6,9 +6,9 @@ using Xunit;
 namespace Anjian.Core.Tests;
 public sealed class LuaApiRegistryTests
 {
- private static readonly string[] Expected=["MoveTo","LeftClick","RightClick","MiddleClick","LeftDoubleClick","RightDoubleClick","MiddleDoubleClick","LeftDown","LeftUp","RightDown","RightUp","MiddleDown","MiddleUp","MouseWheel","KeyPress","KeyDown","KeyUp","TypeText","Hotkey","Delay","RandomDelay","Log","WindowFind","WindowEnumerate","WindowEnumerateChildren","WindowGetInfo","WindowActivate","WindowShow","WindowHide","WindowMinimize","WindowMaximize","WindowRestore","WindowSetTopmost","WindowMove","WindowResize","WindowAlign","WindowWait","WindowWaitClosed","CoordinateToScreen","CoordinateFromScreen","WindowBind","WindowUnbind","WindowGetCapabilities","ControlEnumerate","ControlGetInfo","ControlGetValue","ControlSetValue","ControlGetText","ControlGetSelection","ControlSelect","ControlGetToggleState","ControlToggle","ControlInvoke","WindowInput"];
- [Fact] public void RegistryContainsOnlyImplementedPublicFunctions(){var r=LuaApiRegistry.Load();Assert.Equal(1,r.SchemaVersion);Assert.Equal("0.4",r.ApiVersion);Assert.Equal(Expected.Order(StringComparer.Ordinal),r.PublicFunctionNames.Order(StringComparer.Ordinal));Assert.All(r.Apis,a=>{Assert.Equal("implemented",a.ImplementationStatus);Assert.NotEmpty(a.Id);Assert.NotEmpty(a.Signature);Assert.NotEmpty(a.Example);Assert.NotEmpty(a.Errors);Assert.NotEmpty(a.Behavior.PauseBehavior);Assert.NotEmpty(a.Behavior.CancellationBehavior);Assert.NotEmpty(a.Behavior.CoordinateSpace);Assert.NotEmpty(a.Behavior.PermissionNotes);});Assert.DoesNotContain(r.Apis,a=>a.Name is "FindImage" or "OCR" or "CaptureScreen" or "MoveToWindow");var keys=r.Apis.Single(a=>a.Name=="KeyPress").Parameters.Single(p=>p.Name=="key").AllowedValues;Assert.Contains("NUMPAD0",keys);Assert.Contains("NUMPAD9",keys);Assert.DoesNotContain("NUMPAD0-9",keys);}
- [Fact] public void RuntimeCreatesCatalogGlobalsAndHidesBridgeNames(){var r=LuaApiRegistry.Load();using var lua=new Lua(openLibs:true);LuaApiRuntime.Register(lua,new WorkerLuaApi(new Recorder()));foreach(var a in r.Apis)Assert.Equal("function",lua.DoString($"return type({a.Name})")[0]?.ToString());foreach(var b in r.Apis.SelectMany(a=>a.Runtime.Bindings))Assert.Equal("nil",lua.DoString($"return type({b.Name})")[0]?.ToString());Assert.Equal("nil",lua.DoString("return type(FindWindow)")[0]?.ToString());Assert.Equal("nil",lua.DoString("return type(FindImage)")[0]?.ToString());Assert.Equal("nil",lua.DoString("return type(OCR)")[0]?.ToString());Assert.Equal("nil",lua.DoString("return type(os)")[0]?.ToString());Assert.Equal("nil",lua.DoString("return type(io)")[0]?.ToString());}
+ private static readonly string[] Expected=["MoveTo","LeftClick","RightClick","MiddleClick","LeftDoubleClick","RightDoubleClick","MiddleDoubleClick","LeftDown","LeftUp","RightDown","RightUp","MiddleDown","MiddleUp","MouseWheel","KeyPress","KeyDown","KeyUp","TypeText","Hotkey","Delay","RandomDelay","Log","WindowFind","WindowEnumerate","WindowEnumerateChildren","WindowGetInfo","WindowActivate","WindowShow","WindowHide","WindowMinimize","WindowMaximize","WindowRestore","WindowSetTopmost","WindowMove","WindowResize","WindowAlign","WindowWait","WindowWaitClosed","CoordinateToScreen","CoordinateFromScreen","WindowBind","WindowUnbind","WindowGetCapabilities","ControlEnumerate","ControlGetInfo","ControlGetValue","ControlSetValue","ControlGetText","ControlGetSelection","ControlSelect","ControlGetToggleState","ControlToggle","ControlInvoke","WindowInput","CaptureScreen","CaptureWindow","CaptureClient","CaptureRegion","LoadImage","SaveScreenshot","ReleaseImage","GetImageSize","CropImage","GetPixelColor","CompareColor","FindColor","FindMultiColor","CountColors","FindImage","FindImages","WaitImage","WaitImageGone","WaitColor","WaitColorGone"];
+ [Fact] public void RegistryContainsOnlyImplementedPublicFunctions(){var r=LuaApiRegistry.Load();Assert.Equal(1,r.SchemaVersion);Assert.Equal("0.5",r.ApiVersion);Assert.Equal(Expected.Order(StringComparer.Ordinal),r.PublicFunctionNames.Order(StringComparer.Ordinal));Assert.All(r.Apis,a=>{Assert.Equal("implemented",a.ImplementationStatus);Assert.NotEmpty(a.Id);Assert.NotEmpty(a.Signature);Assert.NotEmpty(a.Example);Assert.NotEmpty(a.Errors);Assert.NotEmpty(a.Behavior.PauseBehavior);Assert.NotEmpty(a.Behavior.CancellationBehavior);Assert.NotEmpty(a.Behavior.CoordinateSpace);Assert.NotEmpty(a.Behavior.PermissionNotes);});Assert.Contains(r.Apis,a=>a.Name=="FindImage");Assert.Contains(r.Apis,a=>a.Name=="CaptureScreen");Assert.DoesNotContain(r.Apis,a=>a.Name is "OCR" or "MoveToWindow");var keys=r.Apis.Single(a=>a.Name=="KeyPress").Parameters.Single(p=>p.Name=="key").AllowedValues;Assert.Contains("NUMPAD0",keys);Assert.Contains("NUMPAD9",keys);Assert.DoesNotContain("NUMPAD0-9",keys);}
+ [Fact] public void RuntimeCreatesCatalogGlobalsAndHidesBridgeNames(){var r=LuaApiRegistry.Load();using var lua=new Lua(openLibs:true);LuaApiRuntime.Register(lua,new WorkerLuaApi(new Recorder()));foreach(var a in r.Apis)Assert.Equal("function",lua.DoString($"return type({a.Name})")[0]?.ToString());foreach(var b in r.Apis.SelectMany(a=>a.Runtime.Bindings))Assert.Equal("nil",lua.DoString($"return type({b.Name})")[0]?.ToString());Assert.Equal("nil",lua.DoString("return type(FindWindow)")[0]?.ToString());Assert.Equal("function",lua.DoString("return type(FindImage)")[0]?.ToString());Assert.Equal("function",lua.DoString("return type(CaptureScreen)")[0]?.ToString());Assert.Equal("nil",lua.DoString("return type(OCR)")[0]?.ToString());Assert.Equal("nil",lua.DoString("return type(os)")[0]?.ToString());Assert.Equal("nil",lua.DoString("return type(io)")[0]?.ToString());}
  [Fact]
  public void LuaCallsAndDefaultsMatchCatalog()
  {
@@ -157,4 +157,21 @@ public sealed class LuaApiRegistryTests
   public void Dispose() { }
  }
 
+}
+
+[Fact]
+public void ImagingApiDefaultsAndValidationAreRegistered()
+{
+ var r=LuaApiRegistry.Load();
+ Assert.Equal("0.5",r.ApiVersion);
+ Assert.Equal(74,r.Apis.Count);
+ var find=r.Apis.Single(a=>a.Name=="FindImage");
+ Assert.Equal(0.95,find.Parameters.Single(p=>p.Name=="similarity").DefaultValue?.GetDouble());
+ using var lua=new Lua(openLibs:true);
+ LuaApiRuntime.Register(lua,new WorkerLuaApi(new Recorder()));
+ Assert.Equal("function",lua.DoString("return type(FindColor)")[0]?.ToString());
+ Assert.Equal("function",lua.DoString("return type(WaitImage)")[0]?.ToString());
+ var result=lua.DoString("local a=pcall(CompareColor, 'image', 0, 0, 0xFF0000, 256); local b=pcall(FindImage, 'image', 'template', 1.2, 0, 0, 0, 0, 0, 0, 1); return a,b");
+ Assert.False(Convert.ToBoolean(result[0]));
+ Assert.False(Convert.ToBoolean(result[1]));
 }

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "apiVersion": "0.4",
+  "apiVersion": "0.5",
   "product": "按键精灵 2026",
   "categories": [
     {
@@ -27,6 +27,11 @@
       "id": "automation",
       "title": "控件与输入自动化",
       "description": "窗口绑定、UI Automation 标准控件 Pattern 能力以及显式前台输入。"
+    },
+    {
+      "id": "imaging",
+      "title": "截图与图像识别",
+      "description": "截图资源、RGB 颜色搜索、模板匹配与可取消等待。"
     }
   ],
   "apis": [
@@ -3163,6 +3168,1541 @@
             "localName": "__AnjianBridge_WindowInput"
           }
         ]
+      }
+    },
+    {
+      "name": "CaptureScreen",
+      "title": "截取虚拟桌面",
+      "category": "imaging",
+      "signature": "CaptureScreen()",
+      "description": "捕获 Windows 虚拟桌面的可见合成画面，返回本轮有效的图像资源 ID。副屏负坐标保存在 origin 元数据中。",
+      "parameters": [],
+      "returns": {
+        "type": "string",
+        "description": "本轮图像资源 ID。"
+      },
+      "errors": [
+        "桌面不可用、截图失败或超过图像/资源池限制时产生错误。"
+      ],
+      "example": "local screen = CaptureScreen()",
+      "runtime": {
+        "definition": "function() return __AnjianBridge_CaptureScreen() end",
+        "bindings": [
+          {
+            "name": "__CaptureScreen",
+            "method": "CaptureScreen",
+            "localName": "__AnjianBridge_CaptureScreen"
+          }
+        ]
+      },
+      "id": "anjian.imaging.captureScreen",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.5.0-dev.1",
+      "behavior": {
+        "pauseBehavior": "在主进程图像操作命令边界遵循暂停状态。",
+        "cancellationBehavior": "本轮 worker 结束时主进程清空本轮所有图像资源。",
+        "sideEffects": [
+          "捕获当前交互桌面的可见合成画面。"
+        ],
+        "coordinateSpace": "返回带屏幕原点的图像；像素使用图像局部零基坐标。",
+        "permissionNotes": "不新增第三方图像引擎依赖。截图依赖当前 Windows 交互桌面的可见合成画面；不保证被遮挡/最小化窗口、硬件加速表面或受保护内容的真实后台像素。不绕过 UIPI/UAC/安全桌面。每张图像最多 32,000,000 像素；单轮最多 128 个资源与 256 MiB 像素缓存。"
+      }
+    },
+    {
+      "name": "CaptureWindow",
+      "title": "截取窗口外框",
+      "category": "imaging",
+      "signature": "CaptureWindow(windowId)",
+      "description": "截取指定可见且未最小化窗口的屏幕外框区域。截图来自桌面合成画面，窗口被其他内容遮挡时不保证得到其后台内容。",
+      "parameters": [
+        {
+          "name": "windowId",
+          "type": "string",
+          "required": true,
+          "description": "当前运行内有效的 M6 不透明窗口引用 ID。"
+        }
+      ],
+      "returns": {
+        "type": "string",
+        "description": "本轮图像资源 ID。"
+      },
+      "errors": [
+        "窗口引用失效、窗口隐藏/最小化、区域无效或截图失败时产生错误。"
+      ],
+      "example": "local image = CaptureWindow(window.id)",
+      "runtime": {
+        "definition": "function(windowId) return __AnjianBridge_CaptureWindow(windowId) end",
+        "bindings": [
+          {
+            "name": "__CaptureWindow",
+            "method": "CaptureWindow",
+            "localName": "__AnjianBridge_CaptureWindow"
+          }
+        ]
+      },
+      "id": "anjian.imaging.captureWindow",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.5.0-dev.1",
+      "behavior": {
+        "pauseBehavior": "在主进程图像操作命令边界遵循暂停状态。",
+        "cancellationBehavior": "本轮 worker 结束时主进程清空本轮所有图像资源。",
+        "sideEffects": [
+          "读取目标窗口在当前桌面上实际可见的合成像素。"
+        ],
+        "coordinateSpace": "屏幕物理像素；结果同时提供局部像素坐标与 screenX/screenY。",
+        "permissionNotes": "不新增第三方图像引擎依赖。截图依赖当前 Windows 交互桌面的可见合成画面；不保证被遮挡/最小化窗口、硬件加速表面或受保护内容的真实后台像素。不绕过 UIPI/UAC/安全桌面。每张图像最多 32,000,000 像素；单轮最多 128 个资源与 256 MiB 像素缓存。"
+      }
+    },
+    {
+      "name": "CaptureClient",
+      "title": "截取窗口客户区",
+      "category": "imaging",
+      "signature": "CaptureClient(windowId)",
+      "description": "截取指定可见且未最小化窗口的客户区屏幕区域；不含标题栏和边框。被遮挡内容不保证可获取。",
+      "parameters": [
+        {
+          "name": "windowId",
+          "type": "string",
+          "required": true,
+          "description": "当前运行内有效的 M6 不透明窗口引用 ID。"
+        }
+      ],
+      "returns": {
+        "type": "string",
+        "description": "本轮图像资源 ID。"
+      },
+      "errors": [
+        "窗口引用失效、窗口隐藏/最小化、客户区无效或截图失败时产生错误。"
+      ],
+      "example": "local image = CaptureClient(window.id)",
+      "runtime": {
+        "definition": "function(windowId) return __AnjianBridge_CaptureClient(windowId) end",
+        "bindings": [
+          {
+            "name": "__CaptureClient",
+            "method": "CaptureClient",
+            "localName": "__AnjianBridge_CaptureClient"
+          }
+        ]
+      },
+      "id": "anjian.imaging.captureClient",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.5.0-dev.1",
+      "behavior": {
+        "pauseBehavior": "在主进程图像操作命令边界遵循暂停状态。",
+        "cancellationBehavior": "本轮 worker 结束时主进程清空本轮所有图像资源。",
+        "sideEffects": [
+          "读取客户区在当前桌面上实际可见的合成像素。"
+        ],
+        "coordinateSpace": "屏幕物理像素；结果同时提供局部像素坐标与 screenX/screenY。",
+        "permissionNotes": "不新增第三方图像引擎依赖。截图依赖当前 Windows 交互桌面的可见合成画面；不保证被遮挡/最小化窗口、硬件加速表面或受保护内容的真实后台像素。不绕过 UIPI/UAC/安全桌面。每张图像最多 32,000,000 像素；单轮最多 128 个资源与 256 MiB 像素缓存。"
+      }
+    },
+    {
+      "name": "CaptureRegion",
+      "title": "按坐标空间截图",
+      "category": "imaging",
+      "signature": "CaptureRegion(windowId, space, x, y, width, height, anchor?)",
+      "description": "按 screen/window/client/anchor/ratio 坐标空间捕获自定义矩形。windowId 为空字符串时必须使用 screen，坐标为虚拟桌面屏幕物理像素；非空 ID 复用 M6 双向坐标转换契约。",
+      "parameters": [
+        {
+          "name": "windowId",
+          "type": "string",
+          "required": true,
+          "description": "当前运行内的窗口引用 ID；空字符串表示不使用窗口引用，且只允许 screen 坐标。"
+        },
+        {
+          "name": "space",
+          "type": "string",
+          "required": true,
+          "description": "screen、window、client、anchor 或 ratio。"
+        },
+        {
+          "name": "x",
+          "type": "number",
+          "required": true,
+          "description": "区域左上角 X；使用指定坐标空间的单位。"
+        },
+        {
+          "name": "y",
+          "type": "number",
+          "required": true,
+          "description": "区域左上角 Y；使用指定坐标空间的单位。"
+        },
+        {
+          "name": "width",
+          "type": "number",
+          "required": true,
+          "description": "区域宽度；使用指定坐标空间的单位，必须大于 0。",
+          "minimum": 0,
+          "maximum": 32768
+        },
+        {
+          "name": "height",
+          "type": "number",
+          "required": true,
+          "description": "区域高度；使用指定坐标空间的单位，必须大于 0。",
+          "minimum": 0,
+          "maximum": 32768
+        },
+        {
+          "name": "anchor",
+          "type": "string",
+          "required": false,
+          "description": "anchor 空间所用的九宫格锚点。",
+          "defaultValue": "top-left"
+        }
+      ],
+      "returns": {
+        "type": "string",
+        "description": "本轮图像资源 ID。"
+      },
+      "errors": [
+        "坐标空间无效、窗口引用失效、矩形越界、区域无效或截图失败时产生错误。"
+      ],
+      "example": "local image = CaptureRegion(\"\", \"screen\", 100, 80, 640, 360)",
+      "runtime": {
+        "definition": "function(windowId, space, x, y, width, height, anchor) return __AnjianBridge_CaptureRegion(windowId, space, x, y, width, height, (anchor == nil and \"top-left\" or anchor)) end",
+        "bindings": [
+          {
+            "name": "__CaptureRegion",
+            "method": "CaptureRegion",
+            "localName": "__AnjianBridge_CaptureRegion"
+          }
+        ]
+      },
+      "id": "anjian.imaging.captureRegion",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.5.0-dev.1",
+      "behavior": {
+        "pauseBehavior": "在主进程图像操作命令边界遵循暂停状态。",
+        "cancellationBehavior": "本轮 worker 结束时主进程清空本轮所有图像资源。",
+        "sideEffects": [
+          "从当前交互桌面捕获指定屏幕矩形。"
+        ],
+        "coordinateSpace": "截图区域复用 M6 screen/window/client/anchor/ratio 契约；像素输出单位为物理像素。",
+        "permissionNotes": "不新增第三方图像引擎依赖。截图依赖当前 Windows 交互桌面的可见合成画面；不保证被遮挡/最小化窗口、硬件加速表面或受保护内容的真实后台像素。不绕过 UIPI/UAC/安全桌面。每张图像最多 32,000,000 像素；单轮最多 128 个资源与 256 MiB 像素缓存。"
+      }
+    },
+    {
+      "name": "LoadImage",
+      "title": "加载模板图像",
+      "category": "imaging",
+      "signature": "LoadImage(path)",
+      "description": "从本地文件加载图像并复制到资源池；PNG 透明像素可在找图时作为通配区域。动图仅载入当前帧，不播放动画。",
+      "parameters": [
+        {
+          "name": "path",
+          "type": "string",
+          "required": true,
+          "description": "本地图像文件的绝对或相对路径。"
+        }
+      ],
+      "returns": {
+        "type": "string",
+        "description": "本轮图像资源 ID。"
+      },
+      "errors": [
+        "文件不存在、格式不支持、图像尺寸超过限制或资源池达到上限时产生错误。"
+      ],
+      "example": "local template = LoadImage(\"C:\\\\scripts\\\\button.png\")",
+      "runtime": {
+        "definition": "function(path) return __AnjianBridge_LoadImage(path) end",
+        "bindings": [
+          {
+            "name": "__LoadImage",
+            "method": "LoadImage",
+            "localName": "__AnjianBridge_LoadImage"
+          }
+        ]
+      },
+      "id": "anjian.imaging.loadImage",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.5.0-dev.1",
+      "behavior": {
+        "pauseBehavior": "在主进程图像操作命令边界遵循暂停状态。",
+        "cancellationBehavior": "本轮 worker 结束时主进程清空本轮所有图像资源。",
+        "sideEffects": [
+          "读取本地图像文件。"
+        ],
+        "coordinateSpace": "本地图像没有屏幕坐标原点；像素使用图像局部零基坐标。",
+        "permissionNotes": "不新增第三方图像引擎依赖。截图依赖当前 Windows 交互桌面的可见合成画面；不保证被遮挡/最小化窗口、硬件加速表面或受保护内容的真实后台像素。不绕过 UIPI/UAC/安全桌面。每张图像最多 32,000,000 像素；单轮最多 128 个资源与 256 MiB 像素缓存。"
+      }
+    },
+    {
+      "name": "SaveScreenshot",
+      "title": "保存图像为 PNG",
+      "category": "imaging",
+      "signature": "SaveScreenshot(imageId, path)",
+      "description": "将图像资源写为 PNG；目标扩展名必须为 .png。若目标文件已存在，会覆盖该文件。",
+      "parameters": [
+        {
+          "name": "imageId",
+          "type": "string",
+          "required": true,
+          "description": "当前运行内有效的图像资源 ID。"
+        },
+        {
+          "name": "path",
+          "type": "string",
+          "required": true,
+          "description": "输出 PNG 文件路径；扩展名必须为 .png。"
+        }
+      ],
+      "returns": {
+        "type": "boolean",
+        "description": "成功保存返回 true。"
+      },
+      "errors": [
+        "资源失效、路径无效、文件写入失败或扩展名不是 .png 时产生错误。"
+      ],
+      "example": "SaveScreenshot(screen, \"C:\\\\scripts\\\\screen.png\")",
+      "runtime": {
+        "definition": "function(imageId, path) return __AnjianBridge_SaveScreenshot(imageId, path) end",
+        "bindings": [
+          {
+            "name": "__SaveScreenshot",
+            "method": "SaveScreenshot",
+            "localName": "__AnjianBridge_SaveScreenshot"
+          }
+        ]
+      },
+      "id": "anjian.imaging.saveScreenshot",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.5.0-dev.1",
+      "behavior": {
+        "pauseBehavior": "在主进程图像操作命令边界遵循暂停状态。",
+        "cancellationBehavior": "本轮 worker 结束时主进程清空本轮所有图像资源。",
+        "sideEffects": [
+          "创建或覆盖 PNG 文件。"
+        ],
+        "coordinateSpace": "写入图像资源的局部像素；不会改变 MoveTo 的 screen 物理像素契约。",
+        "permissionNotes": "不新增第三方图像引擎依赖。截图依赖当前 Windows 交互桌面的可见合成画面；不保证被遮挡/最小化窗口、硬件加速表面或受保护内容的真实后台像素。不绕过 UIPI/UAC/安全桌面。每张图像最多 32,000,000 像素；单轮最多 128 个资源与 256 MiB 像素缓存。"
+      }
+    },
+    {
+      "name": "ReleaseImage",
+      "title": "释放图像资源",
+      "category": "imaging",
+      "signature": "ReleaseImage(imageId)",
+      "description": "释放指定的本轮图像资源并立即归还资源池额度；未知或已释放的 ID 返回 false。每轮脚本结束时本轮资源池也会清空。",
+      "parameters": [
+        {
+          "name": "imageId",
+          "type": "string",
+          "required": true,
+          "description": "要释放的图像资源 ID。"
+        }
+      ],
+      "returns": {
+        "type": "boolean",
+        "description": "首次释放成功返回 true；不存在的资源返回 false。"
+      },
+      "errors": [
+        "图像 ID 为空时产生错误。"
+      ],
+      "example": "ReleaseImage(template)",
+      "runtime": {
+        "definition": "function(imageId) return __AnjianBridge_ReleaseImage(imageId) end",
+        "bindings": [
+          {
+            "name": "__ReleaseImage",
+            "method": "ReleaseImage",
+            "localName": "__AnjianBridge_ReleaseImage"
+          }
+        ]
+      },
+      "id": "anjian.imaging.releaseImage",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.5.0-dev.1",
+      "behavior": {
+        "pauseBehavior": "在主进程图像操作命令边界遵循暂停状态。",
+        "cancellationBehavior": "本轮 worker 结束时主进程清空本轮所有图像资源。",
+        "sideEffects": [
+          "释放托管的图像像素数据。"
+        ],
+        "coordinateSpace": "资源生命周期为单次运行轮次；资源 ID 不可跨轮次保存复用。",
+        "permissionNotes": "不新增第三方图像引擎依赖。截图依赖当前 Windows 交互桌面的可见合成画面；不保证被遮挡/最小化窗口、硬件加速表面或受保护内容的真实后台像素。不绕过 UIPI/UAC/安全桌面。每张图像最多 32,000,000 像素；单轮最多 128 个资源与 256 MiB 像素缓存。"
+      }
+    },
+    {
+      "name": "GetImageSize",
+      "title": "读取图像尺寸",
+      "category": "imaging",
+      "signature": "GetImageSize(imageId)",
+      "description": "返回 width、height、hasScreenCoordinates、screenOriginX 与 screenOriginY；从文件加载的图像没有有效屏幕原点。",
+      "parameters": [
+        {
+          "name": "imageId",
+          "type": "string",
+          "required": true,
+          "description": "当前运行内有效的图像资源 ID。"
+        }
+      ],
+      "returns": {
+        "type": "table",
+        "description": "包含尺寸与屏幕原点元数据的表。"
+      },
+      "errors": [
+        "资源失效或已释放时产生错误。"
+      ],
+      "example": "local size = GetImageSize(screen)",
+      "runtime": {
+        "definition": "function(imageId) return __AnjianBridge_GetImageSize(imageId) end",
+        "bindings": [
+          {
+            "name": "__GetImageSize",
+            "method": "GetImageSize",
+            "localName": "__AnjianBridge_GetImageSize"
+          }
+        ]
+      },
+      "id": "anjian.imaging.getImageSize",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.5.0-dev.1",
+      "behavior": {
+        "pauseBehavior": "在主进程图像操作命令边界遵循暂停状态。",
+        "cancellationBehavior": "本轮 worker 结束时主进程清空本轮所有图像资源。",
+        "sideEffects": [],
+        "coordinateSpace": "宽高为像素；文件图像的屏幕原点标记为 false。",
+        "permissionNotes": "不新增第三方图像引擎依赖。截图依赖当前 Windows 交互桌面的可见合成画面；不保证被遮挡/最小化窗口、硬件加速表面或受保护内容的真实后台像素。不绕过 UIPI/UAC/安全桌面。每张图像最多 32,000,000 像素；单轮最多 128 个资源与 256 MiB 像素缓存。"
+      }
+    },
+    {
+      "name": "CropImage",
+      "title": "裁剪图像",
+      "category": "imaging",
+      "signature": "CropImage(imageId, x, y, width, height)",
+      "description": "按图像局部零基像素裁剪并创建新的独立资源；原资源保持不变，截图的屏幕原点会按裁剪偏移。",
+      "parameters": [
+        {
+          "name": "imageId",
+          "type": "string",
+          "required": true,
+          "description": "源图像资源 ID。"
+        },
+        {
+          "name": "x",
+          "type": "integer",
+          "required": true,
+          "description": "裁剪起点 X。",
+          "minimum": 0,
+          "maximum": 32767,
+          "unit": "像素"
+        },
+        {
+          "name": "y",
+          "type": "integer",
+          "required": true,
+          "description": "裁剪起点 Y。",
+          "minimum": 0,
+          "maximum": 32767,
+          "unit": "像素"
+        },
+        {
+          "name": "width",
+          "type": "integer",
+          "required": true,
+          "description": "裁剪宽度。",
+          "minimum": 1,
+          "maximum": 32768,
+          "unit": "像素"
+        },
+        {
+          "name": "height",
+          "type": "integer",
+          "required": true,
+          "description": "裁剪高度。",
+          "minimum": 1,
+          "maximum": 32768,
+          "unit": "像素"
+        }
+      ],
+      "returns": {
+        "type": "string",
+        "description": "新裁剪图像的资源 ID。"
+      },
+      "errors": [
+        "资源失效、裁剪区域越界或资源池容量不足时产生错误。"
+      ],
+      "example": "local crop = CropImage(screen, 10, 10, 200, 120)",
+      "runtime": {
+        "definition": "function(imageId, x, y, width, height) return __AnjianBridge_CropImage(imageId, x, y, width, height) end",
+        "bindings": [
+          {
+            "name": "__CropImage",
+            "method": "CropImage",
+            "localName": "__AnjianBridge_CropImage"
+          }
+        ]
+      },
+      "id": "anjian.imaging.cropImage",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.5.0-dev.1",
+      "behavior": {
+        "pauseBehavior": "在主进程图像操作命令边界遵循暂停状态。",
+        "cancellationBehavior": "本轮 worker 结束时主进程清空本轮所有图像资源。",
+        "sideEffects": [
+          "创建新的图像资源。"
+        ],
+        "coordinateSpace": "图像局部零基像素坐标；截图裁剪结果会保留正确屏幕原点。",
+        "permissionNotes": "不新增第三方图像引擎依赖。截图依赖当前 Windows 交互桌面的可见合成画面；不保证被遮挡/最小化窗口、硬件加速表面或受保护内容的真实后台像素。不绕过 UIPI/UAC/安全桌面。每张图像最多 32,000,000 像素；单轮最多 128 个资源与 256 MiB 像素缓存。"
+      }
+    },
+    {
+      "name": "GetPixelColor",
+      "title": "读取 RGB 像素颜色",
+      "category": "imaging",
+      "signature": "GetPixelColor(imageId, x, y)",
+      "description": "返回图像局部零基坐标处的 0xRRGGBB 整数，不包含 alpha 通道。",
+      "parameters": [
+        {
+          "name": "imageId",
+          "type": "string",
+          "required": true,
+          "description": "图像资源 ID。"
+        },
+        {
+          "name": "x",
+          "type": "integer",
+          "required": true,
+          "description": "零基像素 X。",
+          "minimum": 0,
+          "maximum": 32767,
+          "unit": "像素"
+        },
+        {
+          "name": "y",
+          "type": "integer",
+          "required": true,
+          "description": "零基像素 Y。",
+          "minimum": 0,
+          "maximum": 32767,
+          "unit": "像素"
+        }
+      ],
+      "returns": {
+        "type": "integer",
+        "description": "0 到 16777215 的 RGB 数值。"
+      },
+      "errors": [
+        "资源失效、坐标越界或参数不合法时产生错误。"
+      ],
+      "example": "local color = GetPixelColor(screen, 10, 20)",
+      "runtime": {
+        "definition": "function(imageId, x, y) return __AnjianBridge_GetPixelColor(imageId, x, y) end",
+        "bindings": [
+          {
+            "name": "__GetPixelColor",
+            "method": "GetPixelColor",
+            "localName": "__AnjianBridge_GetPixelColor"
+          }
+        ]
+      },
+      "id": "anjian.imaging.getPixelColor",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.5.0-dev.1",
+      "behavior": {
+        "pauseBehavior": "在主进程图像操作命令边界遵循暂停状态。",
+        "cancellationBehavior": "本轮 worker 结束时主进程清空本轮所有图像资源。",
+        "sideEffects": [],
+        "coordinateSpace": "图像局部零基像素坐标。",
+        "permissionNotes": "不新增第三方图像引擎依赖。截图依赖当前 Windows 交互桌面的可见合成画面；不保证被遮挡/最小化窗口、硬件加速表面或受保护内容的真实后台像素。不绕过 UIPI/UAC/安全桌面。每张图像最多 32,000,000 像素；单轮最多 128 个资源与 256 MiB 像素缓存。"
+      }
+    },
+    {
+      "name": "CompareColor",
+      "title": "比较像素颜色",
+      "category": "imaging",
+      "signature": "CompareColor(imageId, x, y, color, tolerance?)",
+      "description": "将指定像素与 0xRRGGBB 颜色比较；tolerance 是每个 RGB 通道允许的最大绝对差，默认 0。",
+      "parameters": [
+        {
+          "name": "imageId",
+          "type": "string",
+          "required": true,
+          "description": "图像资源 ID。"
+        },
+        {
+          "name": "x",
+          "type": "integer",
+          "required": true,
+          "description": "零基像素 X。",
+          "minimum": 0,
+          "maximum": 32767,
+          "unit": "像素"
+        },
+        {
+          "name": "y",
+          "type": "integer",
+          "required": true,
+          "description": "零基像素 Y。",
+          "minimum": 0,
+          "maximum": 32767,
+          "unit": "像素"
+        },
+        {
+          "name": "color",
+          "type": "integer",
+          "required": true,
+          "description": "目标 RGB 颜色。",
+          "minimum": 0,
+          "maximum": 16777215
+        },
+        {
+          "name": "tolerance",
+          "type": "integer",
+          "required": false,
+          "description": "每个 RGB 通道最大绝对差。",
+          "defaultValue": 0,
+          "minimum": 0,
+          "maximum": 255
+        }
+      ],
+      "returns": {
+        "type": "boolean",
+        "description": "所有 RGB 通道差值均在容差内返回 true。"
+      },
+      "errors": [
+        "资源失效、坐标越界或颜色/容差不合法时产生错误。"
+      ],
+      "example": "CompareColor(screen, 10, 20, 0xFF0000, 4)",
+      "runtime": {
+        "definition": "function(imageId, x, y, color, tolerance) return __AnjianBridge_CompareColor(imageId, x, y, color, (tolerance == nil and 0 or tolerance)) end",
+        "bindings": [
+          {
+            "name": "__CompareColor",
+            "method": "CompareColor",
+            "localName": "__AnjianBridge_CompareColor"
+          }
+        ]
+      },
+      "id": "anjian.imaging.compareColor",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.5.0-dev.1",
+      "behavior": {
+        "pauseBehavior": "在主进程图像操作命令边界遵循暂停状态。",
+        "cancellationBehavior": "本轮 worker 结束时主进程清空本轮所有图像资源。",
+        "sideEffects": [],
+        "coordinateSpace": "图像局部零基像素坐标；颜色参数为 0xRRGGBB。",
+        "permissionNotes": "不新增第三方图像引擎依赖。截图依赖当前 Windows 交互桌面的可见合成画面；不保证被遮挡/最小化窗口、硬件加速表面或受保护内容的真实后台像素。不绕过 UIPI/UAC/安全桌面。每张图像最多 32,000,000 像素；单轮最多 128 个资源与 256 MiB 像素缓存。"
+      }
+    },
+    {
+      "name": "FindColor",
+      "title": "查找单点颜色",
+      "category": "imaging",
+      "signature": "FindColor(imageId, color, tolerance?, left?, top?, width?, height?, step?)",
+      "description": "按从上到下、从左到右顺序查找首个符合颜色/容差的像素。无命中返回 nil；区域宽或高为 0 表示延伸至图像边缘。结果含局部 x/y；源图像是截图时另含 screenX/screenY。",
+      "parameters": [
+        {
+          "name": "imageId",
+          "type": "string",
+          "required": true,
+          "description": "图像资源 ID。"
+        },
+        {
+          "name": "color",
+          "type": "integer",
+          "required": true,
+          "description": "目标 RGB 颜色。",
+          "minimum": 0,
+          "maximum": 16777215
+        },
+        {
+          "name": "tolerance",
+          "type": "integer",
+          "required": false,
+          "description": "RGB 各通道容差。",
+          "defaultValue": 0,
+          "minimum": 0,
+          "maximum": 255
+        },
+        {
+          "name": "left",
+          "type": "integer",
+          "required": false,
+          "description": "局部区域左边；0 为图像左边。",
+          "defaultValue": 0,
+          "minimum": 0,
+          "maximum": 32767,
+          "unit": "像素"
+        },
+        {
+          "name": "top",
+          "type": "integer",
+          "required": false,
+          "description": "局部区域上边；0 为图像上边。",
+          "defaultValue": 0,
+          "minimum": 0,
+          "maximum": 32767,
+          "unit": "像素"
+        },
+        {
+          "name": "width",
+          "type": "integer",
+          "required": false,
+          "description": "区域宽度；0 表示到图像右边界。",
+          "defaultValue": 0,
+          "minimum": 0,
+          "maximum": 32768,
+          "unit": "像素"
+        },
+        {
+          "name": "height",
+          "type": "integer",
+          "required": false,
+          "description": "区域高度；0 表示到图像下边界。",
+          "defaultValue": 0,
+          "minimum": 0,
+          "maximum": 32768,
+          "unit": "像素"
+        },
+        {
+          "name": "step",
+          "type": "integer",
+          "required": false,
+          "description": "候选采样步长。",
+          "defaultValue": 1,
+          "minimum": 1,
+          "maximum": 64,
+          "unit": "像素"
+        }
+      ],
+      "returns": {
+        "type": "table|nil",
+        "description": "命中位置表或未命中 nil。"
+      },
+      "errors": [
+        "资源失效、区域越界或参数不合法时产生错误。"
+      ],
+      "example": "local hit = FindColor(screen, 0xFF0000, 5)",
+      "runtime": {
+        "definition": "function(imageId, color, tolerance, left, top, width, height, step) return __AnjianBridge_FindColor(imageId, color, (tolerance == nil and 0 or tolerance), (left == nil and 0 or left), (top == nil and 0 or top), (width == nil and 0 or width), (height == nil and 0 or height), (step == nil and 1 or step)) end",
+        "bindings": [
+          {
+            "name": "__FindColor",
+            "method": "FindColor",
+            "localName": "__AnjianBridge_FindColor"
+          }
+        ]
+      },
+      "id": "anjian.imaging.findColor",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.5.0-dev.1",
+      "behavior": {
+        "pauseBehavior": "在主进程图像操作命令边界遵循暂停状态。",
+        "cancellationBehavior": "本轮 worker 结束时主进程清空本轮所有图像资源。",
+        "sideEffects": [],
+        "coordinateSpace": "搜索区域为图像局部零基像素；截图命中另含 screenX/screenY。",
+        "permissionNotes": "不新增第三方图像引擎依赖。截图依赖当前 Windows 交互桌面的可见合成画面；不保证被遮挡/最小化窗口、硬件加速表面或受保护内容的真实后台像素。不绕过 UIPI/UAC/安全桌面。每张图像最多 32,000,000 像素；单轮最多 128 个资源与 256 MiB 像素缓存。"
+      }
+    },
+    {
+      "name": "FindMultiColor",
+      "title": "多点颜色查找",
+      "category": "imaging",
+      "signature": "FindMultiColor(imageId, color, pattern, tolerance?, left?, top?, width?, height?, step?)",
+      "description": "以 base color 为基准验证多个相对偏移点。pattern 格式为 dx,dy,RRGGBB;dx,dy,RRGGBB，颜色可带 0x 或 # 前缀，最多 256 个点。无命中返回 nil。",
+      "parameters": [
+        {
+          "name": "imageId",
+          "type": "string",
+          "required": true,
+          "description": "图像资源 ID。"
+        },
+        {
+          "name": "color",
+          "type": "integer",
+          "required": true,
+          "description": "基准 RGB 颜色。",
+          "minimum": 0,
+          "maximum": 16777215
+        },
+        {
+          "name": "pattern",
+          "type": "string",
+          "required": true,
+          "description": "分号分隔的 dx,dy,RRGGBB 列表。"
+        },
+        {
+          "name": "tolerance",
+          "type": "integer",
+          "required": false,
+          "description": "RGB 各通道容差。",
+          "defaultValue": 0,
+          "minimum": 0,
+          "maximum": 255
+        },
+        {
+          "name": "left",
+          "type": "integer",
+          "required": false,
+          "description": "局部区域左边；0 为图像左边。",
+          "defaultValue": 0,
+          "minimum": 0,
+          "maximum": 32767,
+          "unit": "像素"
+        },
+        {
+          "name": "top",
+          "type": "integer",
+          "required": false,
+          "description": "局部区域上边；0 为图像上边。",
+          "defaultValue": 0,
+          "minimum": 0,
+          "maximum": 32767,
+          "unit": "像素"
+        },
+        {
+          "name": "width",
+          "type": "integer",
+          "required": false,
+          "description": "区域宽度；0 表示到图像右边界。",
+          "defaultValue": 0,
+          "minimum": 0,
+          "maximum": 32768,
+          "unit": "像素"
+        },
+        {
+          "name": "height",
+          "type": "integer",
+          "required": false,
+          "description": "区域高度；0 表示到图像下边界。",
+          "defaultValue": 0,
+          "minimum": 0,
+          "maximum": 32768,
+          "unit": "像素"
+        },
+        {
+          "name": "step",
+          "type": "integer",
+          "required": false,
+          "description": "候选采样步长。",
+          "defaultValue": 1,
+          "minimum": 1,
+          "maximum": 64,
+          "unit": "像素"
+        }
+      ],
+      "returns": {
+        "type": "table|nil",
+        "description": "首个命中位置表或未命中 nil。"
+      },
+      "errors": [
+        "模式格式错误、点数超限、资源失效或区域越界时产生错误。"
+      ],
+      "example": "local hit = FindMultiColor(screen, 0x112233, \"1,0,FF0000;0,1,00FF00\", 2)",
+      "runtime": {
+        "definition": "function(imageId, color, pattern, tolerance, left, top, width, height, step) return __AnjianBridge_FindMultiColor(imageId, color, pattern, (tolerance == nil and 0 or tolerance), (left == nil and 0 or left), (top == nil and 0 or top), (width == nil and 0 or width), (height == nil and 0 or height), (step == nil and 1 or step)) end",
+        "bindings": [
+          {
+            "name": "__FindMultiColor",
+            "method": "FindMultiColor",
+            "localName": "__AnjianBridge_FindMultiColor"
+          }
+        ]
+      },
+      "id": "anjian.imaging.findMultiColor",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.5.0-dev.1",
+      "behavior": {
+        "pauseBehavior": "在主进程图像操作命令边界遵循暂停状态。",
+        "cancellationBehavior": "本轮 worker 结束时主进程清空本轮所有图像资源。",
+        "sideEffects": [],
+        "coordinateSpace": "偏移和区域使用图像局部零基像素；命中截图另含 screenX/screenY。",
+        "permissionNotes": "不新增第三方图像引擎依赖。截图依赖当前 Windows 交互桌面的可见合成画面；不保证被遮挡/最小化窗口、硬件加速表面或受保护内容的真实后台像素。不绕过 UIPI/UAC/安全桌面。每张图像最多 32,000,000 像素；单轮最多 128 个资源与 256 MiB 像素缓存。"
+      }
+    },
+    {
+      "name": "CountColors",
+      "title": "统计区域颜色",
+      "category": "imaging",
+      "signature": "CountColors(imageId, color, tolerance?, left?, top?, width?, height?, step?)",
+      "description": "统计指定区域命中颜色的采样像素数；step 默认 1，增大 step 会稀疏采样。",
+      "parameters": [
+        {
+          "name": "imageId",
+          "type": "string",
+          "required": true,
+          "description": "图像资源 ID。"
+        },
+        {
+          "name": "color",
+          "type": "integer",
+          "required": true,
+          "description": "目标 RGB 颜色。",
+          "minimum": 0,
+          "maximum": 16777215
+        },
+        {
+          "name": "tolerance",
+          "type": "integer",
+          "required": false,
+          "description": "RGB 各通道容差。",
+          "defaultValue": 0,
+          "minimum": 0,
+          "maximum": 255
+        },
+        {
+          "name": "left",
+          "type": "integer",
+          "required": false,
+          "description": "局部区域左边；0 为图像左边。",
+          "defaultValue": 0,
+          "minimum": 0,
+          "maximum": 32767,
+          "unit": "像素"
+        },
+        {
+          "name": "top",
+          "type": "integer",
+          "required": false,
+          "description": "局部区域上边；0 为图像上边。",
+          "defaultValue": 0,
+          "minimum": 0,
+          "maximum": 32767,
+          "unit": "像素"
+        },
+        {
+          "name": "width",
+          "type": "integer",
+          "required": false,
+          "description": "区域宽度；0 表示到图像右边界。",
+          "defaultValue": 0,
+          "minimum": 0,
+          "maximum": 32768,
+          "unit": "像素"
+        },
+        {
+          "name": "height",
+          "type": "integer",
+          "required": false,
+          "description": "区域高度；0 表示到图像下边界。",
+          "defaultValue": 0,
+          "minimum": 0,
+          "maximum": 32768,
+          "unit": "像素"
+        },
+        {
+          "name": "step",
+          "type": "integer",
+          "required": false,
+          "description": "候选采样步长。",
+          "defaultValue": 1,
+          "minimum": 1,
+          "maximum": 64,
+          "unit": "像素"
+        }
+      ],
+      "returns": {
+        "type": "integer",
+        "description": "匹配的采样像素数量。"
+      },
+      "errors": [
+        "资源失效、区域越界或参数不合法时产生错误。"
+      ],
+      "example": "local count = CountColors(screen, 0x00FF00, 0, 0, 0, 640, 480)",
+      "runtime": {
+        "definition": "function(imageId, color, tolerance, left, top, width, height, step) return __AnjianBridge_CountColors(imageId, color, (tolerance == nil and 0 or tolerance), (left == nil and 0 or left), (top == nil and 0 or top), (width == nil and 0 or width), (height == nil and 0 or height), (step == nil and 1 or step)) end",
+        "bindings": [
+          {
+            "name": "__CountColors",
+            "method": "CountColors",
+            "localName": "__AnjianBridge_CountColors"
+          }
+        ]
+      },
+      "id": "anjian.imaging.countColors",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.5.0-dev.1",
+      "behavior": {
+        "pauseBehavior": "在主进程图像操作命令边界遵循暂停状态。",
+        "cancellationBehavior": "本轮 worker 结束时主进程清空本轮所有图像资源。",
+        "sideEffects": [],
+        "coordinateSpace": "搜索区域为图像局部零基像素。",
+        "permissionNotes": "不新增第三方图像引擎依赖。截图依赖当前 Windows 交互桌面的可见合成画面；不保证被遮挡/最小化窗口、硬件加速表面或受保护内容的真实后台像素。不绕过 UIPI/UAC/安全桌面。每张图像最多 32,000,000 像素；单轮最多 128 个资源与 256 MiB 像素缓存。"
+      }
+    },
+    {
+      "name": "FindImage",
+      "title": "模板找图",
+      "category": "imaging",
+      "signature": "FindImage(imageId, templateId, similarity?, tolerance?, left?, top?, width?, height?, step?)",
+      "description": "在源图像区域查找模板首个命中；透明模板像素作为通配点。similarity 为 0–1 的匹配比例，未命中返回 nil。单次调用最多执行 5000 万次模板像素比较，防止长时间无界循环。",
+      "parameters": [
+        {
+          "name": "imageId",
+          "type": "string",
+          "required": true,
+          "description": "被搜索图像资源 ID。"
+        },
+        {
+          "name": "templateId",
+          "type": "string",
+          "required": true,
+          "description": "模板图像资源 ID。"
+        },
+        {
+          "name": "similarity",
+          "type": "number",
+          "required": false,
+          "description": "所需相似度比例。",
+          "defaultValue": 0.95,
+          "minimum": 0,
+          "maximum": 1
+        },
+        {
+          "name": "tolerance",
+          "type": "integer",
+          "required": false,
+          "description": "RGB 每个通道允许的最大绝对差。",
+          "defaultValue": 0,
+          "minimum": 0,
+          "maximum": 255
+        },
+        {
+          "name": "left",
+          "type": "integer",
+          "required": false,
+          "description": "局部区域左边；0 为图像左边。",
+          "defaultValue": 0,
+          "minimum": 0,
+          "maximum": 32767,
+          "unit": "像素"
+        },
+        {
+          "name": "top",
+          "type": "integer",
+          "required": false,
+          "description": "局部区域上边；0 为图像上边。",
+          "defaultValue": 0,
+          "minimum": 0,
+          "maximum": 32767,
+          "unit": "像素"
+        },
+        {
+          "name": "width",
+          "type": "integer",
+          "required": false,
+          "description": "区域宽度；0 表示到图像右边界。",
+          "defaultValue": 0,
+          "minimum": 0,
+          "maximum": 32768,
+          "unit": "像素"
+        },
+        {
+          "name": "height",
+          "type": "integer",
+          "required": false,
+          "description": "区域高度；0 表示到图像下边界。",
+          "defaultValue": 0,
+          "minimum": 0,
+          "maximum": 32768,
+          "unit": "像素"
+        },
+        {
+          "name": "step",
+          "type": "integer",
+          "required": false,
+          "description": "候选采样步长。",
+          "defaultValue": 1,
+          "minimum": 1,
+          "maximum": 64,
+          "unit": "像素"
+        }
+      ],
+      "returns": {
+        "type": "table|nil",
+        "description": "命中位置/相似度与可用的 screenX/screenY；未命中返回 nil。"
+      },
+      "errors": [
+        "模板全透明、资源失效、区域越界或达到像素比较预算时产生错误。"
+      ],
+      "example": "local hit = FindImage(screen, template, 0.95, 4)",
+      "runtime": {
+        "definition": "function(imageId, templateId, similarity, tolerance, left, top, width, height, step) return __AnjianBridge_FindImage(imageId, templateId, (similarity == nil and 0.95 or similarity), (tolerance == nil and 0 or tolerance), (left == nil and 0 or left), (top == nil and 0 or top), (width == nil and 0 or width), (height == nil and 0 or height), (step == nil and 1 or step)) end",
+        "bindings": [
+          {
+            "name": "__FindImage",
+            "method": "FindImage",
+            "localName": "__AnjianBridge_FindImage"
+          }
+        ]
+      },
+      "id": "anjian.imaging.findImage",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.5.0-dev.1",
+      "behavior": {
+        "pauseBehavior": "在主进程图像操作命令边界遵循暂停状态。",
+        "cancellationBehavior": "本轮 worker 结束时主进程清空本轮所有图像资源。",
+        "sideEffects": [],
+        "coordinateSpace": "搜索区域与结果为图像局部零基像素；截图命中另含 screenX/screenY。",
+        "permissionNotes": "不新增第三方图像引擎依赖。截图依赖当前 Windows 交互桌面的可见合成画面；不保证被遮挡/最小化窗口、硬件加速表面或受保护内容的真实后台像素。不绕过 UIPI/UAC/安全桌面。每张图像最多 32,000,000 像素；单轮最多 128 个资源与 256 MiB 像素缓存。"
+      }
+    },
+    {
+      "name": "FindImages",
+      "title": "查找多个模板位置",
+      "category": "imaging",
+      "signature": "FindImages(imageId, templateId, similarity?, tolerance?, maxResults?, left?, top?, width?, height?, step?)",
+      "description": "返回按从上到下、从左到右排序且互不重叠的命中数组。maxResults 为 1–1000；未命中返回空数组。",
+      "parameters": [
+        {
+          "name": "imageId",
+          "type": "string",
+          "required": true,
+          "description": "被搜索图像资源 ID。"
+        },
+        {
+          "name": "templateId",
+          "type": "string",
+          "required": true,
+          "description": "模板图像资源 ID。"
+        },
+        {
+          "name": "similarity",
+          "type": "number",
+          "required": false,
+          "description": "所需相似度比例。",
+          "defaultValue": 0.95,
+          "minimum": 0,
+          "maximum": 1
+        },
+        {
+          "name": "tolerance",
+          "type": "integer",
+          "required": false,
+          "description": "RGB 每个通道允许的最大绝对差。",
+          "defaultValue": 0,
+          "minimum": 0,
+          "maximum": 255
+        },
+        {
+          "name": "maxResults",
+          "type": "integer",
+          "required": false,
+          "description": "最大返回数。",
+          "defaultValue": 100,
+          "minimum": 1,
+          "maximum": 1000
+        },
+        {
+          "name": "left",
+          "type": "integer",
+          "required": false,
+          "description": "局部区域左边；0 为图像左边。",
+          "defaultValue": 0,
+          "minimum": 0,
+          "maximum": 32767,
+          "unit": "像素"
+        },
+        {
+          "name": "top",
+          "type": "integer",
+          "required": false,
+          "description": "局部区域上边；0 为图像上边。",
+          "defaultValue": 0,
+          "minimum": 0,
+          "maximum": 32767,
+          "unit": "像素"
+        },
+        {
+          "name": "width",
+          "type": "integer",
+          "required": false,
+          "description": "区域宽度；0 表示到图像右边界。",
+          "defaultValue": 0,
+          "minimum": 0,
+          "maximum": 32768,
+          "unit": "像素"
+        },
+        {
+          "name": "height",
+          "type": "integer",
+          "required": false,
+          "description": "区域高度；0 表示到图像下边界。",
+          "defaultValue": 0,
+          "minimum": 0,
+          "maximum": 32768,
+          "unit": "像素"
+        },
+        {
+          "name": "step",
+          "type": "integer",
+          "required": false,
+          "description": "候选采样步长。",
+          "defaultValue": 1,
+          "minimum": 1,
+          "maximum": 64,
+          "unit": "像素"
+        }
+      ],
+      "returns": {
+        "type": "table",
+        "description": "Lua 数组形式的命中列表；没有匹配时为空表。"
+      },
+      "errors": [
+        "模板全透明、资源失效、区域越界或达到像素比较预算时产生错误。"
+      ],
+      "example": "local hits = FindImages(screen, template, 0.95, 0, 20)",
+      "runtime": {
+        "definition": "function(imageId, templateId, similarity, tolerance, maxResults, left, top, width, height, step) return __AnjianBridge_FindImages(imageId, templateId, (similarity == nil and 0.95 or similarity), (tolerance == nil and 0 or tolerance), (maxResults == nil and 100 or maxResults), (left == nil and 0 or left), (top == nil and 0 or top), (width == nil and 0 or width), (height == nil and 0 or height), (step == nil and 1 or step)) end",
+        "bindings": [
+          {
+            "name": "__FindImages",
+            "method": "FindImages",
+            "localName": "__AnjianBridge_FindImages"
+          }
+        ]
+      },
+      "id": "anjian.imaging.findImages",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.5.0-dev.1",
+      "behavior": {
+        "pauseBehavior": "在主进程图像操作命令边界遵循暂停状态。",
+        "cancellationBehavior": "本轮 worker 结束时主进程清空本轮所有图像资源。",
+        "sideEffects": [],
+        "coordinateSpace": "搜索区域与结果为图像局部零基像素；截图命中另含 screenX/screenY。",
+        "permissionNotes": "不新增第三方图像引擎依赖。截图依赖当前 Windows 交互桌面的可见合成画面；不保证被遮挡/最小化窗口、硬件加速表面或受保护内容的真实后台像素。不绕过 UIPI/UAC/安全桌面。每张图像最多 32,000,000 像素；单轮最多 128 个资源与 256 MiB 像素缓存。"
+      }
+    },
+    {
+      "name": "WaitImage",
+      "title": "等待模板出现",
+      "category": "imaging",
+      "signature": "WaitImage(templateId, similarity?, tolerance?, timeoutMs?, intervalMs?)",
+      "description": "循环截取当前虚拟桌面并搜索模板；首次命中返回位置表，超时返回 nil。Stop 取消轮询，Pause 会暂停后续轮询。",
+      "parameters": [
+        {
+          "name": "templateId",
+          "type": "string",
+          "required": true,
+          "description": "模板图像资源 ID。"
+        },
+        {
+          "name": "similarity",
+          "type": "number",
+          "required": false,
+          "description": "所需相似度比例。",
+          "defaultValue": 0.95,
+          "minimum": 0,
+          "maximum": 1
+        },
+        {
+          "name": "tolerance",
+          "type": "integer",
+          "required": false,
+          "description": "RGB 每个通道允许的最大绝对差。",
+          "defaultValue": 0,
+          "minimum": 0,
+          "maximum": 255
+        },
+        {
+          "name": "timeoutMs",
+          "type": "integer",
+          "required": false,
+          "description": "最大等待时长。",
+          "defaultValue": 5000,
+          "minimum": 0,
+          "maximum": 600000,
+          "unit": "毫秒"
+        },
+        {
+          "name": "intervalMs",
+          "type": "integer",
+          "required": false,
+          "description": "两次检测间隔。",
+          "defaultValue": 100,
+          "minimum": 10,
+          "maximum": 5000,
+          "unit": "毫秒"
+        }
+      ],
+      "returns": {
+        "type": "table|nil",
+        "description": "首次命中位置或超时 nil。"
+      },
+      "errors": [
+        "模板失效、截图失败、图像过大或搜索达到像素比较预算时产生错误。"
+      ],
+      "example": "local hit = WaitImage(template, 0.95, 0, 5000, 100)",
+      "runtime": {
+        "definition": "function(templateId, similarity, tolerance, timeoutMs, intervalMs) return __AnjianBridge_WaitImage(templateId, (similarity == nil and 0.95 or similarity), (tolerance == nil and 0 or tolerance), (timeoutMs == nil and 5000 or timeoutMs), (intervalMs == nil and 100 or intervalMs)) end",
+        "bindings": [
+          {
+            "name": "__WaitImage",
+            "method": "WaitImage",
+            "localName": "__AnjianBridge_WaitImage"
+          }
+        ]
+      },
+      "id": "anjian.imaging.waitImage",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.5.0-dev.1",
+      "behavior": {
+        "pauseBehavior": "每轮轮询前检查暂停状态；暂停时等待恢复。",
+        "cancellationBehavior": "Stop 取消轮询并终止当前调用；不把取消伪装成超时。",
+        "sideEffects": [
+          "按间隔捕获当前虚拟桌面。"
+        ],
+        "coordinateSpace": "搜索范围为当前虚拟桌面；返回图像局部与 screen 绝对坐标。",
+        "permissionNotes": "不新增第三方图像引擎依赖。截图依赖当前 Windows 交互桌面的可见合成画面；不保证被遮挡/最小化窗口、硬件加速表面或受保护内容的真实后台像素。不绕过 UIPI/UAC/安全桌面。每张图像最多 32,000,000 像素；单轮最多 128 个资源与 256 MiB 像素缓存。"
+      }
+    },
+    {
+      "name": "WaitImageGone",
+      "title": "等待模板消失",
+      "category": "imaging",
+      "signature": "WaitImageGone(templateId, similarity?, tolerance?, timeoutMs?, intervalMs?)",
+      "description": "持续截取虚拟桌面；模板消失返回 true，超时时模板仍存在返回 false。Stop 取消轮询。",
+      "parameters": [
+        {
+          "name": "templateId",
+          "type": "string",
+          "required": true,
+          "description": "模板图像资源 ID。"
+        },
+        {
+          "name": "similarity",
+          "type": "number",
+          "required": false,
+          "description": "所需相似度比例。",
+          "defaultValue": 0.95,
+          "minimum": 0,
+          "maximum": 1
+        },
+        {
+          "name": "tolerance",
+          "type": "integer",
+          "required": false,
+          "description": "RGB 每个通道允许的最大绝对差。",
+          "defaultValue": 0,
+          "minimum": 0,
+          "maximum": 255
+        },
+        {
+          "name": "timeoutMs",
+          "type": "integer",
+          "required": false,
+          "description": "最大等待时长。",
+          "defaultValue": 5000,
+          "minimum": 0,
+          "maximum": 600000,
+          "unit": "毫秒"
+        },
+        {
+          "name": "intervalMs",
+          "type": "integer",
+          "required": false,
+          "description": "两次检测间隔。",
+          "defaultValue": 100,
+          "minimum": 10,
+          "maximum": 5000,
+          "unit": "毫秒"
+        }
+      ],
+      "returns": {
+        "type": "boolean",
+        "description": "模板消失返回 true；超时仍存在返回 false。"
+      },
+      "errors": [
+        "模板失效、截图失败、图像过大或搜索达到像素比较预算时产生错误。"
+      ],
+      "example": "if WaitImageGone(template, 0.95, 0, 5000, 100) then Log(\"目标已消失\") end",
+      "runtime": {
+        "definition": "function(templateId, similarity, tolerance, timeoutMs, intervalMs) return __AnjianBridge_WaitImageGone(templateId, (similarity == nil and 0.95 or similarity), (tolerance == nil and 0 or tolerance), (timeoutMs == nil and 5000 or timeoutMs), (intervalMs == nil and 100 or intervalMs)) end",
+        "bindings": [
+          {
+            "name": "__WaitImageGone",
+            "method": "WaitImageGone",
+            "localName": "__AnjianBridge_WaitImageGone"
+          }
+        ]
+      },
+      "id": "anjian.imaging.waitImageGone",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.5.0-dev.1",
+      "behavior": {
+        "pauseBehavior": "每轮轮询前检查暂停状态；暂停时等待恢复。",
+        "cancellationBehavior": "Stop 取消轮询并终止当前调用；不把取消伪装成超时。",
+        "sideEffects": [
+          "按间隔捕获当前虚拟桌面。"
+        ],
+        "coordinateSpace": "搜索范围为当前虚拟桌面。",
+        "permissionNotes": "不新增第三方图像引擎依赖。截图依赖当前 Windows 交互桌面的可见合成画面；不保证被遮挡/最小化窗口、硬件加速表面或受保护内容的真实后台像素。不绕过 UIPI/UAC/安全桌面。每张图像最多 32,000,000 像素；单轮最多 128 个资源与 256 MiB 像素缓存。"
+      }
+    },
+    {
+      "name": "WaitColor",
+      "title": "等待屏幕颜色出现",
+      "category": "imaging",
+      "signature": "WaitColor(color, tolerance?, timeoutMs?, intervalMs?)",
+      "description": "持续截取虚拟桌面；首次找到指定 RGB 颜色返回命中位置，超时返回 nil。",
+      "parameters": [
+        {
+          "name": "color",
+          "type": "integer",
+          "required": true,
+          "description": "目标 RGB 颜色。",
+          "minimum": 0,
+          "maximum": 16777215
+        },
+        {
+          "name": "tolerance",
+          "type": "integer",
+          "required": false,
+          "description": "RGB 每个通道允许的最大绝对差。",
+          "defaultValue": 0,
+          "minimum": 0,
+          "maximum": 255
+        },
+        {
+          "name": "timeoutMs",
+          "type": "integer",
+          "required": false,
+          "description": "最大等待时长。",
+          "defaultValue": 5000,
+          "minimum": 0,
+          "maximum": 600000,
+          "unit": "毫秒"
+        },
+        {
+          "name": "intervalMs",
+          "type": "integer",
+          "required": false,
+          "description": "两次检测之间的间隔。",
+          "defaultValue": 100,
+          "minimum": 10,
+          "maximum": 5000,
+          "unit": "毫秒"
+        }
+      ],
+      "returns": {
+        "type": "table|nil",
+        "description": "首次命中位置或超时 nil。"
+      },
+      "errors": [
+        "截图失败、图像过大或参数无效时产生错误。"
+      ],
+      "example": "local hit = WaitColor(0x00FF00, 8, 3000, 100)",
+      "runtime": {
+        "definition": "function(color, tolerance, timeoutMs, intervalMs) return __AnjianBridge_WaitColor(color, (tolerance == nil and 0 or tolerance), (timeoutMs == nil and 5000 or timeoutMs), (intervalMs == nil and 100 or intervalMs)) end",
+        "bindings": [
+          {
+            "name": "__WaitColor",
+            "method": "WaitColor",
+            "localName": "__AnjianBridge_WaitColor"
+          }
+        ]
+      },
+      "id": "anjian.imaging.waitColor",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.5.0-dev.1",
+      "behavior": {
+        "pauseBehavior": "每轮轮询前检查暂停状态；暂停时等待恢复。",
+        "cancellationBehavior": "Stop 取消轮询并终止当前调用；不把取消伪装成超时。",
+        "sideEffects": [
+          "按间隔捕获当前虚拟桌面。"
+        ],
+        "coordinateSpace": "搜索范围为当前虚拟桌面；结果包含 screenX/screenY。",
+        "permissionNotes": "不新增第三方图像引擎依赖。截图依赖当前 Windows 交互桌面的可见合成画面；不保证被遮挡/最小化窗口、硬件加速表面或受保护内容的真实后台像素。不绕过 UIPI/UAC/安全桌面。每张图像最多 32,000,000 像素；单轮最多 128 个资源与 256 MiB 像素缓存。"
+      }
+    },
+    {
+      "name": "WaitColorGone",
+      "title": "等待屏幕颜色消失",
+      "category": "imaging",
+      "signature": "WaitColorGone(color, tolerance?, timeoutMs?, intervalMs?)",
+      "description": "持续截取虚拟桌面；指定颜色不再出现返回 true，超时仍存在返回 false。",
+      "parameters": [
+        {
+          "name": "color",
+          "type": "integer",
+          "required": true,
+          "description": "目标 RGB 颜色。",
+          "minimum": 0,
+          "maximum": 16777215
+        },
+        {
+          "name": "tolerance",
+          "type": "integer",
+          "required": false,
+          "description": "RGB 每个通道允许的最大绝对差。",
+          "defaultValue": 0,
+          "minimum": 0,
+          "maximum": 255
+        },
+        {
+          "name": "timeoutMs",
+          "type": "integer",
+          "required": false,
+          "description": "最大等待时长。",
+          "defaultValue": 5000,
+          "minimum": 0,
+          "maximum": 600000,
+          "unit": "毫秒"
+        },
+        {
+          "name": "intervalMs",
+          "type": "integer",
+          "required": false,
+          "description": "两次检测之间的间隔。",
+          "defaultValue": 100,
+          "minimum": 10,
+          "maximum": 5000,
+          "unit": "毫秒"
+        }
+      ],
+      "returns": {
+        "type": "boolean",
+        "description": "颜色消失返回 true；超时仍存在返回 false。"
+      },
+      "errors": [
+        "截图失败、图像过大或参数无效时产生错误。"
+      ],
+      "example": "if WaitColorGone(0x00FF00, 8, 3000, 100) then Log(\"颜色已消失\") end",
+      "runtime": {
+        "definition": "function(color, tolerance, timeoutMs, intervalMs) return __AnjianBridge_WaitColorGone(color, (tolerance == nil and 0 or tolerance), (timeoutMs == nil and 5000 or timeoutMs), (intervalMs == nil and 100 or intervalMs)) end",
+        "bindings": [
+          {
+            "name": "__WaitColorGone",
+            "method": "WaitColorGone",
+            "localName": "__AnjianBridge_WaitColorGone"
+          }
+        ]
+      },
+      "id": "anjian.imaging.waitColorGone",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.5.0-dev.1",
+      "behavior": {
+        "pauseBehavior": "每轮轮询前检查暂停状态；暂停时等待恢复。",
+        "cancellationBehavior": "Stop 取消轮询并终止当前调用；不把取消伪装成超时。",
+        "sideEffects": [
+          "按间隔捕获当前虚拟桌面。"
+        ],
+        "coordinateSpace": "搜索范围为当前虚拟桌面。",
+        "permissionNotes": "不新增第三方图像引擎依赖。截图依赖当前 Windows 交互桌面的可见合成画面；不保证被遮挡/最小化窗口、硬件加速表面或受保护内容的真实后台像素。不绕过 UIPI/UAC/安全桌面。每张图像最多 32,000,000 像素；单轮最多 128 个资源与 256 MiB 像素缓存。"
       }
     }
   ],

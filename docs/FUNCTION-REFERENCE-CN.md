@@ -392,7 +392,7 @@ TypeText("按键精灵 2026")
 
 | 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
 |---|---|---|---|---|---|
-| `keys` | `keyName[]` | 是 | — | 固定值：ENTER、ESC、TAB、SPACE、BACKSPACE、DELETE、INSERT、HOME、END、PAGEUP、PAGEDOWN、UP、DOWN、LEFT、RIGHT、CTRL、CONTROL、SHIFT、ALT、WIN、CAPSLOCK、PRINTSCREEN、PAUSE、NUMLOCK、SCROLLLOCK、NUMPAD0、NUMPAD1、NUMPAD2、NUMPAD3、NUMPAD4、NUMPAD5、NUMPAD6、NUMPAD7、NUMPAD8、NUMPAD9、NUMPADMULTIPLY、NUMPADADD、NUMPADSUBTRACT、NUMPADDECIMAL、NUMPADDIVIDE、SEMICOLON、EQUALS、COMMA、MINUS、PERIOD、SLASH、BACKTICK、LEFTBRACKET、BACKSLASH、RIGHTBRACKET、QUOTE；规则：A-Z、0-9、F1-F24；可变参数 | 一个或多个规范按键名，按输入顺序按下、逆序释放。 |
+| `keys` | `keyName[]` | 是 | — | 固定值：ENTER、ESC、TAB、SPACE、BACKSPACE、DELETE、INSERT、HOME、END、PAGEUP、PAGEDOWN、UP、DOWN、LEFT、RIGHT、CTRL、CONTROL、SHIFT、ALT、WIN、CAPSLOCK、PRINTSCREEN、PAUSE、NUMLOCK、SCROLLLOCK、NUMPAD0、NUMPAD1、NUMPAD2、NUMPAD3、NUMPAD4、NUMPAD5、NUMPAD6、NUMPAD7、NUMPAD8、NUMPAD9、NUMPADMULTIPLY、NUMPADADD、NUMPADSUBTRACT、NUMPADDECIMAL、NUMPADDIVIDE、SEMICOLON、EQUALS、COMMA、MINUS、PERIOD、SLASH、BACKTICK、LEFTBRACKET、BACKSLASH、RIGHTBRACKET、QUOTE；规则：A-Z、0-9、F1-F24；至少 1 项；可变参数 | 一个或多个规范按键名，按输入顺序按下、逆序释放。 |
 
 **返回值：** `nil` — 无显式返回值；成功后继续执行后续 Lua 语句。
 **错误：** 参数类型、整数性或范围不合法时产生 Lua 错误。；输入调用失败、权限不足或目标程序拒绝输入时会报告执行错误。
@@ -1161,6 +1161,476 @@ ControlInvoke(binding, button.controlId)
 **示例：**
 ```lua
 WindowInput(binding, "auto", "click", "left", 400, 300, "", 50)
+```
+
+### 2.6 截图与图像识别
+
+#### `CaptureScreen()` — 截取虚拟桌面
+
+- **稳定 ID：** `anjian.imaging.captureScreen`
+- **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
+- **说明：** 捕获 Windows 虚拟桌面的可见合成画面，返回本轮有效的图像资源 ID。副屏负坐标保存在 origin 元数据中。
+
+**参数：** 无。
+
+**返回值：** `string` — 本轮图像资源 ID。
+**错误：** 桌面不可用、截图失败或超过图像/资源池限制时产生错误。
+**执行/取消语义：** 在主进程图像操作命令边界遵循暂停状态。 本轮 worker 结束时主进程清空本轮所有图像资源。
+**坐标/权限：** 坐标空间：返回带屏幕原点的图像；像素使用图像局部零基坐标。。不新增第三方图像引擎依赖。截图依赖当前 Windows 交互桌面的可见合成画面；不保证被遮挡/最小化窗口、硬件加速表面或受保护内容的真实后台像素。不绕过 UIPI/UAC/安全桌面。每张图像最多 32,000,000 像素；单轮最多 128 个资源与 256 MiB 像素缓存。
+
+**示例：**
+```lua
+local screen = CaptureScreen()
+```
+
+#### `CaptureWindow(windowId)` — 截取窗口外框
+
+- **稳定 ID：** `anjian.imaging.captureWindow`
+- **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
+- **说明：** 截取指定可见且未最小化窗口的屏幕外框区域。截图来自桌面合成画面，窗口被其他内容遮挡时不保证得到其后台内容。
+
+| 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
+|---|---|---|---|---|---|
+| `windowId` | `string` | 是 | — | — | 当前运行内有效的 M6 不透明窗口引用 ID。 |
+
+**返回值：** `string` — 本轮图像资源 ID。
+**错误：** 窗口引用失效、窗口隐藏/最小化、区域无效或截图失败时产生错误。
+**执行/取消语义：** 在主进程图像操作命令边界遵循暂停状态。 本轮 worker 结束时主进程清空本轮所有图像资源。
+**坐标/权限：** 坐标空间：屏幕物理像素；结果同时提供局部像素坐标与 screenX/screenY。。不新增第三方图像引擎依赖。截图依赖当前 Windows 交互桌面的可见合成画面；不保证被遮挡/最小化窗口、硬件加速表面或受保护内容的真实后台像素。不绕过 UIPI/UAC/安全桌面。每张图像最多 32,000,000 像素；单轮最多 128 个资源与 256 MiB 像素缓存。
+
+**示例：**
+```lua
+local image = CaptureWindow(window.id)
+```
+
+#### `CaptureClient(windowId)` — 截取窗口客户区
+
+- **稳定 ID：** `anjian.imaging.captureClient`
+- **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
+- **说明：** 截取指定可见且未最小化窗口的客户区屏幕区域；不含标题栏和边框。被遮挡内容不保证可获取。
+
+| 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
+|---|---|---|---|---|---|
+| `windowId` | `string` | 是 | — | — | 当前运行内有效的 M6 不透明窗口引用 ID。 |
+
+**返回值：** `string` — 本轮图像资源 ID。
+**错误：** 窗口引用失效、窗口隐藏/最小化、客户区无效或截图失败时产生错误。
+**执行/取消语义：** 在主进程图像操作命令边界遵循暂停状态。 本轮 worker 结束时主进程清空本轮所有图像资源。
+**坐标/权限：** 坐标空间：屏幕物理像素；结果同时提供局部像素坐标与 screenX/screenY。。不新增第三方图像引擎依赖。截图依赖当前 Windows 交互桌面的可见合成画面；不保证被遮挡/最小化窗口、硬件加速表面或受保护内容的真实后台像素。不绕过 UIPI/UAC/安全桌面。每张图像最多 32,000,000 像素；单轮最多 128 个资源与 256 MiB 像素缓存。
+
+**示例：**
+```lua
+local image = CaptureClient(window.id)
+```
+
+#### `CaptureRegion(windowId, space, x, y, width, height, anchor?)` — 按坐标空间截图
+
+- **稳定 ID：** `anjian.imaging.captureRegion`
+- **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
+- **说明：** 按 screen/window/client/anchor/ratio 坐标空间捕获自定义矩形。windowId 为空字符串时必须使用 screen，坐标为虚拟桌面屏幕物理像素；非空 ID 复用 M6 双向坐标转换契约。
+
+| 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
+|---|---|---|---|---|---|
+| `windowId` | `string` | 是 | — | — | 当前运行内的窗口引用 ID；空字符串表示不使用窗口引用，且只允许 screen 坐标。 |
+| `space` | `string` | 是 | — | — | screen、window、client、anchor 或 ratio。 |
+| `x` | `number` | 是 | — | — | 区域左上角 X；使用指定坐标空间的单位。 |
+| `y` | `number` | 是 | — | — | 区域左上角 Y；使用指定坐标空间的单位。 |
+| `width` | `number` | 是 | — | 0–32768 | 区域宽度；使用指定坐标空间的单位，必须大于 0。 |
+| `height` | `number` | 是 | — | 0–32768 | 区域高度；使用指定坐标空间的单位，必须大于 0。 |
+| `anchor` | `string` | 否 | `top-left` | — | anchor 空间所用的九宫格锚点。 |
+
+**返回值：** `string` — 本轮图像资源 ID。
+**错误：** 坐标空间无效、窗口引用失效、矩形越界、区域无效或截图失败时产生错误。
+**执行/取消语义：** 在主进程图像操作命令边界遵循暂停状态。 本轮 worker 结束时主进程清空本轮所有图像资源。
+**坐标/权限：** 坐标空间：截图区域复用 M6 screen/window/client/anchor/ratio 契约；像素输出单位为物理像素。。不新增第三方图像引擎依赖。截图依赖当前 Windows 交互桌面的可见合成画面；不保证被遮挡/最小化窗口、硬件加速表面或受保护内容的真实后台像素。不绕过 UIPI/UAC/安全桌面。每张图像最多 32,000,000 像素；单轮最多 128 个资源与 256 MiB 像素缓存。
+
+**示例：**
+```lua
+local image = CaptureRegion("", "screen", 100, 80, 640, 360)
+```
+
+#### `LoadImage(path)` — 加载模板图像
+
+- **稳定 ID：** `anjian.imaging.loadImage`
+- **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
+- **说明：** 从本地文件加载图像并复制到资源池；PNG 透明像素可在找图时作为通配区域。动图仅载入当前帧，不播放动画。
+
+| 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
+|---|---|---|---|---|---|
+| `path` | `string` | 是 | — | — | 本地图像文件的绝对或相对路径。 |
+
+**返回值：** `string` — 本轮图像资源 ID。
+**错误：** 文件不存在、格式不支持、图像尺寸超过限制或资源池达到上限时产生错误。
+**执行/取消语义：** 在主进程图像操作命令边界遵循暂停状态。 本轮 worker 结束时主进程清空本轮所有图像资源。
+**坐标/权限：** 坐标空间：本地图像没有屏幕坐标原点；像素使用图像局部零基坐标。。不新增第三方图像引擎依赖。截图依赖当前 Windows 交互桌面的可见合成画面；不保证被遮挡/最小化窗口、硬件加速表面或受保护内容的真实后台像素。不绕过 UIPI/UAC/安全桌面。每张图像最多 32,000,000 像素；单轮最多 128 个资源与 256 MiB 像素缓存。
+
+**示例：**
+```lua
+local template = LoadImage("C:\\scripts\\button.png")
+```
+
+#### `SaveScreenshot(imageId, path)` — 保存图像为 PNG
+
+- **稳定 ID：** `anjian.imaging.saveScreenshot`
+- **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
+- **说明：** 将图像资源写为 PNG；目标扩展名必须为 .png。若目标文件已存在，会覆盖该文件。
+
+| 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
+|---|---|---|---|---|---|
+| `imageId` | `string` | 是 | — | — | 当前运行内有效的图像资源 ID。 |
+| `path` | `string` | 是 | — | — | 输出 PNG 文件路径；扩展名必须为 .png。 |
+
+**返回值：** `boolean` — 成功保存返回 true。
+**错误：** 资源失效、路径无效、文件写入失败或扩展名不是 .png 时产生错误。
+**执行/取消语义：** 在主进程图像操作命令边界遵循暂停状态。 本轮 worker 结束时主进程清空本轮所有图像资源。
+**坐标/权限：** 坐标空间：写入图像资源的局部像素；不会改变 MoveTo 的 screen 物理像素契约。。不新增第三方图像引擎依赖。截图依赖当前 Windows 交互桌面的可见合成画面；不保证被遮挡/最小化窗口、硬件加速表面或受保护内容的真实后台像素。不绕过 UIPI/UAC/安全桌面。每张图像最多 32,000,000 像素；单轮最多 128 个资源与 256 MiB 像素缓存。
+
+**示例：**
+```lua
+SaveScreenshot(screen, "C:\\scripts\\screen.png")
+```
+
+#### `ReleaseImage(imageId)` — 释放图像资源
+
+- **稳定 ID：** `anjian.imaging.releaseImage`
+- **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
+- **说明：** 释放指定的本轮图像资源并立即归还资源池额度；未知或已释放的 ID 返回 false。每轮脚本结束时本轮资源池也会清空。
+
+| 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
+|---|---|---|---|---|---|
+| `imageId` | `string` | 是 | — | — | 要释放的图像资源 ID。 |
+
+**返回值：** `boolean` — 首次释放成功返回 true；不存在的资源返回 false。
+**错误：** 图像 ID 为空时产生错误。
+**执行/取消语义：** 在主进程图像操作命令边界遵循暂停状态。 本轮 worker 结束时主进程清空本轮所有图像资源。
+**坐标/权限：** 坐标空间：资源生命周期为单次运行轮次；资源 ID 不可跨轮次保存复用。。不新增第三方图像引擎依赖。截图依赖当前 Windows 交互桌面的可见合成画面；不保证被遮挡/最小化窗口、硬件加速表面或受保护内容的真实后台像素。不绕过 UIPI/UAC/安全桌面。每张图像最多 32,000,000 像素；单轮最多 128 个资源与 256 MiB 像素缓存。
+
+**示例：**
+```lua
+ReleaseImage(template)
+```
+
+#### `GetImageSize(imageId)` — 读取图像尺寸
+
+- **稳定 ID：** `anjian.imaging.getImageSize`
+- **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
+- **说明：** 返回 width、height、hasScreenCoordinates、screenOriginX 与 screenOriginY；从文件加载的图像没有有效屏幕原点。
+
+| 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
+|---|---|---|---|---|---|
+| `imageId` | `string` | 是 | — | — | 当前运行内有效的图像资源 ID。 |
+
+**返回值：** `table` — 包含尺寸与屏幕原点元数据的表。
+**错误：** 资源失效或已释放时产生错误。
+**执行/取消语义：** 在主进程图像操作命令边界遵循暂停状态。 本轮 worker 结束时主进程清空本轮所有图像资源。
+**坐标/权限：** 坐标空间：宽高为像素；文件图像的屏幕原点标记为 false。。不新增第三方图像引擎依赖。截图依赖当前 Windows 交互桌面的可见合成画面；不保证被遮挡/最小化窗口、硬件加速表面或受保护内容的真实后台像素。不绕过 UIPI/UAC/安全桌面。每张图像最多 32,000,000 像素；单轮最多 128 个资源与 256 MiB 像素缓存。
+
+**示例：**
+```lua
+local size = GetImageSize(screen)
+```
+
+#### `CropImage(imageId, x, y, width, height)` — 裁剪图像
+
+- **稳定 ID：** `anjian.imaging.cropImage`
+- **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
+- **说明：** 按图像局部零基像素裁剪并创建新的独立资源；原资源保持不变，截图的屏幕原点会按裁剪偏移。
+
+| 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
+|---|---|---|---|---|---|
+| `imageId` | `string` | 是 | — | — | 源图像资源 ID。 |
+| `x` | `integer` | 是 | — | 0–32767 像素 | 裁剪起点 X。 |
+| `y` | `integer` | 是 | — | 0–32767 像素 | 裁剪起点 Y。 |
+| `width` | `integer` | 是 | — | 1–32768 像素 | 裁剪宽度。 |
+| `height` | `integer` | 是 | — | 1–32768 像素 | 裁剪高度。 |
+
+**返回值：** `string` — 新裁剪图像的资源 ID。
+**错误：** 资源失效、裁剪区域越界或资源池容量不足时产生错误。
+**执行/取消语义：** 在主进程图像操作命令边界遵循暂停状态。 本轮 worker 结束时主进程清空本轮所有图像资源。
+**坐标/权限：** 坐标空间：图像局部零基像素坐标；截图裁剪结果会保留正确屏幕原点。。不新增第三方图像引擎依赖。截图依赖当前 Windows 交互桌面的可见合成画面；不保证被遮挡/最小化窗口、硬件加速表面或受保护内容的真实后台像素。不绕过 UIPI/UAC/安全桌面。每张图像最多 32,000,000 像素；单轮最多 128 个资源与 256 MiB 像素缓存。
+
+**示例：**
+```lua
+local crop = CropImage(screen, 10, 10, 200, 120)
+```
+
+#### `GetPixelColor(imageId, x, y)` — 读取 RGB 像素颜色
+
+- **稳定 ID：** `anjian.imaging.getPixelColor`
+- **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
+- **说明：** 返回图像局部零基坐标处的 0xRRGGBB 整数，不包含 alpha 通道。
+
+| 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
+|---|---|---|---|---|---|
+| `imageId` | `string` | 是 | — | — | 图像资源 ID。 |
+| `x` | `integer` | 是 | — | 0–32767 像素 | 零基像素 X。 |
+| `y` | `integer` | 是 | — | 0–32767 像素 | 零基像素 Y。 |
+
+**返回值：** `integer` — 0 到 16777215 的 RGB 数值。
+**错误：** 资源失效、坐标越界或参数不合法时产生错误。
+**执行/取消语义：** 在主进程图像操作命令边界遵循暂停状态。 本轮 worker 结束时主进程清空本轮所有图像资源。
+**坐标/权限：** 坐标空间：图像局部零基像素坐标。。不新增第三方图像引擎依赖。截图依赖当前 Windows 交互桌面的可见合成画面；不保证被遮挡/最小化窗口、硬件加速表面或受保护内容的真实后台像素。不绕过 UIPI/UAC/安全桌面。每张图像最多 32,000,000 像素；单轮最多 128 个资源与 256 MiB 像素缓存。
+
+**示例：**
+```lua
+local color = GetPixelColor(screen, 10, 20)
+```
+
+#### `CompareColor(imageId, x, y, color, tolerance?)` — 比较像素颜色
+
+- **稳定 ID：** `anjian.imaging.compareColor`
+- **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
+- **说明：** 将指定像素与 0xRRGGBB 颜色比较；tolerance 是每个 RGB 通道允许的最大绝对差，默认 0。
+
+| 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
+|---|---|---|---|---|---|
+| `imageId` | `string` | 是 | — | — | 图像资源 ID。 |
+| `x` | `integer` | 是 | — | 0–32767 像素 | 零基像素 X。 |
+| `y` | `integer` | 是 | — | 0–32767 像素 | 零基像素 Y。 |
+| `color` | `integer` | 是 | — | 0–16777215 | 目标 RGB 颜色。 |
+| `tolerance` | `integer` | 否 | `0` | 0–255 | 每个 RGB 通道最大绝对差。 |
+
+**返回值：** `boolean` — 所有 RGB 通道差值均在容差内返回 true。
+**错误：** 资源失效、坐标越界或颜色/容差不合法时产生错误。
+**执行/取消语义：** 在主进程图像操作命令边界遵循暂停状态。 本轮 worker 结束时主进程清空本轮所有图像资源。
+**坐标/权限：** 坐标空间：图像局部零基像素坐标；颜色参数为 0xRRGGBB。。不新增第三方图像引擎依赖。截图依赖当前 Windows 交互桌面的可见合成画面；不保证被遮挡/最小化窗口、硬件加速表面或受保护内容的真实后台像素。不绕过 UIPI/UAC/安全桌面。每张图像最多 32,000,000 像素；单轮最多 128 个资源与 256 MiB 像素缓存。
+
+**示例：**
+```lua
+CompareColor(screen, 10, 20, 0xFF0000, 4)
+```
+
+#### `FindColor(imageId, color, tolerance?, left?, top?, width?, height?, step?)` — 查找单点颜色
+
+- **稳定 ID：** `anjian.imaging.findColor`
+- **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
+- **说明：** 按从上到下、从左到右顺序查找首个符合颜色/容差的像素。无命中返回 nil；区域宽或高为 0 表示延伸至图像边缘。结果含局部 x/y；源图像是截图时另含 screenX/screenY。
+
+| 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
+|---|---|---|---|---|---|
+| `imageId` | `string` | 是 | — | — | 图像资源 ID。 |
+| `color` | `integer` | 是 | — | 0–16777215 | 目标 RGB 颜色。 |
+| `tolerance` | `integer` | 否 | `0` | 0–255 | RGB 各通道容差。 |
+| `left` | `integer` | 否 | `0` | 0–32767 像素 | 局部区域左边；0 为图像左边。 |
+| `top` | `integer` | 否 | `0` | 0–32767 像素 | 局部区域上边；0 为图像上边。 |
+| `width` | `integer` | 否 | `0` | 0–32768 像素 | 区域宽度；0 表示到图像右边界。 |
+| `height` | `integer` | 否 | `0` | 0–32768 像素 | 区域高度；0 表示到图像下边界。 |
+| `step` | `integer` | 否 | `1` | 1–64 像素 | 候选采样步长。 |
+
+**返回值：** `table\|nil` — 命中位置表或未命中 nil。
+**错误：** 资源失效、区域越界或参数不合法时产生错误。
+**执行/取消语义：** 在主进程图像操作命令边界遵循暂停状态。 本轮 worker 结束时主进程清空本轮所有图像资源。
+**坐标/权限：** 坐标空间：搜索区域为图像局部零基像素；截图命中另含 screenX/screenY。。不新增第三方图像引擎依赖。截图依赖当前 Windows 交互桌面的可见合成画面；不保证被遮挡/最小化窗口、硬件加速表面或受保护内容的真实后台像素。不绕过 UIPI/UAC/安全桌面。每张图像最多 32,000,000 像素；单轮最多 128 个资源与 256 MiB 像素缓存。
+
+**示例：**
+```lua
+local hit = FindColor(screen, 0xFF0000, 5)
+```
+
+#### `FindMultiColor(imageId, color, pattern, tolerance?, left?, top?, width?, height?, step?)` — 多点颜色查找
+
+- **稳定 ID：** `anjian.imaging.findMultiColor`
+- **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
+- **说明：** 以 base color 为基准验证多个相对偏移点。pattern 格式为 dx,dy,RRGGBB;dx,dy,RRGGBB，颜色可带 0x 或 # 前缀，最多 256 个点。无命中返回 nil。
+
+| 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
+|---|---|---|---|---|---|
+| `imageId` | `string` | 是 | — | — | 图像资源 ID。 |
+| `color` | `integer` | 是 | — | 0–16777215 | 基准 RGB 颜色。 |
+| `pattern` | `string` | 是 | — | — | 分号分隔的 dx,dy,RRGGBB 列表。 |
+| `tolerance` | `integer` | 否 | `0` | 0–255 | RGB 各通道容差。 |
+| `left` | `integer` | 否 | `0` | 0–32767 像素 | 局部区域左边；0 为图像左边。 |
+| `top` | `integer` | 否 | `0` | 0–32767 像素 | 局部区域上边；0 为图像上边。 |
+| `width` | `integer` | 否 | `0` | 0–32768 像素 | 区域宽度；0 表示到图像右边界。 |
+| `height` | `integer` | 否 | `0` | 0–32768 像素 | 区域高度；0 表示到图像下边界。 |
+| `step` | `integer` | 否 | `1` | 1–64 像素 | 候选采样步长。 |
+
+**返回值：** `table\|nil` — 首个命中位置表或未命中 nil。
+**错误：** 模式格式错误、点数超限、资源失效或区域越界时产生错误。
+**执行/取消语义：** 在主进程图像操作命令边界遵循暂停状态。 本轮 worker 结束时主进程清空本轮所有图像资源。
+**坐标/权限：** 坐标空间：偏移和区域使用图像局部零基像素；命中截图另含 screenX/screenY。。不新增第三方图像引擎依赖。截图依赖当前 Windows 交互桌面的可见合成画面；不保证被遮挡/最小化窗口、硬件加速表面或受保护内容的真实后台像素。不绕过 UIPI/UAC/安全桌面。每张图像最多 32,000,000 像素；单轮最多 128 个资源与 256 MiB 像素缓存。
+
+**示例：**
+```lua
+local hit = FindMultiColor(screen, 0x112233, "1,0,FF0000;0,1,00FF00", 2)
+```
+
+#### `CountColors(imageId, color, tolerance?, left?, top?, width?, height?, step?)` — 统计区域颜色
+
+- **稳定 ID：** `anjian.imaging.countColors`
+- **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
+- **说明：** 统计指定区域命中颜色的采样像素数；step 默认 1，增大 step 会稀疏采样。
+
+| 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
+|---|---|---|---|---|---|
+| `imageId` | `string` | 是 | — | — | 图像资源 ID。 |
+| `color` | `integer` | 是 | — | 0–16777215 | 目标 RGB 颜色。 |
+| `tolerance` | `integer` | 否 | `0` | 0–255 | RGB 各通道容差。 |
+| `left` | `integer` | 否 | `0` | 0–32767 像素 | 局部区域左边；0 为图像左边。 |
+| `top` | `integer` | 否 | `0` | 0–32767 像素 | 局部区域上边；0 为图像上边。 |
+| `width` | `integer` | 否 | `0` | 0–32768 像素 | 区域宽度；0 表示到图像右边界。 |
+| `height` | `integer` | 否 | `0` | 0–32768 像素 | 区域高度；0 表示到图像下边界。 |
+| `step` | `integer` | 否 | `1` | 1–64 像素 | 候选采样步长。 |
+
+**返回值：** `integer` — 匹配的采样像素数量。
+**错误：** 资源失效、区域越界或参数不合法时产生错误。
+**执行/取消语义：** 在主进程图像操作命令边界遵循暂停状态。 本轮 worker 结束时主进程清空本轮所有图像资源。
+**坐标/权限：** 坐标空间：搜索区域为图像局部零基像素。。不新增第三方图像引擎依赖。截图依赖当前 Windows 交互桌面的可见合成画面；不保证被遮挡/最小化窗口、硬件加速表面或受保护内容的真实后台像素。不绕过 UIPI/UAC/安全桌面。每张图像最多 32,000,000 像素；单轮最多 128 个资源与 256 MiB 像素缓存。
+
+**示例：**
+```lua
+local count = CountColors(screen, 0x00FF00, 0, 0, 0, 640, 480)
+```
+
+#### `FindImage(imageId, templateId, similarity?, tolerance?, left?, top?, width?, height?, step?)` — 模板找图
+
+- **稳定 ID：** `anjian.imaging.findImage`
+- **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
+- **说明：** 在源图像区域查找模板首个命中；透明模板像素作为通配点。similarity 为 0–1 的匹配比例，未命中返回 nil。单次调用最多执行 5000 万次模板像素比较，防止长时间无界循环。
+
+| 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
+|---|---|---|---|---|---|
+| `imageId` | `string` | 是 | — | — | 被搜索图像资源 ID。 |
+| `templateId` | `string` | 是 | — | — | 模板图像资源 ID。 |
+| `similarity` | `number` | 否 | `0.95` | 0–1 | 所需相似度比例。 |
+| `tolerance` | `integer` | 否 | `0` | 0–255 | RGB 每个通道允许的最大绝对差。 |
+| `left` | `integer` | 否 | `0` | 0–32767 像素 | 局部区域左边；0 为图像左边。 |
+| `top` | `integer` | 否 | `0` | 0–32767 像素 | 局部区域上边；0 为图像上边。 |
+| `width` | `integer` | 否 | `0` | 0–32768 像素 | 区域宽度；0 表示到图像右边界。 |
+| `height` | `integer` | 否 | `0` | 0–32768 像素 | 区域高度；0 表示到图像下边界。 |
+| `step` | `integer` | 否 | `1` | 1–64 像素 | 候选采样步长。 |
+
+**返回值：** `table\|nil` — 命中位置/相似度与可用的 screenX/screenY；未命中返回 nil。
+**错误：** 模板全透明、资源失效、区域越界或达到像素比较预算时产生错误。
+**执行/取消语义：** 在主进程图像操作命令边界遵循暂停状态。 本轮 worker 结束时主进程清空本轮所有图像资源。
+**坐标/权限：** 坐标空间：搜索区域与结果为图像局部零基像素；截图命中另含 screenX/screenY。。不新增第三方图像引擎依赖。截图依赖当前 Windows 交互桌面的可见合成画面；不保证被遮挡/最小化窗口、硬件加速表面或受保护内容的真实后台像素。不绕过 UIPI/UAC/安全桌面。每张图像最多 32,000,000 像素；单轮最多 128 个资源与 256 MiB 像素缓存。
+
+**示例：**
+```lua
+local hit = FindImage(screen, template, 0.95, 4)
+```
+
+#### `FindImages(imageId, templateId, similarity?, tolerance?, maxResults?, left?, top?, width?, height?, step?)` — 查找多个模板位置
+
+- **稳定 ID：** `anjian.imaging.findImages`
+- **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
+- **说明：** 返回按从上到下、从左到右排序且互不重叠的命中数组。maxResults 为 1–1000；未命中返回空数组。
+
+| 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
+|---|---|---|---|---|---|
+| `imageId` | `string` | 是 | — | — | 被搜索图像资源 ID。 |
+| `templateId` | `string` | 是 | — | — | 模板图像资源 ID。 |
+| `similarity` | `number` | 否 | `0.95` | 0–1 | 所需相似度比例。 |
+| `tolerance` | `integer` | 否 | `0` | 0–255 | RGB 每个通道允许的最大绝对差。 |
+| `maxResults` | `integer` | 否 | `100` | 1–1000 | 最大返回数。 |
+| `left` | `integer` | 否 | `0` | 0–32767 像素 | 局部区域左边；0 为图像左边。 |
+| `top` | `integer` | 否 | `0` | 0–32767 像素 | 局部区域上边；0 为图像上边。 |
+| `width` | `integer` | 否 | `0` | 0–32768 像素 | 区域宽度；0 表示到图像右边界。 |
+| `height` | `integer` | 否 | `0` | 0–32768 像素 | 区域高度；0 表示到图像下边界。 |
+| `step` | `integer` | 否 | `1` | 1–64 像素 | 候选采样步长。 |
+
+**返回值：** `table` — Lua 数组形式的命中列表；没有匹配时为空表。
+**错误：** 模板全透明、资源失效、区域越界或达到像素比较预算时产生错误。
+**执行/取消语义：** 在主进程图像操作命令边界遵循暂停状态。 本轮 worker 结束时主进程清空本轮所有图像资源。
+**坐标/权限：** 坐标空间：搜索区域与结果为图像局部零基像素；截图命中另含 screenX/screenY。。不新增第三方图像引擎依赖。截图依赖当前 Windows 交互桌面的可见合成画面；不保证被遮挡/最小化窗口、硬件加速表面或受保护内容的真实后台像素。不绕过 UIPI/UAC/安全桌面。每张图像最多 32,000,000 像素；单轮最多 128 个资源与 256 MiB 像素缓存。
+
+**示例：**
+```lua
+local hits = FindImages(screen, template, 0.95, 0, 20)
+```
+
+#### `WaitImage(templateId, similarity?, tolerance?, timeoutMs?, intervalMs?)` — 等待模板出现
+
+- **稳定 ID：** `anjian.imaging.waitImage`
+- **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
+- **说明：** 循环截取当前虚拟桌面并搜索模板；首次命中返回位置表，超时返回 nil。Stop 取消轮询，Pause 会暂停后续轮询。
+
+| 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
+|---|---|---|---|---|---|
+| `templateId` | `string` | 是 | — | — | 模板图像资源 ID。 |
+| `similarity` | `number` | 否 | `0.95` | 0–1 | 所需相似度比例。 |
+| `tolerance` | `integer` | 否 | `0` | 0–255 | RGB 每个通道允许的最大绝对差。 |
+| `timeoutMs` | `integer` | 否 | `5000` | 0–600000 毫秒 | 最大等待时长。 |
+| `intervalMs` | `integer` | 否 | `100` | 10–5000 毫秒 | 两次检测间隔。 |
+
+**返回值：** `table\|nil` — 首次命中位置或超时 nil。
+**错误：** 模板失效、截图失败、图像过大或搜索达到像素比较预算时产生错误。
+**执行/取消语义：** 每轮轮询前检查暂停状态；暂停时等待恢复。 Stop 取消轮询并终止当前调用；不把取消伪装成超时。
+**坐标/权限：** 坐标空间：搜索范围为当前虚拟桌面；返回图像局部与 screen 绝对坐标。。不新增第三方图像引擎依赖。截图依赖当前 Windows 交互桌面的可见合成画面；不保证被遮挡/最小化窗口、硬件加速表面或受保护内容的真实后台像素。不绕过 UIPI/UAC/安全桌面。每张图像最多 32,000,000 像素；单轮最多 128 个资源与 256 MiB 像素缓存。
+
+**示例：**
+```lua
+local hit = WaitImage(template, 0.95, 0, 5000, 100)
+```
+
+#### `WaitImageGone(templateId, similarity?, tolerance?, timeoutMs?, intervalMs?)` — 等待模板消失
+
+- **稳定 ID：** `anjian.imaging.waitImageGone`
+- **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
+- **说明：** 持续截取虚拟桌面；模板消失返回 true，超时时模板仍存在返回 false。Stop 取消轮询。
+
+| 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
+|---|---|---|---|---|---|
+| `templateId` | `string` | 是 | — | — | 模板图像资源 ID。 |
+| `similarity` | `number` | 否 | `0.95` | 0–1 | 所需相似度比例。 |
+| `tolerance` | `integer` | 否 | `0` | 0–255 | RGB 每个通道允许的最大绝对差。 |
+| `timeoutMs` | `integer` | 否 | `5000` | 0–600000 毫秒 | 最大等待时长。 |
+| `intervalMs` | `integer` | 否 | `100` | 10–5000 毫秒 | 两次检测间隔。 |
+
+**返回值：** `boolean` — 模板消失返回 true；超时仍存在返回 false。
+**错误：** 模板失效、截图失败、图像过大或搜索达到像素比较预算时产生错误。
+**执行/取消语义：** 每轮轮询前检查暂停状态；暂停时等待恢复。 Stop 取消轮询并终止当前调用；不把取消伪装成超时。
+**坐标/权限：** 坐标空间：搜索范围为当前虚拟桌面。。不新增第三方图像引擎依赖。截图依赖当前 Windows 交互桌面的可见合成画面；不保证被遮挡/最小化窗口、硬件加速表面或受保护内容的真实后台像素。不绕过 UIPI/UAC/安全桌面。每张图像最多 32,000,000 像素；单轮最多 128 个资源与 256 MiB 像素缓存。
+
+**示例：**
+```lua
+if WaitImageGone(template, 0.95, 0, 5000, 100) then Log("目标已消失") end
+```
+
+#### `WaitColor(color, tolerance?, timeoutMs?, intervalMs?)` — 等待屏幕颜色出现
+
+- **稳定 ID：** `anjian.imaging.waitColor`
+- **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
+- **说明：** 持续截取虚拟桌面；首次找到指定 RGB 颜色返回命中位置，超时返回 nil。
+
+| 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
+|---|---|---|---|---|---|
+| `color` | `integer` | 是 | — | 0–16777215 | 目标 RGB 颜色。 |
+| `tolerance` | `integer` | 否 | `0` | 0–255 | RGB 每个通道允许的最大绝对差。 |
+| `timeoutMs` | `integer` | 否 | `5000` | 0–600000 毫秒 | 最大等待时长。 |
+| `intervalMs` | `integer` | 否 | `100` | 10–5000 毫秒 | 两次检测之间的间隔。 |
+
+**返回值：** `table\|nil` — 首次命中位置或超时 nil。
+**错误：** 截图失败、图像过大或参数无效时产生错误。
+**执行/取消语义：** 每轮轮询前检查暂停状态；暂停时等待恢复。 Stop 取消轮询并终止当前调用；不把取消伪装成超时。
+**坐标/权限：** 坐标空间：搜索范围为当前虚拟桌面；结果包含 screenX/screenY。。不新增第三方图像引擎依赖。截图依赖当前 Windows 交互桌面的可见合成画面；不保证被遮挡/最小化窗口、硬件加速表面或受保护内容的真实后台像素。不绕过 UIPI/UAC/安全桌面。每张图像最多 32,000,000 像素；单轮最多 128 个资源与 256 MiB 像素缓存。
+
+**示例：**
+```lua
+local hit = WaitColor(0x00FF00, 8, 3000, 100)
+```
+
+#### `WaitColorGone(color, tolerance?, timeoutMs?, intervalMs?)` — 等待屏幕颜色消失
+
+- **稳定 ID：** `anjian.imaging.waitColorGone`
+- **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
+- **说明：** 持续截取虚拟桌面；指定颜色不再出现返回 true，超时仍存在返回 false。
+
+| 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
+|---|---|---|---|---|---|
+| `color` | `integer` | 是 | — | 0–16777215 | 目标 RGB 颜色。 |
+| `tolerance` | `integer` | 否 | `0` | 0–255 | RGB 每个通道允许的最大绝对差。 |
+| `timeoutMs` | `integer` | 否 | `5000` | 0–600000 毫秒 | 最大等待时长。 |
+| `intervalMs` | `integer` | 否 | `100` | 10–5000 毫秒 | 两次检测之间的间隔。 |
+
+**返回值：** `boolean` — 颜色消失返回 true；超时仍存在返回 false。
+**错误：** 截图失败、图像过大或参数无效时产生错误。
+**执行/取消语义：** 每轮轮询前检查暂停状态；暂停时等待恢复。 Stop 取消轮询并终止当前调用；不把取消伪装成超时。
+**坐标/权限：** 坐标空间：搜索范围为当前虚拟桌面。。不新增第三方图像引擎依赖。截图依赖当前 Windows 交互桌面的可见合成画面；不保证被遮挡/最小化窗口、硬件加速表面或受保护内容的真实后台像素。不绕过 UIPI/UAC/安全桌面。每张图像最多 32,000,000 像素；单轮最多 128 个资源与 256 MiB 像素缓存。
+
+**示例：**
+```lua
+if WaitColorGone(0x00FF00, 8, 3000, 100) then Log("颜色已消失") end
 ```
 
 <!-- END GENERATED API REFERENCE -->
