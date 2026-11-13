@@ -36,6 +36,7 @@ internal sealed class MainForm : Form
     private readonly Button _playButton = new();
     private readonly Button _pauseButton = new();
     private readonly Button _stopButton = new();
+    private readonly Button _recoverInputButton = new() { Text = "确认键鼠已恢复", Visible = false };
     private readonly Button _debugStartButton = new();
     private readonly Button _debugContinueButton = new();
     private readonly Button _debugStepIntoButton = new();
@@ -183,6 +184,8 @@ internal sealed class MainForm : Form
         _stopButton.Enabled = false;
         _stopButton.Click += async (_, _) => await StopPlaybackAsync();
         toolbar.Controls.Add(_stopButton);
+        _recoverInputButton.Click += (_, _) => RecoverInputAfterManualCheck();
+        toolbar.Controls.Add(_recoverInputButton);
         toolbar.Controls.Add(MakeButton("查找/替换", (_, _) => ShowSearchReplace()));
         toolbar.Controls.Add(MakeButton("检查语法", async (_, _) => await CheckCurrentSyntaxAsync()));
         toolbar.Controls.Add(MakeButton("关闭标签", (_, _) => CloseCurrentTab()));
@@ -1255,11 +1258,15 @@ internal sealed class MainForm : Form
         _pauseButton.Enabled = !_recordSessionActive && _playback.SelectedCanPause;
         _stopButton.Enabled = !_recordSessionActive && _playback.IsRunning;
         _pauseButton.Text = _playback.IsPaused ? "继续" : "暂停";
-        _status.Text = !_recordSessionActive
-            ? (_playback.HasActiveInstances
-                ? $"运行中 {_playback.ActiveCount} 个实例，排队 {_playback.QueuedCount} 个"
-                : "未运行")
-            : _recordingPaused ? "正在录制…" : "录制已暂停";
+        _recoverInputButton.Visible = _playback.InputFaulted;
+        _recoverInputButton.Enabled = _playback.InputFaulted;
+        _status.Text = _playback.InputFaulted
+            ? "键鼠输入已锁定：请人工检查并释放所有键鼠状态"
+            : !_recordSessionActive
+                ? (_playback.HasActiveInstances
+                    ? $"运行中 {_playback.ActiveCount} 个实例，排队 {_playback.QueuedCount} 个"
+                    : "未运行")
+                : _recordingPaused ? "正在录制…" : "录制已暂停";
         _progress.Text = "";
         _scripts.Enabled = !_recordSessionActive;
         _editorTabs.Enabled = true;
@@ -1268,6 +1275,35 @@ internal sealed class MainForm : Form
         UpdateActionEditorButton();
     }
 
+
+    private void RecoverInputAfterManualCheck()
+    {
+        if (!_playback.InputFaulted)
+            return;
+
+        var reason = _playback.InputFaultReason ?? "输入状态未知。";
+        var choice = MessageBox.Show(
+            this,
+            "全局键鼠输入因实例清理失败而锁定，其他实例暂时不能继续注入输入。\n\n" +
+            "请先人工检查目标桌面，确认没有仍被按住的键或鼠标按钮，必要时手动释放。\n\n" +
+            "故障原因：" + reason + "\n\n" +
+            "确认已检查并恢复物理键鼠状态后，才解除锁定。",
+            "人工恢复键鼠输入",
+            MessageBoxButtons.YesNo,
+            MessageBoxIcon.Warning);
+        if (choice != DialogResult.Yes)
+            return;
+
+        if (!_playback.TryRecoverInputAfterManualAcknowledgement())
+        {
+            MessageBox.Show(this, "仍有实例持有输入租约或存在等待项，暂时不能解除锁定。",
+                "无法恢复", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        AppendLog("全局键鼠仲裁已由用户人工确认恢复。");
+        SetIdle();
+    }
 
     private void UpdateActionEditorButton()
     {
