@@ -779,3 +779,5 @@ M4 基础调试器与 M5 可视化录制/动作列表均已完成 Windows CI 验
 - Core tests：151 passed / 1 failed / 0 skipped / total 152。唯一失败为旧测试 `ImagingApiDefaultsAndValidationAreRegistered` 仍断言 API registry 版本为 1.0；实际 registry 已提升到 1.1。进程 API 相关新增测试已通过此次 Test 阶段。
 - 后续 API handbook / self-contained publish / Sprite Worker smoke / ZIP 与 artifact upload 因 Test 失败按 workflow 条件跳过，不能记为通过。
 - 同时审查发现 WaitProcess 的暂停时间不应消耗 timeout；后续修正改为每完成一个 pause-aware 等待片段才递减剩余预算，并新增暂停不消耗超时的自动化断言。此修正仍需下一轮 Windows CI 验证。
+
+- 第二轮修正准备前复核发现同一旧契约测试还有函数数量断言 99；随第二轮测试版本修正一并更新为 102，防止版本断言修复后继续暴露陈旧数量预期。
