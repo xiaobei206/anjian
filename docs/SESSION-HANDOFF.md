@@ -252,7 +252,7 @@ M4 基础调试器已在 main 实现并通过 Windows CI。具体实现提交与
 - **桌面验收仍未完成**：M7-01..M7-10 在 `docs/ACCEPTANCE-TEST-CN.md` 全部保持 NOT RUN。不要将 GitHub Actions CI 当成 Windows 10/11 UIA Pattern、焦点、UIPI、Stop 响应的实机通过证明。
 - 本阶段未更新 VERSION/csproj 预览版本、未创建 Release；已发布的 v0.1.0-preview.4 资产未改变。
 
-## M8 阶段交付结果（核心 API/CI 已完成；整个阶段尚未 DONE）
+## M8 阶段历史交付快照（该小节记录 M8-CLOSE 前状态；已由下方 M8-CLOSE 更新）
 
 ### 实现范围
 - 核心代码基线 1b87af713ff17c907feac6984bb96aa5dd8e821f。API registry 已从 0.4 升到 0.5，共 74 个真实公开函数；新增 20 个图像 API，函数手册从同一 registry 生成。
@@ -274,7 +274,7 @@ M4 基础调试器已在 main 实现并通过 Windows CI。具体实现提交与
 - M8-01..M8-14 实机验收与相关 Windows 边界测试。
 
 
-## M8-CLOSE 本次实施结果（2026-11-13；提交与 CI 待核实）
+## M8-CLOSE 本次实施结果（2026-11-13；Windows CI PASS，桌面验收 NOT RUN）
 
 ### 已实施
 - Lua API registry 从 0.5/74 项升至 0.6/78 项，新增 RgbToHex、HexToRgb、ColorDifference、FindColorBlocks；编辑器补全/签名提示消费同一 registry，函数手册由 registry 生成。

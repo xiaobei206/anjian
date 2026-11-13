@@ -526,7 +526,7 @@ M4 基础调试器与 M5 可视化录制/动作列表均已完成 Windows CI 验
 - docs/ACCEPTANCE-TEST-CN.md M8-01..M8-13 的 Windows 桌面场景尚未执行（NOT RUN）；M8-14 对应 UI 尚未实现。CI PASS 不替代 Windows 10/11 的 DPI/多显示器/负坐标、遮挡、受保护窗口、Stop 与资源清理实测。
 - 未修改 VERSION/csproj 预览版本，没有创建新 Release；v0.1.0-preview.4 官方 Release ZIP/SHA256 未变化。
  
-## 2026-11-13 — M8-CLOSE — 图像资源 UI、视觉调试与 RGB/颜色块闭环（Windows CI 待验证）
+## 2026-11-13 — M8-CLOSE — 图像资源 UI、视觉调试与 RGB/颜色块闭环（Windows CI PASS；桌面验收 NOT RUN）
 
 ### 实现
 - API registry 从 0.5 升至 0.6，公开函数总数从 74 升至 78；新增 RgbToHex、HexToRgb、ColorDifference、FindColorBlocks。编辑器补全/签名提示继续使用唯一 registry，函数参考手册同步生成。
@@ -537,6 +537,7 @@ M4 基础调试器与 M5 可视化录制/动作列表均已完成 Windows CI 验
 - Core 新增 RGB/hex、颜色差值、八邻域色块算法；增加 PNG manifest/path/hash 和 LoadImage 依赖扫描测试；颜色块扫描上限 4,000,000 个采样点、最多 100 个返回项并支持取消。
 
 ### 验证
-- 本地执行环境无 .NET SDK，不能本地 Restore/Build/Test。必须以本提交触发的 Windows Actions 结果作为构建/自动化测试证据；在结果返回前不得声称构建成功。
-- M8-01..M8-18 Windows 10/11 桌面人工验收全部 NOT RUN。特别需要真实桌面验证多显示器负坐标、透明 PNG/GDI 预览、脚本资源迁移、点击穿透、SetWindowDisplayAffinity 返回及截图是否含 overlay。
-- 没有修改 VERSION/csproj 版本，没有创建 Release；v0.1.0-preview.4 官方 Release/ZIP/SHA256 不变。
+- 本地执行容器无 .NET SDK，因此本地 Restore/Build/Test 未运行。最终代码基线 main HEAD `7dae8af881524fae08ddd5af281ef9d4e47a58c7`，Windows Actions run [43357876777](https://github.com/xiaobei206/anjian/actions/runs/43357876777) SUCCESS；runner 为 Windows Server 2025（10.0.26100，SDK 10.0.404）。Restore PASS；Release Build 0 warnings / 0 errors；Core Tests 85 passed / 0 failed / 0 skipped；API handbook `--check` PASS（78 个公开函数）；self-contained win-x64 publish PASS；ZIP/SHA256 package 与 artifact upload PASS。
+- 临时 CI artifact：`Anjian2026-preview-win-x64`，Artifact ID `14006578557`，大小 76,460,734 bytes，保留期 30 天。它是 Actions 临时 artifact，不是 GitHub Release；“Create GitHub Release”步骤按分支 push 预期 SKIPPED。没有修改 VERSION/csproj 版本，也没有替换 v0.1.0-preview.4 官方 ZIP/SHA256。
+- 中间失败均保留并已修复：初次 Build 的 `RgbColor` 类型/方法同名遮蔽；随后 Build 的 WinForms `WFO1000` 和 xUnit 断言 analyzer；之后测试暴露 registry 0.6 仍残留 0.5/74 项旧预期。当前最终 run 已全绿。
+- M8-01..M8-18 Windows 10/11 桌面人工验收全部 NOT RUN。特别需要真实桌面验证多显示器负坐标、透明 PNG/GDI 预览、脚本资源迁移、点击穿透、SetWindowDisplayAffinity 返回及截图是否含 overlay。Windows Server CI 不代表用户桌面通过。

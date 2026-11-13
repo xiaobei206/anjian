@@ -9,7 +9,7 @@ v0.1.0-preview.4 已正式发布。Windows CI 的 Restore、Build、7 项测试�
 下载入口：[v0.1.0-preview.4 Release](https://github.com/xiaobei206/anjian/releases/tag/v0.1.0-preview.4)，[Windows x64 ZIP](https://github.com/xiaobei206/anjian/releases/download/v0.1.0-preview.4/Anjian2026-0.1.0-preview.4-win-x64.zip)，[SHA256 sidecar](https://github.com/xiaobei206/anjian/releases/download/v0.1.0-preview.4/Anjian2026-0.1.0-preview.4-win-x64.zip.sha256)。
 ZIP SHA256：`6b59ab27f825aa48b2ec5343cec826ad8b0ded759e9989af02d51f8b949f09aa`。
 
-**main 开发状态（未发布）：** M3–M7 代码已进入 main；M8 已接入图像资源管理 UI（PNG 导入/列表/预览/命名、schema/路径/尺寸/大小/SHA-256 校验、静态 LoadImage 依赖检查）、按脚本目录解析相对资源路径、视觉调试点击穿透覆盖层，以及 RGB/十六进制转换、颜色差值和八邻域颜色块识别。API 注册表升级到 0.6，共 78 个公开 Lua API。该代码尚未进入已发布 preview.4；当前提交的 Windows Actions 与 Windows 10/11 桌面验收状态以最新 CI/验收清单记录为准，桌面项目均不得因 CI 自动标为 PASS。preview.4 Release ZIP/SHA256 保持不变；本次不升级 VERSION/csproj 版本、不创建 Release。M5 录制仍固定 screen 物理像素，窗口相对录制/回放重定位尚未实现.
+**main 开发状态（未发布）：** M3–M7 代码已进入 main；M8 已接入图像资源管理 UI（PNG 导入/列表/预览/命名、schema/路径/尺寸/大小/SHA-256 校验、静态 LoadImage 依赖检查）、按脚本目录解析相对资源路径、视觉调试点击穿透覆盖层，以及 RGB/十六进制转换、颜色差值和八邻域颜色块识别。API 注册表升级到 0.6，共 78 个公开 Lua API。该代码尚未进入已发布 preview.4；M8-CLOSE 的 Windows Actions run [https://github.com/xiaobei206/anjian/actions/runs/43357876777](https://github.com/xiaobei206/anjian/actions/runs/43357876777) 已 SUCCESS（Windows Server 2025 runner：Release Build 0 warnings/0 errors、85/85 Core tests、API 手册生成校验、win-x64 自包含发布与 ZIP/SHA256 artifact 上传均通过）。Windows 10/11 桌面 UI 验收仍全部 NOT RUN，不能由 CI 自动标为 PASS。preview.4 Release ZIP/SHA256 保持不变；本次不升级 VERSION/csproj 版本、不创建 Release。M5 录制仍固定 screen 物理像素，窗口相对录制/回放重定位尚未实现.
 使用说明：[首版使用说明](docs/USER-GUIDE-CN.md)。
 
 ## 项目完整大纲与接手资料
