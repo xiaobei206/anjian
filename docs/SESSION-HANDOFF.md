@@ -833,13 +833,15 @@ M12-10 已完成本地插件包/manifest/生命周期与独立 Worker 基础；�
 - Core 契约提交：`7112e1dbabc01911d63108d842e799d3334cecc1`，新增 `src/Anjian.Core/Runtime/RunInstanceLifecycle.cs` 与 `tests/Anjian.Core.Tests/RunInstanceLifecycleTests.cs`。
 - Worker 启动超时边界：`4d1ac7d631293e48e06c21b448bacd5ca4d2fc5f`；补充 Starting -> TimeoutRequested，启动 watchdog 30,000 ms。
 - 测试契约同步：`a03fd8c35f61e283da40d47caaf033ac4c27a465`。
-- 最新 main HEAD 与 CI 状态：以本 handoff 文档提交之后重新查询为准；不要把上面代码提交 SHA 当作最终 HEAD。
+- 进程测试去除 Windows runner 时序竞争：`77da5f74465a62b54b461295b0e4edaf8bd7ae64`（将 `ping -n 3` 延长至 `ping -n 12`）。
+- 正常结束不再错误标记 Graceful termination：`f1aacb5f4368723f7b5dea208cf40920e184e04e`；测试断言：`46bf87dc3324b3befba2369870bc45c4fa28c031`。
+- M13-01 最终代码/测试 HEAD：`46bf87dc3324b3befba2369870bc45c4fa28c031`；其后的文档收尾提交位于 main 顶部。
 
 ## M13-01 冻结结果
 
 - `instanceId` 为小写 32 位 GUID-N；同一逻辑实例跨 RepeatCount 保持身份，Worker 每轮使用单独 attempt ID、pipe 和 nonce。相同 `startRequestId` 重试幂等；不同 Start 意图（即使脚本相同）允许独立实例。
-- Core 机器可读状态包括 Created、Validating、Queued、Starting、Running、Paused、StopRequested、TimeoutRequested、Cancelling、ForceTerminating、CleaningUp、Cleaned。Outcome（Succeeded/Failed/Cancelled/TimedOut）、终止方式和清理结果分别记录；首个 Stop/timeout 原因不可覆盖，清理失败不能改写脚本运行结果。
-- 限额冻结：4 个活动 Worker 槽位、16 个 FIFO queued 项；Worker startup watchdog 30 秒；Stop 后正常退出宽限 2 秒，超时强制终止。槽位在 Cleaned 后释放。用户可配置实例超时从第一次 Running 开始，Running 与 Paused 均计入墙钟时长，校验/审阅/排队不计入；具体配置范围放 M13-03。
+- Core 机器可读状态包括 Created、Validating、Queued、Starting、Running、Paused、StopRequested、TimeoutRequested、Cancelling、ForceTerminating、CleaningUp、Cleaned。Outcome（Succeeded/Failed/Cancelled/TimedOut）、终止方式和清理结果分别记录；首个 Stop/timeout 原因不可覆盖，清理失败不能改写脚本运行结果。自然完成 TerminationMode=None，经 Cancelling 才为 Graceful，ForceTerminating 才为 Forced；Coordinator 必须串行提交单实例状态转换。
+- 限额契约冻结：4 个活动 Worker 槽位、16 个 FIFO queued 项；Worker startup watchdog 30 秒；Stop 后正常退出宽限 2 秒，超时强制终止。槽位在 Cleaned 后释放。注意 M13-01 只定义常量/规则，不执行队列、watchdog 或取消计时；由 M13-02 实现。用户可配置实例超时从第一次 Running 开始，Running 与 Paused 均计入墙钟时长，校验/审阅/排队不计入；具体配置范围放 M13-03。
 - 实例私有：Lua state/Worker/pipe/attempt、pause gate、CTS、计时、ProcessSession 随机句柄、HTTP/Window/Image/Plugin/debug context、日志和输入 held-state。Worker 崩溃、Stop、timeout 或失败只影响所属实例。
 - 权限 Grant 每实例重新读取 request 并逐次审阅；不按脚本路径共享、不持久化。Host 保留权威 Grant，对该实例每条 IPC 再验证；进程 handle 字典只属于创建它的实例。IPC 后续必须绑定 instanceId + workerAttemptId + nonce 到服务端 pipe/session，未知/伪造请求 fail-closed。
 - 输入资源是全局而非实例私有：M13-02 必须实现主进程 FIFO InputArbiter。Click/KeyPress/TypeText 等原子操作不得互相交错；显式 Down 持有租约直到 Up；暂停保留租约；Stop/timeout 只释放本实例 owned-held 集合，成功释放后才交给下一实例。清理失败全局锁定后续输入，不能误释放别的实例按键。
@@ -848,8 +850,8 @@ M12-10 已完成本地插件包/manifest/生命周期与独立 Worker 基础；�
 ## 验收与验证
 
 - 新增 10 个 Core 生命周期单元测试，穷举已允许/禁止状态对，并覆盖稳定 ID、成功/暂停/取消/超时/强制终止、首个结果不可覆盖、清理失败与容量/宽限常量。
-- 对初始 Core 提交 HEAD `7112e1d` 的 Windows Actions run [43448241211](https://github.com/xiaobei206/anjian/actions/runs/43448241211) SUCCESS：Restore、Build 0 warnings / 0 errors、187/187 Core tests、API handbook、自包含 win-x64 publish、Sprite/Worker smoke、ZIP/SHA256、artifact upload 均 PASS。
-- 带启动 timeout 边界的最终代码 HEAD `a03fd8c` 对应 run [43448660886](https://github.com/xiaobei206/anjian/actions/runs/43448660886) 的最终状态必须在接手/完成时核对并按实际结果更正；不能用初始提交 run 替代最新 HEAD 的 CI 结论。
+- 最新最终代码 HEAD `46bf87dc3324b3befba2369870bc45c4fa28c031` 的 Windows Actions run [43449173287](https://github.com/xiaobei206/anjian/actions/runs/43449173287) SUCCESS：Restore、Release Build 0 warnings / 0 errors、187/187 Core tests、API handbook、自包含 win-x64 publish、published Sprite/Worker smoke、ZIP/SHA256 与 artifact upload 全 PASS。Artifact ID `14050195325`，87,285,016 bytes，uploaded artifact archive SHA-256 `4112f445fe3c4135880fdf9a016f6de6ecaab085b6fd53ab581274f0ced41017`，有效至 2026-12-13；临时 Actions artifact，不是 Release。
+- CI 曾出现两次有据可查的失败：`43448652175` 为状态转换测试期望未同步，`43448660886` 为 Windows `ping -n 3` 测试进程时序竞争；分别已修复并由上述最新 HEAD run 全通过。`77da5f7` 的中间 run `43448988930` 也已 187/187 与完整包流程通过。不能省略失败修正记录，也不能用中间 HEAD 替代最终 HEAD。
 - 本地容器没有 .NET SDK，local Restore/Build/Test NOT RUN。M13-01 尚无 coordinator/Worker concurrency/全局 InputArbiter 集成测试；这部分必须由 M13-02 补齐。Windows 10/11 WinForms、并发键鼠、权限审阅、DPI/多屏、主窗口隐藏/退出和 2 小时稳定性仍 NOT RUN（M14）。
 - 无 Lua API/registry 变化；无 VERSION/AssemblyVersion/FileVersion 变化；无 tag/Release；preview.4 资产不变。
 
@@ -863,7 +865,7 @@ M12-10 已完成本地插件包/manifest/生命周期与独立 Worker 基础；�
 2. 每个实例封存独立 launch snapshot、ScriptPermissionGrant、参数、Plugin plans、Process/HTTP sessions、Window/Image cache、debug wait 与 held-input ownership。实例启动时重新审阅权限，不复用同路径实例的 Grant。
 3. 为每个 Worker attempt 加 instanceId/workerAttemptId/nonce；宿主把私有 named pipe/session 固定到创建它的实例，拒绝伪造、跨实例和过期 IPC。Worker 不得提供/覆盖 Grant；host 每条受保护 IPC 按 owner instance 的权威 Grant fail-closed 校验。process handle 只能被创建该句柄的实例查询。
 4. 实现主进程 FIFO InputArbiter，串行化 SendInput/SetCursorPos。Click/KeyPress/TypeText 等原子输入不可交错；显式 Down 持租约到 Up；Pause 时租约归原 owner；Stop/timeout/Worker crash 只释放 owner-held 按键和鼠标，清理完成后交接。清理失败时锁定后续全局输入并提供可观测恢复路径，不可让其他实例发送输入。
-5. MainForm 增加实例列表/选择或适当的多实例状态呈现，单独暂停/停止、实例日志筛选；隐藏主窗口时实例继续；明确退出时按 ADR-033 stop-all 流程处理。不要把 M13-03 的 schedule UI 混进本批。
+5. MainForm 只接入 Coordinator 所必需的 Start/Pause/Stop 和 stop-all 生命周期；避免再保留单个 `_playback` 假设。完整实例列表/筛选、实例日志浏览与恢复 UI 留给 M13-04。隐藏主窗口时实例继续；明确退出时按 ADR-033 stop-all 流程处理。不要把 M13-03 的 schedule UI 混进本批。
 6. 自动化验证覆盖幂等/同脚本多实例/并发容量/FIFO/队列取消/独立 Pause 与 Stop/Grant 与 process handle cross-instance 拒绝/伪造 IPC/Worker 崩溃 cleanup/InputArbiter 公平串行与失败锁定。Windows self-contained package smoke 覆盖至少两个实例真实 Worker 同时存活并分别停止。
 7. 同步 ROADMAP、FEATURE-MATRIX、ARCHITECTURE、DECISIONS（仅若实现中需补决策）、ACCEPTANCE、DEVELOPMENT-LOG、handoff。真实 Windows 10/11 并发输入、权限 UI、DPI/多屏仍留 M14；不得用 CI 替代桌面实测。不改版本、不创建 Release。
 

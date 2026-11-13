@@ -462,9 +462,9 @@ M13-01 先冻结契约；新增 Core 类型只负责身份、状态转换和并�
 
 - 每实例拥有 Worker/Lua state、IPC 会话、ExecutionGate、CancellationTokenSource、运行计时、随机 process handles、HTTP session、Window 引用、Image cache、Plugin contribution snapshot、debug wait source、日志/异常上下文和输入释放登记。不能让 runner 复用另一实例的可变字段。
 - Core 状态类型：`RunInstanceState` + 独立的 `RunInstanceOutcome`、`RunInstanceTerminationMode`、`RunInstanceCleanupStatus`。状态转换表由 `RunInstanceLifecycle.AllowedTransitions` 导出，并由测试枚举所有状态对核对；首个终止原因不可覆盖，进入 Cleaned 前必须完成清理并写入成功/失败结果。
-- 容量：同时最多 4 个 Worker 槽位实例，另有最多 16 个 FIFO 排队项。正在启动、运行、暂停、终止和清理仍占用槽位；只有 Cleaned 后才释放。队列满立即明确拒绝。启动 Worker 连接 watchdog 30 秒，停止后给 Worker 2 秒正常退出宽限，再强制杀死进程树。
+- 容量契约：同时最多 4 个 Worker 槽位实例，另有最多 16 个 FIFO 排队项。正在启动、运行、暂停、终止和清理仍占用槽位；只有 Cleaned 后才释放。队列满立即明确拒绝。Worker 启动连接 watchdog 30 秒，Stop 后给 Worker 2 秒正常退出宽限，再强制杀进程树。M13-01 仅冻结 `RunInstanceLimits` 常量，尚无 queue/coordinator/watchdog 运行时执行。
 - 实例运行超时从首个 Running 开始；验证、权限提示和排队不计时；Running 与 Paused 都计入墙钟时间，循环间隔也计入。具体用户可配置的上限/默认值由 M13-03 冻结。
-- 首个状态提交决定 Stop 与 timeout 的胜者；用户 Stop 锁定 Cancelled，timeout 锁定 TimedOut，其他后续异常只能附加诊断，不能改写结果。清理异常另由 CleanupStatus 反映。
+- 首个状态提交决定 Stop 与 timeout 的胜者；用户 Stop 锁定 Cancelled，timeout 锁定 TimedOut，其他后续异常只能附加诊断，不能改写结果。清理异常另由 CleanupStatus 反映。正常自然结束的 TerminationMode 为 None；Graceful 仅对应经过 Cancelling 的停止/超时流程，Forced 仅对应 ForceTerminating。状态转换函数本身不提供跨线程互斥，协调器必须串行化每个 instanceId 的提交。
 
 ### 19.3 输入、权限和 IPC 隔离
 
@@ -475,6 +475,6 @@ M13-01 先冻结契约；新增 Core 类型只负责身份、状态转换和并�
 
 ### 19.4 当前可机读契约与下一步
 
-- Core：`Anjian.Core.Runtime.RunInstanceLifecycle`、`RunInstanceId`、`RunInstanceSnapshot`、`RunInstanceLimits`。限额常量：4 active、16 queued、30,000 ms Worker startup watchdog、2,000 ms cancellation grace。
+- Core：`Anjian.Core.Runtime.RunInstanceLifecycle`、`RunInstanceId`、`RunInstanceSnapshot`、`RunInstanceLimits`。契约常量：4 active、16 queued、30,000 ms Worker startup watchdog、2,000 ms cancellation grace；这些常量尚未由运行时协调器强制执行。
 - 自动化测试核对 GUID-N 规范、所有允许/禁止状态边、排队/成功/暂停/停止/超时/强制终止/清理失败的状态结果，以及首个终止原因不可覆盖。
 - M13-02 才落地 coordinator、Worker payload/IPC identity、全局 InputArbiter 与 owner-only cleanup；M13-03 负责用户超时/定时；M13-04 负责多实例 UI、日志筛选与 Windows 包 smoke。M14 负责真实桌面验收。

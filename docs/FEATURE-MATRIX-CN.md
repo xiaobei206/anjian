@@ -82,4 +82,4 @@ M1–M13 的 Windows 桌面实机验收统一延期至 M14 全部功能开发完
 
 ## M13-01 状态注记（2026-11-13）
 
-F31 由“未实现”调整为“部分实现”，只代表 Core 契约与状态机测试进入 main。没有多实例运行时、并发 Worker、UI 管理器或 InputArbiter；这些仍必须按 M13-02/M13-04 落地。当前 Windows Actions 结果与 Windows 10/11 手工验收分别记录，后者保持 NOT RUN（M14）。
+F31 由“未实现”调整为“部分实现”，只代表 Core 契约与状态机测试进入 main。没有多实例运行时、并发 Worker、UI 管理器或 InputArbiter；这些仍必须按 M13-02/M13-04 落地。最新代码 HEAD `46bf87d` 的 Windows Actions run [43449173287](https://github.com/xiaobei206/anjian/actions/runs/43449173287) 的 187/187 Core tests、Build、API handbook 与 self-contained 包 smoke PASS；Windows 10/11 手工验收仍保持 NOT RUN（M14）。
