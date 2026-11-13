@@ -73,7 +73,7 @@ public sealed class PluginPackageStoreTests : IDisposable
         Assert.True(Assert.Single(_store.ListInstalled()).Enabled);
         var plan = _store.ResolveExecutionPlan(installed.PluginId, installed.Version, GetApprovedScriptGrant(installed));
         Assert.Equal("entry.lua", plan.EntryRelativePath);
-        Assert.Equal(1, plan.ModuleHashes.Count);
+        Assert.Single(plan.ModuleHashes);
         Assert.True(plan.Permissions.AllowsFileRead(Path.Combine(installed.PackageDirectory, "data", "sub", "input.txt")));
         Assert.False(plan.Permissions.AllowsClipboardWrite);
         Assert.True(plan.Permissions.AllowsClipboardRead);
