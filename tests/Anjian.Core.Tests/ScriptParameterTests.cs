@@ -141,6 +141,7 @@ public sealed class ScriptParameterTests
         try
         {
             ParameterConfigurationStore.SaveAtomic(path, new ParameterConfiguration { Values = new() { ["count"] = Json("2") } });
+            ParameterConfigurationStore.SaveAtomic(path, new ParameterConfiguration { Values = new() { ["count"] = Json("3") } });
             File.WriteAllText(path, "{\"schemaVersion\":9,\"values\":{}}");
             Assert.Throws<NotSupportedException>(() => ParameterConfigurationStore.LoadOrRecover(path));
             Assert.Contains("\"schemaVersion\":9", File.ReadAllText(path));
