@@ -294,3 +294,27 @@ preview.4 当前采用低级鼠标/键盘 Hook，已纳入 Windows CI 编译与�
 ### 14.4 验证边界
 - Core 的 API 契约测试使用假 OCR 服务，不加载真实模型；它验证 Lua 表结构、屏幕原点换算、置信度过滤、匹配模式和 WaitText 资源释放。
 - Windows Actions run [43363150335](https://github.com/xiaobei206/anjian/actions/runs/43363150335) SUCCESS：NuGet Restore PASS、Release Build 0 warnings / 0 errors、90/90 Core tests、API handbook check、win-x64 self-contained publish、ZIP/SHA256 与 artifact upload 全 PASS；artifact ID `14008744436`。真实语言识别质量、模型下载/断网运行、DPI/多屏与 OCR 性能仍需 M14 后 Windows 桌面集中验收；CI 不等同于用户桌面验收。
+
+
+## 15. M10 参数、配置与自定义 UI（实现基线）
+
+### 15.1 文件边界
+- 参数定义是脚本同目录 sidecar：`<script>.params.json`；schemaVersion=1。定义可被编辑器读取/编辑，不需要执行脚本。
+- 运行配置独立保存在用户数据目录，按脚本规范化路径的 SHA-256 派生稳定键，不污染项目源码。定义和用户运行值分离。
+- Core 提供版本化 schema DTO、字段级 validator、配置迁移/持久化接口和参数注入 JSON 合约。WinForms 只负责参数设计器、按 schema 自动生成表单、导入导出交互。
+
+### 15.2 类型和值语义
+- text:string；integer:int64；number:finite double；boolean:boolean；select:string（必须属于选项）；multiSelect:string[]（每项必须属于选项且不重复）；filePath/directoryPath:string（支持 required、可选 exists）；hotkey:string（规范化组合键）；color:string（#RRGGBB 或 #AARRGGBB）。
+- DefaultValue 与运行值使用 JSON 元素/节点保留真实类型；未提供默认值时不伪造类型默认值。必填字段可由用户显式提供，也可由有效默认值满足。
+- 参数名使用 Lua 标识符规则且唯一；ID 使用稳定 GUID/slug，禁止同 schema 内重复 ID、name 或 order 不受控。
+
+### 15.3 启动、Worker 与只读入口
+- 主进程在启动前解析 schema/config、迁移兼容版本、验证所有值；错误按参数 ID/标签返回，绝不创建 Worker。
+- Worker 启动握手后接收独立 JSON 参数对象；将 JSON 原生类型转换为 Lua string/number/boolean/table，不把用户字符串拼接成 Lua 源码。脚本通过只读 `Args` 表访问参数。
+- `Args` 顶层写入应抛出明确错误；嵌套表也必须递归只读或提供深复制只读视图，避免脚本修改值后污染同轮其他消费者。
+- 敏感参数只在必要 UI 显示，普通运行日志不得记录参数值；导入/导出、异常消息与测试快照同样执行脱敏。
+
+### 15.4 持久化和恢复
+- 配置写入采用同目录临时文件、flush 和原子替换；保留上一份有效备份。损坏时先尝试恢复备份，失败后可用默认值但须明确告知用户；未知未来 schema 不得写回/覆盖。
+- JSON 导入只接收受限大小的 UTF-8 JSON，校验后才能替换配置；导出使用同 schema/validator。迁移必须保留原文件副本，失败则回滚。
+- M11 小精灵参数 UI 直接复用 Core schema/validator，不能另造第二套参数定义或校验语义。

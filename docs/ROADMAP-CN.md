@@ -20,7 +20,7 @@
 | M7 控件与前后台能力适配 | DONE（Windows CI PASS；桌面验收 NOT RUN） | UI Automation Control View/Pattern；worker 隔离与可停止性；按能力报告语义后台控件操作、受限前台输入和明确 unsupported 边界；run 43350412493：64/64 tests、0 warning/error、API check、win-x64 publish、ZIP/SHA256、artifact upload 均 PASS |
 | M8 截图、图色与模板资源 | DONE（实现/Windows CI；桌面验收延期至 M14 后） | 图像资源 UI、manifest/assets、相对路径/依赖、RGB/hex/颜色块、透明模板、视觉调试 overlay 已进入 main 并通过 Windows CI；M8-01..M8-18 仍 NOT RUN，集中验收 |
 | M9 OCR 与文本识别 | DONE（实现与 Windows CI PASS；桌面验收延期至 M14 后，NOT RUN） | PaddleOcrNet 2.4.0 CPU 适配器、显式 ch/en/japan 模型管理、严格离线推理、行级结果/置信度/边界框、OCR/FindText/WaitText、暂停/停止与资源释放 |
-| M10 参数、配置与脚本自定义 UI | TODO | 参数声明、类型/默认值/范围/选项、校验、持久化和通用表单 |
+| M10 参数、配置与脚本自定义 UI | IN_PROGRESS（先定 schema/持久化/Worker 合约，再实现） | 参数声明、类型/默认值/范围/选项、校验、持久化和通用表单 |
 | M11 小精灵打包器 | TODO | 独立包/EXE 入口、独立参数界面、图标、依赖收集、运行控制、清单与校验 |
 | M12 内置扩展 API 与插件系统 | TODO | 文件、剪贴板、对话框、进程、HTTP/JSON，插件 manifest/权限/API 版本 |
 | M13 多实例与定时任务 | TODO | 独立运行实例、任务状态、定时、超时、失败策略与隔离 |
@@ -300,3 +300,20 @@ M7 实现/CI 已完成不代表 M7-01..M7-10 Windows 桌面验收通过；这些
 - 参数经 Worker IPC 后保持实际类型，不发生代码注入；启动校验失败时 Worker 不启动。
 - UI 与 Lua 读取完全相同值；敏感项不进入普通日志。
 - Windows CI Restore/Build/Core Tests/API handbook/self-contained win-x64 publish/ZIP/SHA256 必须全 PASS。真实 WinForms 表单、DPI 和交互仍延后至 M14 集中验收。
+
+
+## M10 — 参数、配置与脚本自定义 UI（IN_PROGRESS）
+
+### 首轮规格冻结（2026-11-13）
+- ADR-022 决定脚本 sidecar `<script>.params.json` schemaVersion=1；不执行 Lua 读取声明。用户值与参数定义分离，配置存放用户数据目录并按脚本规范化路径派生稳定键。
+- 支持 text、integer、number、boolean、select、multiSelect、filePath、directoryPath、hotkey、color 十种类型；每项含 stable ID、Lua 名称、中文标签、required/default、范围、选项、说明、规则、排序和敏感标记。
+- Core 统一验证器用于默认值、启动值、JSON 导入、UI 表单和未来 M11 小精灵；启动失败时禁止创建 Worker。
+- IPC 使用独立 JSON 参数载荷，Worker 将真实类型映射到 Lua 值，禁止 Lua 字符串拼接。脚本只读入口计划为 `Args`。
+- 配置采用原子替换、上一份有效备份、损坏恢复；未知未来 schema 只读拒绝，绝不覆盖。
+- M10 桌面验收行将保持 NOT RUN，随 M1–M13 于 M14 后集中执行。
+
+### 开发顺序
+1. Core schema DTO / validator / JSON 配置存储与单元测试。
+2. PlaybackRunner 启动前加载/校验；Worker 握手注入 typed JSON；Lua 只读 `Args`。
+3. WinForms 参数设计器与自动表单；保存/载入/默认/导入/导出；敏感字段脱敏。
+4. Windows CI 验证 Restore/Build/Test/API handbook/self-contained win-x64/ZIP/SHA256；桌面验收延后。

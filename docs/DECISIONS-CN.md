@@ -132,3 +132,15 @@
 - 语言首轮范围：简体中文 `ch`、英语 `en`、日语 `japan`。识别输出使用统一 DTO，包含全文、逐行置信度、局部矩形、多边形、语言、源图像尺寸和耗时；截图结果另附 screen 绝对坐标。
 - 停止/隔离：OCR 推理只能发生在独立 Lua Worker；Stop 通过终止 Worker 打断阻塞的原生推理，主 UI 不等待 OCR 引擎。WaitText 在每轮截图前经 checkpoint 支持暂停，临时截图在 finally 路径释放。
 - 影响与保留意见：PaddleOcrNet 2.4.0 的上游规模较小，因此只能通过适配层依赖；不得将 Paddle 类型泄漏至 Core。若未来替换引擎，只需重写 App adapter 和模型管理 UI，不改变 Lua/DTO 契约。发布前仍需核对包许可证、所有传递依赖的许可和 win-x64 native assets，并在真实 Windows 10/11 测试精度、速度、内存和断网行为。
+
+
+## ADR-022：脚本参数使用独立版本化 schema 与类型安全 Worker 注入
+- 状态：ACCEPTED（M10 实施基线）
+- 参数定义：每个脚本使用同目录 sidecar `<script>.params.json`，schemaVersion 固定为 1。元数据包含稳定参数 ID、机器名、中文标签、类型、必填、默认值、数值边界、选项、说明、验证规则、排序与敏感标记。读取参数定义绝不执行用户 Lua。
+- 运行配置：用户值单独存放在用户数据目录的配置文件中，使用脚本规范化路径的 SHA-256 派生 ID，不写回脚本目录。参数定义与运行值分离，默认值和用户值均经同一 validator 验证。
+- 类型：text、integer、number、boolean、select、multiSelect、filePath、directoryPath、hotkey、color。JSON 保留真实类型；路径只验证语法/存在性规则，不自动打开文件；热键使用规范化字符串，颜色使用 #RRGGBB 或 #AARRGGBB。
+- 启动事务：先读取 schema 和用户配置，验证 schema/version、字段 ID/名称唯一性、类型、选项、范围、必填和每个值；任何错误都在创建 Worker 之前返回字段级错误。未知未来 schemaVersion 必须只读拒绝，不能自动备份后覆盖原文件。
+- IPC：启动握手以独立结构化 JSON 载荷传入已验证参数；Worker 将值转换为 Lua 原生 string/number/boolean/table。禁止将用户值拼接到 Lua 源码。Lua 全局只读入口 `Args` 通过代理拒绝顶层写入；值表在 Worker 内构建，用户输入不被当作代码执行。
+- 持久化：配置写入同目录临时文件、flush、原子替换；替换前保留上一份有效备份。损坏配置可恢复有效备份或使用默认值并给出明确状态；导入 JSON 必须经过同一 validator。导出时默认对敏感参数进行提示/脱敏，显式导出才允许包含敏感值。
+- UI：从 schema 生成参数对话框；开发者通过“参数设计器”新增/编辑/删除/排序定义。表单控件和 validator 共用类型定义；取消参数对话框不启动 Worker。打包器 M11 复用同一 schema/validator。
+- 测试：Core 单元测试覆盖每种类型、边界/必填/选项、多选、路径/热键/颜色、序列化往返、未知 schema、损坏备份恢复、原子替换故障、注入类型与恶意字符串。Windows CI 不代替 WinForms 实机验收；M10 桌面项延后 M14。

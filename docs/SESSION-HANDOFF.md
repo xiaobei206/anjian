@@ -367,3 +367,27 @@ M4 基础调试器已在 main 实现并通过 Windows CI。具体实现提交与
 - 参数经 Worker IPC 后保持实际类型，不发生代码注入；启动校验失败时 Worker 不启动。
 - UI 与 Lua 读取完全相同值；敏感项不进入普通日志。
 - Windows CI Restore/Build/Core Tests/API handbook/self-contained win-x64 publish/ZIP/SHA256 必须全 PASS。真实 WinForms 表单、DPI 和交互仍延后至 M14 集中实机验收。
+
+
+# 最新交接状态：M10 参数、配置与脚本自定义 UI（更新于 2026-11-13）
+
+## 当前 HEAD 与证据
+- 开始 M10 时核对的 main HEAD：`a5aa0aa21ca16e95fc8e3a1ace5c7b8d7d0925d8`。
+- M9 Windows CI 最终 run [43363150335](https://github.com/xiaobei206/anjian/actions/runs/43363150335) SUCCESS：Restore、Build 0 warnings/errors、90/90 tests、API handbook check、win-x64 self-contained publish、ZIP/SHA256、artifact upload 全 PASS。M9 真实桌面验收 NOT RUN。
+- 用户决定 M1–M13 桌面验收统一延后到 M14 完成后；不阻塞开发，不得把 NOT RUN 标为 PASS。
+
+## M10 唯一开发任务
+先实现 ADR-022 规定的 Core 参数 schema / validator / 配置持久化与测试，再接 Worker typed IPC 和只读 `Args`，最后完成 WinForms 参数设计器/自动表单、导入导出和完整 CI。规格已经追加到 ARCHITECTURE、DECISIONS、ROADMAP、FEATURE-MATRIX、ACCEPTANCE 和 DEVELOPMENT-LOG；M10 仍 IN_PROGRESS。
+
+- Sidecar：`<script>.params.json`，schemaVersion=1；不得执行 Lua 来读取参数定义。
+- 类型：text、integer、number、boolean、select、multiSelect、filePath、directoryPath、hotkey、color。
+- 用户运行值独立于 schema，存储在用户数据目录；启动前统一校验，错误不创建 Worker。
+- Worker 通过独立 JSON 结构化载荷接收类型化值，脚本使用只读 `Args`；禁止将用户值拼接成 Lua 源码。
+- 配置需原子写入、备份、损坏恢复、JSON 导入/导出、版本迁移与未知未来 schema 保护；敏感参数不进入普通日志。
+- 自动化验收 M10-01..M10-10 已列入 ACCEPTANCE，均 NOT RUN，桌面验收 M14 后统一执行。
+
+### 下一步
+1. 实现 Core DTO/schema loader/validator/config store；补齐每种类型与迁移/恢复/安全测试。
+2. 把 validated values 通过 PlaybackRunner 的 worker-ready handshake 传递，Worker 注入只读 Lua `Args`。
+3. 增加运行参数对话框和 schema 设计器；保存、恢复默认、导入/导出与敏感值保护。
+4. 运行 Windows CI；记录真实 Restore/Build/Test/API docs/self-contained package/SHA 结果；不发布新版本。

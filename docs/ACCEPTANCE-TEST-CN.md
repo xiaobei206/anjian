@@ -308,3 +308,20 @@ M1–M13 的桌面实测不再作为进入下一开发阶段的前置条件，�
 
 
 **M9 自动化/构建证据（非桌面 PASS）：** Windows Actions run [43363150335](https://github.com/xiaobei206/anjian/actions/runs/43363150335) SUCCESS：Restore、Release Build（0 warnings / 0 errors）、90/90 Core tests、API handbook check、self-contained win-x64 publish、ZIP/SHA256 和 artifact upload 全 PASS（artifact ID 14008744436）。因此 M9 代码/自动化状态可记 DONE；上表 M9-01..M9-08 仍全部 NOT RUN，必须按用户决定延后至 M14 完成后的 Windows 10/11 集中桌面验收。
+
+
+## 16. M10 参数、配置与脚本自定义 UI（当前均 NOT RUN）
+
+| ID | 场景 | 操作 | 通过标准 | 当前状态 |
+|---|---|---|---|---|
+| M10-01 | schema 静态读取 | 创建含全部参数类型的 sidecar；确认不执行 Lua 也可显示参数设计器 | schemaVersion/字段唯一性/默认值/范围/选项验证准确；未知未来 schema 只读拒绝且原文件不变 | NOT RUN |
+| M10-02 | 类型验证 | 分别提交 text/integer/number/boolean/select/multiSelect/filePath/directoryPath/hotkey/color 有效和无效值 | 保持 JSON/Lua 类型；非有限数字、越界、无效选项、重复多选、错误路径/热键/颜色被拒绝 | NOT RUN |
+| M10-03 | 默认与必填 | 空配置启动，测试有效默认值和无默认必填字段 | 有效默认值被采用；缺少必填值给出字段级错误；失败时 Worker 绝不启动 | NOT RUN |
+| M10-04 | 参数 UI | 编辑/新增/删除/排序参数，打开运行表单并修改值 | 设计器和运行表单都由同 schema 驱动；保存重开值一致；取消表单不运行脚本 | NOT RUN |
+| M10-05 | 安全 Worker 注入 | 输入包含引号、换行、Lua 语句和恶意字符串；脚本读取 Args | 字符串仅作为数据；不会被执行；Args 顶层和嵌套值不可变；数字/布尔/数组/对象类型一致 | NOT RUN |
+| M10-06 | 配置持久化与备份 | 保存、重新打开、故意破坏配置、再破坏备份、模拟写入失败 | 原子写入；优先恢复上一份有效备份；均损坏时退回默认值并告警；失败不丢失旧文件 | NOT RUN |
+| M10-07 | JSON 导入/导出 | 导入合法、非法、超大 JSON；导出含敏感字段的配置 | 导入前完整验证；非法导入不覆盖现值；敏感值默认脱敏并明确告知 | NOT RUN |
+| M10-08 | schema migration | 用旧 schema、未来 schema、未知字段和迁移失败样本启动 | 受支持版本可迁移并备份；未来版本拒绝写回；迁移失败恢复原文件 | NOT RUN |
+| M10-09 | 敏感数据与日志 | 使用敏感参数并触发验证错误、Worker 异常、导出 | 普通日志/异常不包含敏感值；仅用户明确选择时才导出明文敏感值 | NOT RUN |
+| M10-10 | 运行生命周期 | 校验失败、用户取消、Worker 启动、暂停/停止和多轮运行 | 校验/取消不启动 Worker；每轮参数隔离；Stop 后清理运行值与资源；UI 不冻结 | NOT RUN |
+

@@ -602,3 +602,10 @@ M4 基础调试器与 M5 可视化录制/动作列表均已完成 Windows CI 验
 - 本地容器为 Debian 13，无 .NET SDK；本地 Restore/Build/Test：NOT RUN。最终 90 项测试和 Windows x64 发布全部来自 Windows Server 2025 GitHub Actions。
 - M9-01..M9-08 真实 Windows 10/11 桌面验收全部 NOT RUN：包括真实模型下载/哈希、断网识别、中文/英语/日语精度、真实边界框、WaitText Pause/Stop、DPI/多屏与长时稳定性。它们与 M1–M8 桌面项一并延期至 M14 完成后的集中验收。
 - 未修改 VERSION、AssemblyVersion、FileVersion；未创建 Release；v0.1.0-preview.4 官方 ZIP/SHA256 未更改。
+
+
+## 2026-11-13 — 开始 M10 参数/配置/自定义 UI（规格优先）
+- 已核对 main HEAD `a5aa0aa21ca16e95fc8e3a1ace5c7b8d7d0925d8`，并读取 AGENTS、README、handoff、PRD 2.9/2.13、F20/F26、架构、决策、API registry 与 Worker IPC。
+- M9 Windows Actions run 43363150335：Restore、Release Build（0 warnings/0 errors）、90/90 Core tests、API handbook check、self-contained win-x64、ZIP/SHA256 和 artifact upload 全 PASS；真实桌面仍 NOT RUN。
+- M10 先冻结 ADR-022：脚本旁版本化 params schema、独立用户运行配置、10 种参数类型、统一 Core validator、启动前拒绝、typed Worker IPC、Lua 只读 Args、原子写入/备份/损坏恢复/未知 schema 保护和敏感字段脱敏。
+- 当前阶段仅完成规格与验收定义；代码和 Windows CI 尚未验证，不得标记 M10 完成。接下来实现 Core schema/validator/store 和测试，再接入 Worker/UI。
