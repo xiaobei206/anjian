@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Anjian.Core;
 using Anjian.Core.Runtime;
 
@@ -50,10 +51,36 @@ internal static class MultiInstanceSmokeTestRunner
                 throw new InvalidOperationException("停止第一个实例时影响了第二个 Worker，或第一个 Worker 未退出。");
 
             messages.Add($"first-stopped-second-alive:{firstPid},{secondPid}");
-            second.Stop();
-            await secondTask.WaitAsync(TimeSpan.FromSeconds(10));
-            if (second.IsWorkerAlive)
-                throw new InvalidOperationException("第二个 Worker 在 Stop 后未退出。");
+
+            using var third = new PlaybackRunner(RunInstanceId.Create(), inputArbiter);
+            var thirdReady = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            third.WorkerReady += () => thirdReady.TrySetResult();
+            third.Log += message => messages.Add("third: " + message);
+            var thirdTask = third.RunAsync(scriptPath, options);
+            await thirdReady.Task.WaitAsync(TimeSpan.FromSeconds(30));
+            var thirdPid = third.WorkerProcessId
+                ?? throw new InvalidOperationException("第三个 Worker 未保持存活。");
+
+            using (var crashedWorker = Process.GetProcessById(secondPid))
+                crashedWorker.Kill(entireProcessTree: true);
+            try
+            {
+                await secondTask.WaitAsync(TimeSpan.FromSeconds(10));
+                throw new InvalidOperationException("被外部终止的 Worker 未将所属运行报告为失败。");
+            }
+            catch (InvalidOperationException ex) when (
+                ex.Message.Contains("脚本执行失败", StringComparison.Ordinal))
+            {
+                messages.Add($"second-worker-crashed-third-alive:{secondPid},{thirdPid}");
+            }
+
+            if (second.IsWorkerAlive || !third.IsWorkerAlive)
+                throw new InvalidOperationException("Worker 崩溃未局限于所属实例。");
+
+            third.Stop();
+            await thirdTask.WaitAsync(TimeSpan.FromSeconds(10));
+            if (third.IsWorkerAlive)
+                throw new InvalidOperationException("第三个 Worker 在 Stop 后未退出。");
 
             WriteLog(logPath, "PASS", messages);
             return 0;
