@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using Anjian.Core.Api;
 using Anjian.Core.Permissions;
@@ -119,9 +120,29 @@ public sealed class ScriptProcessTests
         var handle = JsonSerializer.Deserialize<string>(session.Start(grant, Path.GetTempPath(), payload));
         Assert.False(string.IsNullOrWhiteSpace(handle));
 
-        var initial = JsonDocument.Parse(session.GetInfo(grant,
+        using var initial = JsonDocument.Parse(session.GetInfo(grant,
             JsonSerializer.Serialize(new ScriptProcessHandleRequest(handle!))));
         Assert.False(initial.RootElement.GetProperty("hasExited").GetBoolean());
+
+        var pauseEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var resumeWait = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var pauseTimer = Stopwatch.StartNew();
+        var pauseAwareWait = session.WaitAsync(grant,
+            JsonSerializer.Serialize(new ScriptProcessWaitRequest(handle!, 100)),
+            async (ms, token) =>
+            {
+                pauseEntered.TrySetResult();
+                await resumeWait.Task.WaitAsync(token);
+                await Task.Delay(ms, token);
+            },
+            CancellationToken.None);
+        await pauseEntered.Task.WaitAsync(TimeSpan.FromSeconds(3));
+        await Task.Delay(150);
+        Assert.False(pauseAwareWait.IsCompleted);
+        resumeWait.TrySetResult();
+        Assert.False(await pauseAwareWait);
+        Assert.True(pauseTimer.ElapsedMilliseconds >= 230,
+            "Time spent paused must not consume the process wait timeout.");
 
         using (var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(50)))
         {
@@ -131,7 +152,7 @@ public sealed class ScriptProcessTests
                     (ms, token) => Task.Delay(ms, token), cts.Token));
         }
 
-        var afterCancel = JsonDocument.Parse(session.GetInfo(grant,
+        using var afterCancel = JsonDocument.Parse(session.GetInfo(grant,
             JsonSerializer.Serialize(new ScriptProcessHandleRequest(handle!))));
         Assert.False(afterCancel.RootElement.GetProperty("hasExited").GetBoolean());
 
@@ -139,7 +160,7 @@ public sealed class ScriptProcessTests
             JsonSerializer.Serialize(new ScriptProcessWaitRequest(handle!, 15000)),
             (ms, token) => Task.Delay(ms, token), CancellationToken.None);
         Assert.True(exited);
-        var final = JsonDocument.Parse(session.GetInfo(grant,
+        using var final = JsonDocument.Parse(session.GetInfo(grant,
             JsonSerializer.Serialize(new ScriptProcessHandleRequest(handle!))));
         Assert.True(final.RootElement.GetProperty("hasExited").GetBoolean());
         Assert.Equal(0, final.RootElement.GetProperty("exitCode").GetInt32());

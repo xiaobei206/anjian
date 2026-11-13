@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Text.Json;
 
 namespace Anjian.Core.Permissions;
@@ -59,17 +58,21 @@ public sealed class ScriptProcessSession : IDisposable
         ArgumentNullException.ThrowIfNull(pauseAwareDelay);
         var request = ScriptProcessPolicy.ParseWaitRequest(payload);
         var entry = GetOwnedEntry(grant, request.Handle);
-        var timer = Stopwatch.StartNew();
+        var remainingMilliseconds = request.TimeoutMilliseconds;
 
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (entry.Process.HasExited)
                 return true;
-            var remaining = request.TimeoutMilliseconds - (int)Math.Min(int.MaxValue, timer.ElapsedMilliseconds);
-            if (remaining <= 0)
+            if (remainingMilliseconds <= 0)
                 return false;
-            await pauseAwareDelay(Math.Min(100, remaining), cancellationToken).ConfigureAwait(false);
+
+            var slice = Math.Min(100, remainingMilliseconds);
+            await pauseAwareDelay(slice, cancellationToken).ConfigureAwait(false);
+            // The injected delay pauses while the script is paused, so subtracting only
+            // completed active-time slices keeps Pause from consuming the user's timeout.
+            remainingMilliseconds -= slice;
         }
     }
 

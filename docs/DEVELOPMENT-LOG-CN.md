@@ -771,3 +771,11 @@ M4 基础调试器与 M5 可视化录制/动作列表均已完成 Windows CI 验
 - 当前容器没有 .NET SDK，本地 Restore/Build/Test：NOT RUN。Windows GitHub Actions 将在本次 main push 后触发；必须核对实际 run 结论并据实回填，不把推送当作 CI 通过。
 - Windows 10/11 权限审阅、实际启动 GUI EXE、Stop 后应用保留、DPI/UIPI 等桌面实机验收：NOT RUN，统一留 M14。
 - 未修改 VERSION/AssemblyVersion/FileVersion；不创建 tag/Release；v0.1.0-preview.4 保持不变。
+
+
+### M12-08 Windows Actions 首轮测试结果与修正（run 43413876754）
+- Restore PASS。
+- Release Build PASS：0 warnings / 0 errors。
+- Core tests：151 passed / 1 failed / 0 skipped / total 152。唯一失败为旧测试 `ImagingApiDefaultsAndValidationAreRegistered` 仍断言 API registry 版本为 1.0；实际 registry 已提升到 1.1。进程 API 相关新增测试已通过此次 Test 阶段。
+- 后续 API handbook / self-contained publish / Sprite Worker smoke / ZIP 与 artifact upload 因 Test 失败按 workflow 条件跳过，不能记为通过。
+- 同时审查发现 WaitProcess 的暂停时间不应消耗 timeout；后续修正改为每完成一个 pause-aware 等待片段才递减剩余预算，并新增暂停不消耗超时的自动化断言。此修正仍需下一轮 Windows CI 验证。

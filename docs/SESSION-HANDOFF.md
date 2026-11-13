@@ -641,3 +641,12 @@ M12-02 验收前不做剪贴板、对话框、进程、HTTP 或插件加载。�
 - 查询最新 main HEAD 与对应 Windows Actions run；检查 Restore/Build/Core tests/API handbook/self-contained win-x64/Sprite Worker smoke/ZIP-SHA256/artifact upload 全部步骤。
 - 修复本轮 CI 实际暴露的问题，逐步提交 main；不要为抢先推进 M12-09 而跳过 M12-08 CI 绿灯。
 - Windows CI PASS 后，将 run ID、测试数量、Build warning/error 数与 artifact 信息写回 ROADMAP、DEVELOPMENT-LOG、ACCEPTANCE、handoff。真实桌面仍 NOT RUN（M14）。
+
+
+---
+
+# M12-08 CI 修正进展（2026-11-13）
+- 首次提交：`90a86e7af8c391308288c6116ce12288a7287002`。
+- 首轮 Windows Actions run [43413876754](https://github.com/xiaobei206/anjian/actions/runs/43413876754)：Restore PASS；Build PASS（0 warnings/0 errors）；151/152 Core tests，唯一失败为 `ImagingApiDefaultsAndValidationAreRegistered` 中遗留的 API version 1.0 断言；其余 151 项（含首轮 Process API tests）PASS。API handbook、自包含发布、Sprite/Worker smoke、ZIP/SHA 和 artifact upload 因 Test 失败跳过。
+- 本次修正：更新该测试期望至 API 1.1；WaitProcess 暂停时不消耗超时预算，并增加自动化覆盖。修正提交与下一轮 Windows CI 结果待确认。
+- 当前 M14 Windows 10/11 GUI、权限审批、Stop 后真实应用生命周期、DPI/UIPI 与多显示器实机验收仍 NOT RUN。
