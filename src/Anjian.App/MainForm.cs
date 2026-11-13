@@ -91,6 +91,7 @@ internal sealed class MainForm : Form
         _applicationIcon = LoadApplicationIcon();
         Icon = (Icon)_applicationIcon.Clone();
         BuildUi();
+        _playback.SetUiOwner(this);
 
         _playback.Log += message => Ui(() =>
         {

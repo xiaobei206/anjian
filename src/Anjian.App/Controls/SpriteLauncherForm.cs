@@ -124,6 +124,7 @@ internal sealed class SpriteLauncherForm : Form
         Controls.Add(_log);
         Controls.Add(statusPanel);
         Controls.Add(toolbar);
+        _runner.SetUiOwner(this);
 
         _runner.Log += AppendLog;
         _start.Click += async (_, _) => await StartSelectedEntryAsync();

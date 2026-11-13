@@ -24,6 +24,7 @@ internal sealed class PlaybackRunner : IDisposable
     private SpriteWorkerRuntimeOptions? _spriteRuntimeOptions;
     private ScriptPermissionGrant _launchPermissions = ScriptPermissionGrant.Empty;
     private string _launchScriptDirectory = string.Empty;
+    private ClipboardDialogHost? _clipboardDialogHost;
     private TaskCompletionSource<LuaDebugCommand>? _debugCommandSource;
 
     public PlaybackRunner()
@@ -41,6 +42,12 @@ internal sealed class PlaybackRunner : IDisposable
     public bool IsRunning => _runCts is not null;
     public bool IsPaused => _gate.IsPaused;
     public bool IsDebugging => _runCts is not null && _debugLaunchOptions is not null;
+
+    public void SetUiOwner(Control owner)
+    {
+        ArgumentNullException.ThrowIfNull(owner);
+        _clipboardDialogHost = new ClipboardDialogHost(owner);
+    }
 
     public void Pause() => _gate.Pause();
     public void Resume() => _gate.Resume();
@@ -392,6 +399,19 @@ internal sealed class PlaybackRunner : IDisposable
             case "directory-create":
                 return ScriptFileSystemHostDispatcher.Dispatch(
                     _launchPermissions, _launchScriptDirectory, message.Type, message.Name, message.Text, token);
+            case "clipboard-read-text":
+            case "clipboard-write-text":
+            case "dialog-message":
+            case "dialog-input":
+            case "dialog-confirm":
+            {
+                // The host repeats permission and payload validation independently of WorkerLuaApi.
+                var command = ScriptClipboardDialogPolicy.ValidateCommand(
+                    _launchPermissions, message.Type, message.Text);
+                var host = _clipboardDialogHost
+                    ?? throw new InvalidOperationException("剪贴板/对话框 UI 调度器尚未初始化。");
+                return await host.DispatchAsync(command, token).ConfigureAwait(false);
+            }
             case "file-copy":
             case "file-move":
             case "file-rename":

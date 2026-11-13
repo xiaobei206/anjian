@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "apiVersion": "0.9",
+  "apiVersion": "1.0",
   "product": "按键精灵 2026",
   "categories": [
     {
@@ -42,6 +42,11 @@
       "id": "files",
       "title": "文件与目录",
       "description": "在逐次批准的文件根目录内执行受限文件/目录读写、存在性检查、非递归枚举、复制/移动/重命名和受控临时路径创建。"
+    },
+    {
+      "id": "clipboardDialogs",
+      "title": "剪贴板与对话框",
+      "description": "经逐次授权后读写文本剪贴板，并显示可取消的消息、输入与确认对话框。"
     }
   ],
   "apis": [
@@ -5994,6 +5999,262 @@
           }
         ]
       }
+    },
+    {
+      "id": "anjian.clipboard.get-text",
+      "name": "GetClipboardText",
+      "category": "clipboardDialogs",
+      "title": "读取剪贴板文本",
+      "description": "读取 Windows 系统剪贴板中的 Unicode 文本；剪贴板没有文本时返回空字符串。最多返回 1,048,576 个 UTF-16 字符，不会将内容自动写入应用日志。",
+      "signature": "GetClipboardText()",
+      "parameters": [],
+      "returns": {
+        "type": "string",
+        "description": "剪贴板 Unicode 文本；无文本时为空字符串。"
+      },
+      "errors": [
+        "未获本次剪贴板读取权限时拒绝执行。",
+        "剪贴板被其他进程占用、系统访问失败或文本超过 1,048,576 个 UTF-16 字符时产生错误。"
+      ],
+      "example": "local text = GetClipboardText()",
+      "runtime": {
+        "definition": "function() return __AnjianBridge_GetClipboardText() end",
+        "bindings": [
+          {
+            "name": "__GetClipboardText",
+            "method": "GetClipboardText",
+            "localName": "__AnjianBridge_GetClipboardText"
+          }
+        ]
+      },
+      "behavior": {
+        "pauseBehavior": "在执行器命令边界遵循暂停状态；若用户在对话框打开期间暂停，脚本在下一条命令边界等待恢复。",
+        "cancellationBehavior": "Stop 取消等待中的 IPC；打开的自定义对话框会关闭，Worker 随即终止。剪贴板写入若已由 Windows 接受，不会回滚。",
+        "sideEffects": [
+          "读取系统剪贴板文本。"
+        ],
+        "coordinateSpace": "none",
+        "permissionNotes": "Worker bridge 先检查本次 Grant，PlaybackRunner 对每条 IPC 再次独立检查；没有 sidecar 或未批准时默认拒绝。剪贴板/对话框内容不会自动写入应用日志。"
+      },
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "1.0.0-dev.1"
+    },
+    {
+      "id": "anjian.clipboard.set-text",
+      "name": "SetClipboardText",
+      "category": "clipboardDialogs",
+      "title": "写入剪贴板文本",
+      "description": "将文本写入 Windows 系统剪贴板；空字符串表示清空剪贴板。最大 1,048,576 个 UTF-16 字符，不会自动记录写入内容。",
+      "signature": "SetClipboardText(text)",
+      "parameters": [
+        {
+          "name": "text",
+          "type": "string",
+          "required": true,
+          "description": "要写入的 Unicode 文本；空字符串清空剪贴板。"
+        }
+      ],
+      "returns": {
+        "type": "boolean",
+        "description": "Windows 接受剪贴板操作后返回 true；失败时抛出错误。"
+      },
+      "errors": [
+        "未获本次剪贴板写入权限时拒绝执行。",
+        "文本超过 1,048,576 个 UTF-16 字符或 Windows 拒绝访问剪贴板时产生错误。"
+      ],
+      "example": "SetClipboardText(\"复制到剪贴板的内容\")",
+      "runtime": {
+        "definition": "function(text) return __AnjianBridge_SetClipboardText(text) end",
+        "bindings": [
+          {
+            "name": "__SetClipboardText",
+            "method": "SetClipboardText",
+            "localName": "__AnjianBridge_SetClipboardText"
+          }
+        ]
+      },
+      "behavior": {
+        "pauseBehavior": "在执行器命令边界遵循暂停状态；若用户在对话框打开期间暂停，脚本在下一条命令边界等待恢复。",
+        "cancellationBehavior": "Stop 取消等待中的 IPC；打开的自定义对话框会关闭，Worker 随即终止。剪贴板写入若已由 Windows 接受，不会回滚。",
+        "sideEffects": [
+          "替换系统剪贴板内容；空字符串将清空剪贴板。"
+        ],
+        "coordinateSpace": "none",
+        "permissionNotes": "Worker bridge 先检查本次 Grant，PlaybackRunner 对每条 IPC 再次独立检查；没有 sidecar 或未批准时默认拒绝。剪贴板/对话框内容不会自动写入应用日志。"
+      },
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "1.0.0-dev.1"
+    },
+    {
+      "id": "anjian.dialog.message",
+      "name": "MessageBox",
+      "category": "clipboardDialogs",
+      "title": "显示消息对话框",
+      "description": "显示带确定按钮的模态消息窗体。标题默认“按键精灵 2026”；正文最多 32,768 个 UTF-16 字符，标题最多 256 个字符。用户关闭窗口时返回 false。",
+      "signature": "MessageBox(text, title?)",
+      "parameters": [
+        {
+          "name": "text",
+          "type": "string",
+          "required": true,
+          "description": "要显示的消息正文。"
+        },
+        {
+          "name": "title",
+          "type": "string",
+          "required": false,
+          "defaultValue": "按键精灵 2026",
+          "description": "可选窗口标题，最多 256 个字符。"
+        }
+      ],
+      "returns": {
+        "type": "boolean",
+        "description": "点击确定返回 true；关闭窗口返回 false。"
+      },
+      "errors": [
+        "未获本次 message 对话框权限时拒绝执行。",
+        "正文或标题超过长度上限、主 UI 线程不可用或窗体创建失败时产生错误。"
+      ],
+      "example": "MessageBox(\"处理完成\", \"脚本提示\")",
+      "runtime": {
+        "definition": "function(text, title) return __AnjianBridge_MessageBox(text, title == nil and \"按键精灵 2026\" or title) end",
+        "bindings": [
+          {
+            "name": "__MessageBox",
+            "method": "MessageBox",
+            "localName": "__AnjianBridge_MessageBox"
+          }
+        ]
+      },
+      "behavior": {
+        "pauseBehavior": "在执行器命令边界遵循暂停状态；若用户在对话框打开期间暂停，脚本在下一条命令边界等待恢复。",
+        "cancellationBehavior": "Stop 取消等待中的 IPC；打开的自定义对话框会关闭，Worker 随即终止。剪贴板写入若已由 Windows 接受，不会回滚。",
+        "sideEffects": [
+          "在主程序 UI 线程显示模态消息窗体。"
+        ],
+        "coordinateSpace": "none",
+        "permissionNotes": "Worker bridge 先检查本次 Grant，PlaybackRunner 对每条 IPC 再次独立检查；没有 sidecar 或未批准时默认拒绝。剪贴板/对话框内容不会自动写入应用日志。"
+      },
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "1.0.0-dev.1"
+    },
+    {
+      "id": "anjian.dialog.input",
+      "name": "InputBox",
+      "category": "clipboardDialogs",
+      "title": "请求用户输入",
+      "description": "显示自定义输入对话框。用户点击确定返回文本；取消或关闭窗口返回 nil。提示最多 32,768 个字符，标题最多 256 个字符，默认值/输入最多 32,768 个字符。Stop 会关闭对话框并终止 Worker。",
+      "signature": "InputBox(prompt, title?, defaultValue?)",
+      "parameters": [
+        {
+          "name": "prompt",
+          "type": "string",
+          "required": true,
+          "description": "显示在输入框上方的提示。"
+        },
+        {
+          "name": "title",
+          "type": "string",
+          "required": false,
+          "defaultValue": "按键精灵 2026",
+          "description": "可选窗口标题，最多 256 个字符。"
+        },
+        {
+          "name": "defaultValue",
+          "type": "string",
+          "required": false,
+          "defaultValue": "",
+          "description": "输入框初始文本，最多 32,768 个字符。"
+        }
+      ],
+      "returns": {
+        "type": "string | nil",
+        "description": "确定返回用户输入的字符串；取消或关闭对话框返回 nil。"
+      },
+      "errors": [
+        "未获本次 input 对话框权限时拒绝执行。",
+        "参数超过长度上限或主 UI 线程不可用时产生错误。"
+      ],
+      "example": "local name = InputBox(\"请输入名称\", \"配置\", \"默认名称\")\nif name then Log(\"已输入\") end",
+      "runtime": {
+        "definition": "function(prompt, title, defaultValue) return __AnjianBridge_InputBox(prompt, title == nil and \"按键精灵 2026\" or title, defaultValue == nil and \"\" or defaultValue) end",
+        "bindings": [
+          {
+            "name": "__InputBox",
+            "method": "InputBox",
+            "localName": "__AnjianBridge_InputBox"
+          }
+        ]
+      },
+      "behavior": {
+        "pauseBehavior": "在执行器命令边界遵循暂停状态；若用户在对话框打开期间暂停，脚本在下一条命令边界等待恢复。",
+        "cancellationBehavior": "Stop 取消等待中的 IPC；打开的自定义对话框会关闭，Worker 随即终止。剪贴板写入若已由 Windows 接受，不会回滚。",
+        "sideEffects": [
+          "在主程序 UI 线程显示模态输入窗体。"
+        ],
+        "coordinateSpace": "none",
+        "permissionNotes": "Worker bridge 先检查本次 Grant，PlaybackRunner 对每条 IPC 再次独立检查；没有 sidecar 或未批准时默认拒绝。剪贴板/对话框内容不会自动写入应用日志。"
+      },
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "1.0.0-dev.1"
+    },
+    {
+      "id": "anjian.dialog.confirm",
+      "name": "Confirm",
+      "category": "clipboardDialogs",
+      "title": "请求用户确认",
+      "description": "显示自定义是/否确认对话框。标题默认“按键精灵 2026”；正文最多 32,768 个字符，标题最多 256 个字符。",
+      "signature": "Confirm(text, title?)",
+      "parameters": [
+        {
+          "name": "text",
+          "type": "string",
+          "required": true,
+          "description": "要向用户确认的问题。"
+        },
+        {
+          "name": "title",
+          "type": "string",
+          "required": false,
+          "defaultValue": "按键精灵 2026",
+          "description": "可选窗口标题，最多 256 个字符。"
+        }
+      ],
+      "returns": {
+        "type": "boolean",
+        "description": "点击是返回 true；点击否或关闭窗口返回 false。"
+      },
+      "errors": [
+        "未获本次 confirm 对话框权限时拒绝执行。",
+        "正文或标题超过长度上限、主 UI 线程不可用或窗体创建失败时产生错误。"
+      ],
+      "example": "if Confirm(\"继续执行下一步？\") then\n  Log(\"用户已确认\")\nend",
+      "runtime": {
+        "definition": "function(text, title) return __AnjianBridge_Confirm(text, title == nil and \"按键精灵 2026\" or title) end",
+        "bindings": [
+          {
+            "name": "__Confirm",
+            "method": "Confirm",
+            "localName": "__AnjianBridge_Confirm"
+          }
+        ]
+      },
+      "behavior": {
+        "pauseBehavior": "在执行器命令边界遵循暂停状态；若用户在对话框打开期间暂停，脚本在下一条命令边界等待恢复。",
+        "cancellationBehavior": "Stop 取消等待中的 IPC；打开的自定义对话框会关闭，Worker 随即终止。剪贴板写入若已由 Windows 接受，不会回滚。",
+        "sideEffects": [
+          "在主程序 UI 线程显示模态确认窗体。"
+        ],
+        "coordinateSpace": "none",
+        "permissionNotes": "Worker bridge 先检查本次 Grant，PlaybackRunner 对每条 IPC 再次独立检查；没有 sidecar 或未批准时默认拒绝。剪贴板/对话框内容不会自动写入应用日志。"
+      },
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "1.0.0-dev.1"
     }
   ],
   "runtime": {
