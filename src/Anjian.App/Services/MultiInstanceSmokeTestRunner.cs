@@ -69,7 +69,8 @@ internal static class MultiInstanceSmokeTestRunner
                 throw new InvalidOperationException("被外部终止的 Worker 未将所属运行报告为失败。");
             }
             catch (InvalidOperationException ex) when (
-                ex.Message.Contains("脚本执行失败", StringComparison.Ordinal))
+                ex.Message.Contains("脚本执行失败", StringComparison.Ordinal) ||
+                ex.Message.Contains("Worker 在宿主处理 IPC 命令", StringComparison.Ordinal))
             {
                 messages.Add($"second-worker-crashed-third-alive:{secondPid},{thirdPid}");
             }
