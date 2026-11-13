@@ -62,6 +62,58 @@ public sealed partial class WorkerLuaApi
         return RequestFilePathBoolean("directory-create", fullPath);
     }
 
+    public bool CopyFile(string sourcePath, string destinationPath, bool overwrite = false)
+    {
+        var source = ResolveFileApiPath(sourcePath, write: false);
+        var destination = ResolveFileApiPath(destinationPath, write: true);
+        if (PathsEqual(source, destination))
+            throw new InvalidDataException("源文件与目标文件不能是同一路径。");
+        return RequestFileBoolean("file-copy",
+            new ScriptFileTransferRequest(source, destination, overwrite));
+    }
+
+    public bool MoveFile(string sourcePath, string destinationPath, bool overwrite = false)
+    {
+        var source = ResolveFileApiPath(sourcePath, write: false);
+        _ = ResolveFileApiPath(sourcePath, write: true);
+        var destination = ResolveFileApiPath(destinationPath, write: true);
+        return RequestFileBoolean("file-move",
+            new ScriptFileTransferRequest(source, destination, overwrite));
+    }
+
+    public bool RenameFile(string path, string newName, bool overwrite = false)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(newName);
+        if (newName is "." or ".." || newName.Contains('/') || newName.Contains('\\') ||
+            newName.Contains(':') || Path.IsPathFullyQualified(newName))
+            throw new InvalidDataException("新文件名必须是同一目录中的普通文件名。");
+
+        var source = ResolveFileApiPath(path, write: false);
+        _ = ResolveFileApiPath(path, write: true);
+        _ = ResolveFileApiPath(
+            Path.Combine(Path.GetDirectoryName(source)!, newName), write: true);
+        return RequestFileBoolean("file-rename",
+            new ScriptFileRenameRequest(source, newName, overwrite));
+    }
+
+    public string CreateTempFile(string directoryPath)
+    {
+        var directory = ResolveFileApiPath(directoryPath, write: true);
+        return RequestFileString("file-create-temp", directory);
+    }
+
+    public string CreateTempDirectory(string parentDirectoryPath)
+    {
+        var parent = ResolveFileApiPath(parentDirectoryPath, write: true);
+        return RequestFileString("directory-create-temp", parent);
+    }
+
+    private static bool PathsEqual(string left, string right) =>
+        string.Equals(left, right, OperatingSystem.IsWindows()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal);
+
+
     private string ResolveFileApiPath(string path, bool write)
     {
         var fullPath = ScriptFileSystem.ResolvePath(path, ScriptDirectory);
@@ -89,5 +141,14 @@ public sealed partial class WorkerLuaApi
         if (!bool.TryParse(response, out var result))
             throw new InvalidDataException($"文件 API {type} 返回了无效布尔值。");
         return result;
+    }
+
+    private string RequestFileString(string type, string path)
+    {
+        var response = pipe.Request(type, name: path);
+        if (string.IsNullOrWhiteSpace(response))
+            throw new IOException($"文件 API {type} 没有返回路径。");
+        return JsonSerializer.Deserialize<string>(response)
+            ?? throw new InvalidDataException($"文件 API {type} 返回了无效路径。");
     }
 }

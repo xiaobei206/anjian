@@ -3,7 +3,7 @@
 > 这是当前运行时 API 契约与完整目标 API 设计的技术规格。当前函数与目标函数的状态以 [中文函数/参数参考手册](FUNCTION-REFERENCE-CN.md) 和 [完整功能矩阵](FEATURE-MATRIX-CN.md) 为准。
 
 - Lua 版本：5.4
-- API 版本：0.7（M9 OCR 文本识别扩展；仅 main 开发版，尚未发布到 preview.4）
+- API 版本：0.9（M12 文件操作扩展；仅 main 开发版，尚未发布到 preview.4）
 - 命令风格：全局英文函数名 + 标准 Lua 函数调用语法
 - 时间单位：毫秒
 - 坐标单位：虚拟桌面物理像素
@@ -208,7 +208,7 @@ WindowUnbind(binding)
 
 ## 8. API 注册与兼容
 
-- 唯一机器可读来源：`src/Anjian.Core/Api/lua-api-registry.json`，登记 81 个当前公开函数的稳定 ID、分类、签名、参数 schema、默认值/范围、返回值/错误、暂停/取消、坐标/权限、示例、实现状态和版本。
+- 唯一机器可读来源：`src/Anjian.Core/Api/lua-api-registry.json`，登记 94 个当前公开函数的稳定 ID、分类、签名、参数 schema、默认值/范围、返回值/错误、暂停/取消、坐标/权限、示例、实现状态和版本。
 - `Anjian.Core.Api.LuaApiRuntime` 从该注册表生成 Lua 全局包装；内部 `__...` 桥接绑定在包装闭包建立后隐藏。
 - `docs/FUNCTION-REFERENCE-CN.md` 第 2 节由 `tools/Anjian.ApiDocsGenerator` 生成；使用 `--write` 更新，`--check` 验证是否漂移。
 - 注册表只包含真实当前实现。M6 窗口/坐标、M7 UIA、M8 图像资源/视觉调试与 M9 OCR 首轮 API 已进入 main；尚未完成的 M10+ 功能仍属于后续阶段，不会被伪装成可调用 API。
@@ -287,3 +287,20 @@ FindColorBlocks 的 step 是采样网格步长，pixelCount 指命中采样点�
 - 脚本识别默认严格离线。未安装所选语言模型时明确报错并提示下载；不会自动联网或静默下载。
 - 每张 OCR 图像最多 16,000,000 像素，PNG IPC 编码最多 64 MiB；过大的图像先调用 CropImage。
 - 当前接口的真实识别质量、模型耗时、断网行为和 Windows 多屏坐标均需在 M14 结束后的 Windows 10/11 集中桌面验收中完成。
+
+## 11. M12 文件/目录 API（API 0.9；main 开发版）
+
+本节 API 仅存在于 main 开发版，不包含在 v0.1.0-preview.4 中。当前 API registry 为 0.9 / 94 项；完整参数表与错误契约以自动生成的函数参考手册第 2 节为准。
+
+| API | 行为与授权 |
+|---|---|
+| CopyFile(sourcePath, destinationPath, overwrite?) | 只复制普通文件，不复制目录；源路径要求读取授权，目标要求写入授权。最大 64 MiB，默认不覆盖。先写目标目录内的随机临时文件，flush、SHA-256 校验后再原子提交。 |
+| MoveFile(sourcePath, destinationPath, overwrite?) | 只移动普通文件；源路径同时要求读取和写入授权，目标要求写入授权。同卷使用句柄级 rename；跨卷先复制、flush、SHA-256 校验并提交目标，再删除源。跨卷上限 64 MiB。源删除失败时保留源文件并报告已提交目标，便于恢复。 |
+| RenameFile(path, newName, overwrite?) | 只在同一父目录内重命名普通文件；源路径要求读取和写入授权，目标名必须是单一文件名。默认不覆盖。 |
+| CreateTempFile(directoryPath) | 在调用者明确指定且已获批准写入的目录内创建空临时文件，返回完整路径。 |
+| CreateTempDirectory(parentDirectoryPath) | 在调用者明确指定且已获批准写入的目录下创建一级临时目录，返回完整路径。 |
+
+- CopyFile / MoveFile / RenameFile 均拒绝符号链接、reparse point 和多硬链接文件；不跟随源文件或覆盖目标中的链接。
+- 临时文件/目录的随机名称和 CreateNew 仅用于避免覆盖现有条目；API 不会自动访问系统 TEMP，也不会扩大批准根。调用者必须明确提供已授权写入目录。
+- 所有新增文件 IPC 同时经过 Worker bridge 与 PlaybackRunner 主进程 dispatcher 的 Grant 检查。Stop 在复制分块与提交前检查；同卷 rename 是单个句柄操作。
+- 本批 API 仍需 Windows 10/11 实机文件权限/真实桌面验收；CI 自动化测试不替代 M14 集中验收。

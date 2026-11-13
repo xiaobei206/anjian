@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
+using System.Security.Cryptography;
 using Microsoft.Win32.SafeHandles;
 
 namespace Anjian.Core.Permissions;
@@ -16,16 +17,21 @@ public sealed class ScriptFileSystem
 {
     public const int MaximumTextBytes = 4 * 1024 * 1024;
     public const int MaximumListEntries = 1000;
+    public const int MaximumTransferBytes = 64 * 1024 * 1024;
 
     private const uint GenericRead = 0x80000000;
     private const uint GenericWrite = 0x40000000;
     private const uint FileReadAttributes = 0x00000080;
+    private const uint FileAddFile = 0x00000002;
+    private const uint DeleteAccess = 0x00010000;
     private const uint FileShareRead = 0x00000001;
     private const uint FileShareWrite = 0x00000002;
     private const uint OpenExisting = 3;
     private const uint CreateNew = 1;
     private const uint FileFlagBackupSemantics = 0x02000000;
     private const uint FileFlagOpenReparsePoint = 0x00200000;
+    private const int FileRenameInfoClass = 3;
+    private const int FileDispositionInfoClass = 4;
     private const uint FileAttributeDirectory = 0x00000010;
     private const uint FileAttributeReparsePoint = 0x00000400;
     private const int ErrorFileNotFound = 2;
@@ -34,12 +40,17 @@ public sealed class ScriptFileSystem
     private static readonly UTF8Encoding StrictUtf8 = new(false, true);
     private readonly ScriptPermissionGrant _grant;
     private readonly string _scriptDirectory;
+    private readonly Func<Guid> _temporaryIdFactory;
 
-    public ScriptFileSystem(ScriptPermissionGrant? grant, string scriptDirectory)
+    public ScriptFileSystem(
+        ScriptPermissionGrant? grant,
+        string scriptDirectory,
+        Func<Guid>? temporaryIdFactory = null)
     {
         _grant = grant ?? ScriptPermissionGrant.Empty;
         ArgumentException.ThrowIfNullOrWhiteSpace(scriptDirectory);
         _scriptDirectory = Path.GetFullPath(scriptDirectory);
+        _temporaryIdFactory = temporaryIdFactory ?? (() => Guid.NewGuid());
     }
 
     public string ReadTextFile(string path, CancellationToken cancellationToken = default)
@@ -232,6 +243,374 @@ public sealed class ScriptFileSystem
         return true;
     }
 
+
+    /// <summary>Copies one ordinary file through a verified same-directory temporary file.</summary>
+    public bool CopyFile(
+        string sourcePath,
+        string destinationPath,
+        bool overwrite = false,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var sourceFullPath = ResolveAndDemandFile(sourcePath, write: false);
+        var destinationFullPath = ResolveAndDemandFile(destinationPath, write: true);
+        EnsureDifferentPaths(sourceFullPath, destinationFullPath);
+
+        using var sourceParents = LockDirectoryChain(Path.GetDirectoryName(sourceFullPath)!);
+        using var destinationParents = LockDirectoryChain(Path.GetDirectoryName(destinationFullPath)!);
+        using var sourceHandle = OpenFileHandle(sourceFullPath,
+            GenericRead | FileReadAttributes, FileShareRead, OpenExisting);
+        var sourceInfo = GetFileInformation(sourceHandle, sourceFullPath);
+        var sourceLength = GetFileLength(sourceInfo);
+        if (sourceLength > MaximumTransferBytes)
+            throw new InvalidDataException($"复制文件超过 {MaximumTransferBytes} 字节上限。");
+
+        EnsureDestinationAvailable(destinationFullPath, overwrite);
+        using var destinationDirectory = OpenDirectoryHandle(
+            Path.GetDirectoryName(destinationFullPath)!, FileReadAttributes | FileAddFile);
+        var temporaryPath = CreateTemporaryFileInDirectory(Path.GetDirectoryName(destinationFullPath)!);
+        try
+        {
+            using var sourceStream = new FileStream(sourceHandle, FileAccess.Read, 64 * 1024, isAsync: false);
+            CopyStreamToDestination(sourceStream, temporaryPath, destinationFullPath,
+                destinationDirectory, overwrite, sourceLength, cancellationToken);
+            return true;
+        }
+        finally
+        {
+            TryDeleteTemporaryFile(temporaryPath);
+        }
+    }
+
+    /// <summary>
+    /// Moves one ordinary file. Same-volume moves rename the opened file handle;
+    /// cross-volume moves copy, hash-verify, commit, then delete the source handle.
+    /// </summary>
+    public bool MoveFile(
+        string sourcePath,
+        string destinationPath,
+        bool overwrite = false,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var sourceFullPath = ResolveAndDemandFile(sourcePath, write: false);
+        _ = ResolveAndDemandFile(sourcePath, write: true);
+        var destinationFullPath = ResolveAndDemandFile(destinationPath, write: true);
+        using var sourceParents = LockDirectoryChain(Path.GetDirectoryName(sourceFullPath)!);
+        using var destinationParents = LockDirectoryChain(Path.GetDirectoryName(destinationFullPath)!);
+        using var sourceHandle = OpenFileHandle(sourceFullPath,
+            GenericRead | DeleteAccess | FileReadAttributes, FileShareRead, OpenExisting);
+        var sourceInfo = GetFileInformation(sourceHandle, sourceFullPath);
+        if (PathsEqual(sourceFullPath, destinationFullPath))
+            return true;
+        var sourceLength = GetFileLength(sourceInfo);
+
+        EnsureDestinationAvailable(destinationFullPath, overwrite);
+        using var destinationDirectory = OpenDirectoryHandle(
+            Path.GetDirectoryName(destinationFullPath)!, FileReadAttributes | FileAddFile);
+        var destinationVolume = GetFileInformation(destinationDirectory, Path.GetDirectoryName(destinationFullPath)!)
+            .VolumeSerialNumber;
+
+        if (sourceInfo.VolumeSerialNumber == destinationVolume)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            RenameByHandle(sourceHandle, destinationDirectory,
+                Path.GetFileName(destinationFullPath), overwrite);
+            using var moved = OpenFileHandle(destinationFullPath, FileReadAttributes,
+                FileShareRead | FileShareWrite, OpenExisting);
+            return true;
+        }
+
+        if (sourceLength > MaximumTransferBytes)
+            throw new InvalidDataException($"跨卷移动文件超过 {MaximumTransferBytes} 字节上限。");
+
+        var temporaryPath = CreateTemporaryFileInDirectory(Path.GetDirectoryName(destinationFullPath)!);
+        try
+        {
+            using var sourceStream = new FileStream(sourceHandle, FileAccess.Read, 64 * 1024, isAsync: false);
+            CopyStreamToDestination(sourceStream, temporaryPath, destinationFullPath,
+                destinationDirectory, overwrite, sourceLength, cancellationToken);
+
+            // Do not delete the source if Stop arrives after the destination commit.
+            // In that narrow window both verified copies remain available for recovery.
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                MarkFileForDeletion(sourceHandle, sourceFullPath);
+            }
+            catch (Exception ex)
+            {
+                throw new IOException(
+                    $"跨卷移动已复制并校验目标，但删除源文件失败；源文件仍保留：{sourceFullPath}",
+                    ex);
+            }
+
+            return true;
+        }
+        finally
+        {
+            TryDeleteTemporaryFile(temporaryPath);
+        }
+    }
+
+    /// <summary>Renames one ordinary file within its existing parent directory.</summary>
+    public bool RenameFile(
+        string path,
+        string newName,
+        bool overwrite = false,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var sourceFullPath = ResolveAndDemandFile(path, write: false);
+        _ = ResolveAndDemandFile(path, write: true);
+        ValidateLeafFileName(newName);
+
+        var parentPath = Path.GetDirectoryName(sourceFullPath)
+            ?? throw new InvalidDataException("无法确定源文件所在目录。");
+        var destinationFullPath = ResolveAndDemandFile(Path.Combine(parentPath, newName), write: true);
+        using var parents = LockDirectoryChain(parentPath);
+        using var sourceHandle = OpenFileHandle(sourceFullPath,
+            DeleteAccess | FileReadAttributes, FileShareRead, OpenExisting);
+        if (string.Equals(sourceFullPath, destinationFullPath, StringComparison.Ordinal))
+            return true;
+        if (PathsEqual(sourceFullPath, destinationFullPath))
+            throw new InvalidDataException("不支持仅改变文件名大小写的重命名。");
+        using var destinationDirectory = OpenDirectoryHandle(parentPath, FileReadAttributes | FileAddFile);
+        EnsureDestinationAvailable(destinationFullPath, overwrite);
+
+        cancellationToken.ThrowIfCancellationRequested();
+        RenameByHandle(sourceHandle, destinationDirectory, newName, overwrite);
+        using var renamed = OpenFileHandle(destinationFullPath, FileReadAttributes,
+            FileShareRead | FileShareWrite, OpenExisting);
+        return true;
+    }
+
+    /// <summary>Creates an empty temporary file inside an explicitly approved writable directory.</summary>
+    public string CreateTempFile(string directoryPath, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var directory = ResolveAndDemand(directoryPath, write: true);
+        using var parents = LockDirectoryChain(directory);
+        return CreateTemporaryFileInDirectory(directory);
+    }
+
+    /// <summary>Creates one temporary directory inside an explicitly approved writable parent.</summary>
+    public string CreateTempDirectory(string parentDirectoryPath, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var parent = ResolveAndDemand(parentDirectoryPath, write: true);
+        using var parents = LockDirectoryChain(parent);
+        for (var attempt = 0; attempt < 16; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var path = Path.Combine(parent, ".anjian-" + _temporaryIdFactory().ToString("N") + ".tmpdir");
+            if (CreateDirectoryW(path, IntPtr.Zero))
+            {
+                using var created = LockDirectoryChain(path);
+                return path;
+            }
+
+            var error = Marshal.GetLastWin32Error();
+            if (error == 183) // ERROR_ALREADY_EXISTS: generate a new random name.
+                continue;
+            throw CreatePathException(path, error, directory: true);
+        }
+
+        throw new IOException("连续生成临时目录名称时发生冲突，请重试。");
+    }
+
+    private string CreateTemporaryFileInDirectory(string directory)
+    {
+        for (var attempt = 0; attempt < 16; attempt++)
+        {
+            var path = Path.Combine(directory, ".anjian-" + _temporaryIdFactory().ToString("N") + ".tmp");
+            try
+            {
+                using var handle = OpenFileHandle(path,
+                    GenericWrite | FileReadAttributes, FileShareRead, CreateNew);
+                return path;
+            }
+            catch (IOException ex) when (IsAlreadyExists(ex))
+            {
+                // CreateNew makes collisions harmless; never open or truncate the existing entry.
+            }
+        }
+
+        throw new IOException("连续生成临时文件名称时发生冲突，请重试。");
+    }
+
+    private static bool IsAlreadyExists(IOException exception) =>
+        exception.InnerException is Win32Exception win32 &&
+        win32.NativeErrorCode is 80 or 183;
+
+    private static void CopyStreamToDestination(
+        Stream source,
+        string temporaryPath,
+        string destinationPath,
+        SafeFileHandle destinationDirectory,
+        bool overwrite,
+        long expectedLength,
+        CancellationToken cancellationToken)
+    {
+        using var sourceHash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        using (var temporaryHandle = OpenFileHandle(temporaryPath,
+            GenericWrite | FileReadAttributes, FileShareRead, OpenExisting))
+        using (var destination = new FileStream(temporaryHandle, FileAccess.Write, 64 * 1024, isAsync: false))
+        {
+            var buffer = new byte[64 * 1024];
+            long total = 0;
+            while (true)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var read = source.Read(buffer, 0, buffer.Length);
+                if (read == 0)
+                    break;
+                total += read;
+                if (total > MaximumTransferBytes)
+                    throw new InvalidDataException($"文件复制超过 {MaximumTransferBytes} 字节上限。");
+                destination.Write(buffer, 0, read);
+                sourceHash.AppendData(buffer, 0, read);
+            }
+
+            if (total != expectedLength)
+                throw new IOException("复制期间源文件长度发生变化，已取消提交。");
+            destination.Flush(flushToDisk: true);
+        }
+
+        var expectedHash = sourceHash.GetHashAndReset();
+        cancellationToken.ThrowIfCancellationRequested();
+        using var commitHandle = OpenFileHandle(temporaryPath,
+            GenericRead | DeleteAccess | FileReadAttributes, FileShareRead, OpenExisting);
+        using (var verifyStream = new FileStream(commitHandle, FileAccess.Read, 64 * 1024, isAsync: false))
+        {
+            var actualHash = HashStream(verifyStream, out var actualLength, cancellationToken);
+            if (actualLength != expectedLength ||
+                !CryptographicOperations.FixedTimeEquals(expectedHash, actualHash))
+                throw new IOException("复制后的临时文件校验失败，目标文件未提交。");
+
+            cancellationToken.ThrowIfCancellationRequested();
+            RenameByHandle(commitHandle, destinationDirectory,
+                Path.GetFileName(destinationPath), overwrite);
+        }
+
+        // The rename is the commit boundary. Do not report cancellation after this point.
+        using var verified = OpenFileHandle(destinationPath, FileReadAttributes,
+            FileShareRead | FileShareWrite, OpenExisting);
+    }
+
+    private static byte[] HashStream(Stream stream, out long length, CancellationToken cancellationToken)
+    {
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        var buffer = new byte[64 * 1024];
+        length = 0;
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var read = stream.Read(buffer, 0, buffer.Length);
+            if (read == 0)
+                break;
+            length += read;
+            if (length > MaximumTransferBytes)
+                throw new InvalidDataException($"复制文件超过 {MaximumTransferBytes} 字节上限。");
+            hash.AppendData(buffer, 0, read);
+        }
+        return hash.GetHashAndReset();
+    }
+
+    private static void EnsureDestinationAvailable(string destinationPath, bool overwrite)
+    {
+        var exists = false;
+        try
+        {
+            using var existing = OpenFileHandle(destinationPath, FileReadAttributes,
+                FileShareRead | FileShareWrite, OpenExisting);
+            exists = true;
+        }
+        catch (FileNotFoundException) { }
+        catch (DirectoryNotFoundException) { }
+
+        if (exists && !overwrite)
+            throw new IOException($"目标文件已存在，未启用覆盖：{destinationPath}");
+    }
+
+    private static void EnsureDifferentPaths(string sourcePath, string destinationPath)
+    {
+        if (PathsEqual(sourcePath, destinationPath))
+            throw new InvalidDataException("源文件与目标文件不能是同一路径。");
+    }
+
+    private static bool PathsEqual(string left, string right) =>
+        string.Equals(left, right, OperatingSystem.IsWindows()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal);
+
+    private static void ValidateLeafFileName(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name) || name is "." or ".." ||
+            Path.IsPathFullyQualified(name) ||
+            name.Contains('/') || name.Contains('\\') || name.Contains(':') ||
+            !string.Equals(Path.GetFileName(name), name, StringComparison.Ordinal))
+            throw new InvalidDataException("新文件名必须是同一目录中的普通文件名，不能包含路径或数据流分隔符。");
+    }
+
+    private static long GetFileLength(ByHandleFileInformation info) =>
+        ((long)info.FileSizeHigh << 32) | info.FileSizeLow;
+
+    private static void RenameByHandle(
+        SafeFileHandle fileHandle,
+        SafeFileHandle destinationDirectory,
+        string destinationName,
+        bool overwrite)
+    {
+        var nameBytes = Encoding.Unicode.GetBytes(destinationName);
+        var nameOffset = (IntPtr.Size * 2) + sizeof(uint);
+        var bufferSize = nameOffset + nameBytes.Length;
+        var buffer = Marshal.AllocHGlobal(bufferSize);
+        try
+        {
+            var zeroed = new byte[bufferSize];
+            Marshal.Copy(zeroed, 0, buffer, bufferSize);
+            Marshal.WriteByte(buffer, 0, overwrite ? (byte)1 : (byte)0);
+            Marshal.WriteIntPtr(buffer, IntPtr.Size, destinationDirectory.DangerousGetHandle());
+            Marshal.WriteInt32(buffer, IntPtr.Size * 2, nameBytes.Length);
+            Marshal.Copy(nameBytes, 0, IntPtr.Add(buffer, nameOffset), nameBytes.Length);
+            if (!SetFileInformationByHandle(fileHandle, FileRenameInfoClass,
+                    buffer, (uint)bufferSize))
+            {
+                var error = Marshal.GetLastWin32Error();
+                throw new IOException(
+                    $"无法原子重命名/移动文件到 {destinationName}。",
+                    new Win32Exception(error));
+            }
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(buffer);
+        }
+    }
+
+    private static void MarkFileForDeletion(SafeFileHandle fileHandle, string sourcePath)
+    {
+        var buffer = Marshal.AllocHGlobal(1);
+        try
+        {
+            Marshal.WriteByte(buffer, 0, 1);
+            if (!SetFileInformationByHandle(fileHandle, FileDispositionInfoClass, buffer, 1))
+                throw new IOException(
+                    $"无法删除已复制的跨卷移动源文件：{sourcePath}",
+                    new Win32Exception(Marshal.GetLastWin32Error()));
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(buffer);
+        }
+    }
+
+    private static void TryDeleteTemporaryFile(string path)
+    {
+        try { File.Delete(path); } catch { }
+    }
+
     /// <summary>Resolve relative paths against the script directory and reject ambiguous/device paths.</summary>
     public static string ResolvePath(string path, string scriptDirectory)
     {
@@ -332,9 +711,9 @@ public sealed class ScriptFileSystem
         }
     }
 
-    private static SafeFileHandle OpenDirectoryHandle(string path)
+    private static SafeFileHandle OpenDirectoryHandle(string path, uint desiredAccess = FileReadAttributes)
     {
-        var handle = CreateFileW(path, FileReadAttributes, FileShareRead | FileShareWrite,
+        var handle = CreateFileW(path, desiredAccess, FileShareRead | FileShareWrite,
             IntPtr.Zero, OpenExisting, FileFlagBackupSemantics | FileFlagOpenReparsePoint, IntPtr.Zero);
         if (handle.IsInvalid)
         {
@@ -448,6 +827,11 @@ public sealed class ScriptFileSystem
         string fileName, uint desiredAccess, uint shareMode, IntPtr securityAttributes,
         uint creationDisposition, uint flagsAndAttributes, IntPtr templateFile);
 
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetFileInformationByHandle(
+        SafeFileHandle fileHandle, int fileInformationClass, IntPtr fileInformation, uint bufferSize);
+
     [DllImport("kernel32.dll", EntryPoint = "CreateDirectoryW", CharSet = CharSet.Unicode, SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool CreateDirectoryW(string path, IntPtr securityAttributes);
@@ -460,6 +844,8 @@ public sealed class ScriptFileSystem
 
 public sealed record ScriptFilePathRequest(string Path);
 public sealed record ScriptFileTextRequest(string Path, string Content);
+public sealed record ScriptFileTransferRequest(string SourcePath, string DestinationPath, bool Overwrite = false);
+public sealed record ScriptFileRenameRequest(string Path, string NewName, bool Overwrite = false);
 
 /// <summary>
 /// Main-process IPC boundary. This dispatcher always applies the host's current Grant,
@@ -512,6 +898,28 @@ public static class ScriptFileSystemHostDispatcher
             }
             case "directory-create":
                 return JsonSerializer.Serialize(fileSystem.CreateDirectory(RequiredPath(name), cancellationToken));
+            case "file-copy":
+            {
+                var request = ReadTransferRequest(text);
+                return JsonSerializer.Serialize(fileSystem.CopyFile(
+                    request.SourcePath, request.DestinationPath, request.Overwrite, cancellationToken));
+            }
+            case "file-move":
+            {
+                var request = ReadTransferRequest(text);
+                return JsonSerializer.Serialize(fileSystem.MoveFile(
+                    request.SourcePath, request.DestinationPath, request.Overwrite, cancellationToken));
+            }
+            case "file-rename":
+            {
+                var request = ReadRenameRequest(text);
+                return JsonSerializer.Serialize(fileSystem.RenameFile(
+                    request.Path, request.NewName, request.Overwrite, cancellationToken));
+            }
+            case "file-create-temp":
+                return JsonSerializer.Serialize(fileSystem.CreateTempFile(RequiredPath(name), cancellationToken));
+            case "directory-create-temp":
+                return JsonSerializer.Serialize(fileSystem.CreateTempDirectory(RequiredPath(name), cancellationToken));
             default:
                 throw new InvalidDataException($"未知文件系统 IPC 命令：{command}");
         }
@@ -528,6 +936,29 @@ public static class ScriptFileSystemHostDispatcher
             throw new InvalidDataException("文件系统 IPC 请求为空或超过大小上限。");
         return JsonSerializer.Deserialize<ScriptFilePathRequest>(json, JsonOptions)
             ?? throw new InvalidDataException("文件系统 IPC 路径请求无效。");
+    }
+
+    private static ScriptFileTransferRequest ReadTransferRequest(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json) || json.Length > 16 * 1024)
+            throw new InvalidDataException("文件传输 IPC 请求为空或超过大小上限。");
+        var request = JsonSerializer.Deserialize<ScriptFileTransferRequest>(json, JsonOptions)
+            ?? throw new InvalidDataException("文件传输 IPC 请求无效。");
+        if (string.IsNullOrWhiteSpace(request.SourcePath) ||
+            string.IsNullOrWhiteSpace(request.DestinationPath))
+            throw new InvalidDataException("文件传输 IPC 请求缺少源路径或目标路径。");
+        return request;
+    }
+
+    private static ScriptFileRenameRequest ReadRenameRequest(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json) || json.Length > 16 * 1024)
+            throw new InvalidDataException("文件重命名 IPC 请求为空或超过大小上限。");
+        var request = JsonSerializer.Deserialize<ScriptFileRenameRequest>(json, JsonOptions)
+            ?? throw new InvalidDataException("文件重命名 IPC 请求无效。");
+        if (string.IsNullOrWhiteSpace(request.Path) || string.IsNullOrWhiteSpace(request.NewName))
+            throw new InvalidDataException("文件重命名 IPC 请求缺少路径或名称。");
+        return request;
     }
 
     private static ScriptFileTextRequest ReadTextRequest(string? json)

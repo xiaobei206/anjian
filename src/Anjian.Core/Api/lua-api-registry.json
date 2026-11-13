@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "apiVersion": "0.8",
+  "apiVersion": "0.9",
   "product": "按键精灵 2026",
   "categories": [
     {
@@ -41,7 +41,7 @@
     {
       "id": "files",
       "title": "文件与目录",
-      "description": "在逐次批准的文件根目录内执行受限文本读写、存在性检查、非递归枚举与目录创建。"
+      "description": "在逐次批准的文件根目录内执行受限文件/目录读写、存在性检查、非递归枚举、复制/移动/重命名和受控临时路径创建。"
     }
   ],
   "apis": [
@@ -5722,6 +5722,275 @@
             "name": "__CreateDirectory",
             "method": "CreateDirectory",
             "localName": "__AnjianBridge_CreateDirectory"
+          }
+        ]
+      }
+    },
+    {
+      "id": "anjian.files.copy-file",
+      "name": "CopyFile",
+      "category": "files",
+      "title": "复制文件",
+      "description": "将批准读取根目录中的普通文件复制到批准写入根目录；只支持普通文件，最大 64 MiB。先写入目标目录内的随机临时文件，flush 并 SHA-256 校验后再原子提交。",
+      "signature": "CopyFile(sourcePath, destinationPath, overwrite)",
+      "parameters": [
+        {
+          "name": "sourcePath",
+          "type": "string",
+          "required": true,
+          "description": "源文件路径，必须位于本次运行批准的读取根目录。"
+        },
+        {
+          "name": "destinationPath",
+          "type": "string",
+          "required": true,
+          "description": "目标文件路径，必须位于本次运行批准的写入根目录。"
+        },
+        {
+          "name": "overwrite",
+          "type": "boolean",
+          "required": false,
+          "defaultValue": false,
+          "description": "目标已存在时是否覆盖；默认 false。"
+        }
+      ],
+      "returns": {
+        "type": "boolean",
+        "description": "复制并原子提交成功时 true。"
+      },
+      "errors": [
+        "源路径未获读取授权、目标路径未获写入授权、源文件不存在、目标父目录不存在、遇到链接/硬链接、文件超过 64 MiB、覆盖被禁用或复制校验失败时产生错误。"
+      ],
+      "behavior": {
+        "pauseBehavior": "每条文件 IPC 在主进程执行前经过暂停检查点；暂停期间等待恢复。",
+        "cancellationBehavior": "Stop 取消当前运行 token；复制/校验按 64 KiB 分块检查取消，原子提交前再次检查。提交后不报告取消；跨卷移动在目标提交后收到 Stop 时保留两份文件以便恢复。",
+        "sideEffects": [
+          "将批准读取根目录中的普通文件复制到批准写入根目录；只支持普通文件，最大 64 MiB。先写入目标目录内的随机临时文件，flush 并 SHA-256 校验后再原子提交。"
+        ],
+        "coordinateSpace": "none",
+        "permissionNotes": "Worker 在 IPC 前检查本次 Grant，主进程对每条 IPC 再次检查。源文件操作需要批准读取根；移动/重命名还要求源路径位于批准写入根；目标必须位于批准写入根。拒绝 reparse point/符号链接和多硬链接文件；该机制不是恶意同用户进程的 OS 级沙箱。"
+      },
+      "example": "CopyFile(\"data/source.bin\", \"backup/source.bin\", true)",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.9.0-dev.1",
+      "runtime": {
+        "definition": "function(sourcePath, destinationPath, overwrite) if overwrite == nil then overwrite = false end; return __AnjianBridge_CopyFile(sourcePath, destinationPath, overwrite) end",
+        "bindings": [
+          {
+            "name": "__CopyFile",
+            "method": "CopyFile",
+            "localName": "__AnjianBridge_CopyFile"
+          }
+        ]
+      }
+    },
+    {
+      "id": "anjian.files.move-file",
+      "name": "MoveFile",
+      "category": "files",
+      "title": "移动文件",
+      "description": "移动一个普通文件；源文件必须同时位于批准读取根和写入根，目标必须位于批准写入根。同卷使用句柄级重命名；跨卷限 64 MiB，先复制、flush、SHA-256 校验并提交目标，再删除源文件。",
+      "signature": "MoveFile(sourcePath, destinationPath, overwrite)",
+      "parameters": [
+        {
+          "name": "sourcePath",
+          "type": "string",
+          "required": true,
+          "description": "源文件路径，必须同时获读取和写入授权。"
+        },
+        {
+          "name": "destinationPath",
+          "type": "string",
+          "required": true,
+          "description": "目标文件路径，必须位于本次运行批准的写入根目录。"
+        },
+        {
+          "name": "overwrite",
+          "type": "boolean",
+          "required": false,
+          "defaultValue": false,
+          "description": "目标已存在时是否覆盖；默认 false。"
+        }
+      ],
+      "returns": {
+        "type": "boolean",
+        "description": "移动成功时 true。"
+      },
+      "errors": [
+        "源路径未同时获读取/写入授权、目标未获写入授权、路径不是普通文件、目标不可覆盖、跨卷文件超过 64 MiB、复制校验失败或源删除失败时产生错误；删除失败时目标副本保留且源文件不被自动丢弃。"
+      ],
+      "behavior": {
+        "pauseBehavior": "每条文件 IPC 在主进程执行前经过暂停检查点；暂停期间等待恢复。",
+        "cancellationBehavior": "Stop 取消当前运行 token；复制/校验按 64 KiB 分块检查取消，原子提交前再次检查。提交后不报告取消；跨卷移动在目标提交后收到 Stop 时保留两份文件以便恢复。",
+        "sideEffects": [
+          "移动一个普通文件；源文件必须同时位于批准读取根和写入根，目标必须位于批准写入根。同卷使用句柄级重命名；跨卷限 64 MiB，先复制、flush、SHA-256 校验并提交目标，再删除源文件。"
+        ],
+        "coordinateSpace": "none",
+        "permissionNotes": "Worker 在 IPC 前检查本次 Grant，主进程对每条 IPC 再次检查。源文件操作需要批准读取根；移动/重命名还要求源路径位于批准写入根；目标必须位于批准写入根。拒绝 reparse point/符号链接和多硬链接文件；该机制不是恶意同用户进程的 OS 级沙箱。"
+      },
+      "example": "MoveFile(\"data/old.txt\", \"archive/old.txt\")",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.9.0-dev.1",
+      "runtime": {
+        "definition": "function(sourcePath, destinationPath, overwrite) if overwrite == nil then overwrite = false end; return __AnjianBridge_MoveFile(sourcePath, destinationPath, overwrite) end",
+        "bindings": [
+          {
+            "name": "__MoveFile",
+            "method": "MoveFile",
+            "localName": "__AnjianBridge_MoveFile"
+          }
+        ]
+      }
+    },
+    {
+      "id": "anjian.files.rename-file",
+      "name": "RenameFile",
+      "category": "files",
+      "title": "重命名文件",
+      "description": "在同一已批准父目录内重命名一个普通文件；源路径必须同时获读取和写入授权，目标名必须是单个文件名，不能指定其他目录。",
+      "signature": "RenameFile(path, newName, overwrite)",
+      "parameters": [
+        {
+          "name": "path",
+          "type": "string",
+          "required": true,
+          "description": "源文件路径，必须同时获读取和写入授权。"
+        },
+        {
+          "name": "newName",
+          "type": "string",
+          "required": true,
+          "description": "同一父目录中的新文件名，不可包含路径分隔符或数据流分隔符。"
+        },
+        {
+          "name": "overwrite",
+          "type": "boolean",
+          "required": false,
+          "defaultValue": false,
+          "description": "目标已存在时是否覆盖；默认 false。"
+        }
+      ],
+      "returns": {
+        "type": "boolean",
+        "description": "重命名成功时 true。"
+      },
+      "errors": [
+        "源文件未获读取/写入授权、目标未获写入授权、新文件名不是单一文件名、源文件不存在、目标冲突或遇到链接/硬链接时产生错误。"
+      ],
+      "behavior": {
+        "pauseBehavior": "每条文件 IPC 在主进程执行前经过暂停检查点；暂停期间等待恢复。",
+        "cancellationBehavior": "Stop 取消当前运行 token；复制/校验按 64 KiB 分块检查取消，原子提交前再次检查。提交后不报告取消；跨卷移动在目标提交后收到 Stop 时保留两份文件以便恢复。",
+        "sideEffects": [
+          "在同一已批准父目录内重命名一个普通文件；源路径必须同时获读取和写入授权，目标名必须是单个文件名，不能指定其他目录。"
+        ],
+        "coordinateSpace": "none",
+        "permissionNotes": "Worker 在 IPC 前检查本次 Grant，主进程对每条 IPC 再次检查。源文件操作需要批准读取根；移动/重命名还要求源路径位于批准写入根；目标必须位于批准写入根。拒绝 reparse point/符号链接和多硬链接文件；该机制不是恶意同用户进程的 OS 级沙箱。"
+      },
+      "example": "RenameFile(\"data/report-old.txt\", \"report.txt\")",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.9.0-dev.1",
+      "runtime": {
+        "definition": "function(path, newName, overwrite) if overwrite == nil then overwrite = false end; return __AnjianBridge_RenameFile(path, newName, overwrite) end",
+        "bindings": [
+          {
+            "name": "__RenameFile",
+            "method": "RenameFile",
+            "localName": "__AnjianBridge_RenameFile"
+          }
+        ]
+      }
+    },
+    {
+      "id": "anjian.files.create-temp-file",
+      "name": "CreateTempFile",
+      "category": "files",
+      "title": "创建受控临时文件",
+      "description": "在调用者明确指定且获批准写入的目录内创建空临时文件，采用安全随机名称和 CreateNew，返回完整路径；不会访问或自动授权系统 TEMP。",
+      "signature": "CreateTempFile(directoryPath)",
+      "parameters": [
+        {
+          "name": "directoryPath",
+          "type": "string",
+          "required": true,
+          "description": "已获批准写入的父目录。"
+        }
+      ],
+      "returns": {
+        "type": "string",
+        "description": "新建临时文件的完整路径。"
+      },
+      "errors": [
+        "父目录未获写入授权、目录不存在、路径包含链接/重解析点或连续随机名称冲突时产生错误。"
+      ],
+      "behavior": {
+        "pauseBehavior": "每条文件 IPC 在主进程执行前经过暂停检查点；暂停期间等待恢复。",
+        "cancellationBehavior": "Stop 取消当前运行 token；复制/校验按 64 KiB 分块检查取消，原子提交前再次检查。提交后不报告取消；跨卷移动在目标提交后收到 Stop 时保留两份文件以便恢复。",
+        "sideEffects": [
+          "在调用者明确指定且获批准写入的目录内创建空临时文件，采用安全随机名称和 CreateNew，返回完整路径；不会访问或自动授权系统 TEMP。"
+        ],
+        "coordinateSpace": "none",
+        "permissionNotes": "Worker 在 IPC 前检查本次 Grant，主进程对每条 IPC 再次检查。源文件操作需要批准读取根；移动/重命名还要求源路径位于批准写入根；目标必须位于批准写入根。拒绝 reparse point/符号链接和多硬链接文件；该机制不是恶意同用户进程的 OS 级沙箱。"
+      },
+      "example": "local tempPath = CreateTempFile(\"data/cache\")",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.9.0-dev.1",
+      "runtime": {
+        "definition": "function(directoryPath) return __AnjianBridge_CreateTempFile(directoryPath) end",
+        "bindings": [
+          {
+            "name": "__CreateTempFile",
+            "method": "CreateTempFile",
+            "localName": "__AnjianBridge_CreateTempFile"
+          }
+        ]
+      }
+    },
+    {
+      "id": "anjian.files.create-temp-directory",
+      "name": "CreateTempDirectory",
+      "category": "files",
+      "title": "创建受控临时目录",
+      "description": "在调用者明确指定且获批准写入的父目录下创建一级临时目录，使用安全随机名称；不递归创建父级，也不会访问或自动授权系统 TEMP。",
+      "signature": "CreateTempDirectory(parentDirectoryPath)",
+      "parameters": [
+        {
+          "name": "parentDirectoryPath",
+          "type": "string",
+          "required": true,
+          "description": "已获批准写入的父目录。"
+        }
+      ],
+      "returns": {
+        "type": "string",
+        "description": "新建临时目录的完整路径。"
+      },
+      "errors": [
+        "父目录未获写入授权、父目录不存在、路径包含链接/重解析点或连续随机名称冲突时产生错误。"
+      ],
+      "behavior": {
+        "pauseBehavior": "每条文件 IPC 在主进程执行前经过暂停检查点；暂停期间等待恢复。",
+        "cancellationBehavior": "Stop 取消当前运行 token；复制/校验按 64 KiB 分块检查取消，原子提交前再次检查。提交后不报告取消；跨卷移动在目标提交后收到 Stop 时保留两份文件以便恢复。",
+        "sideEffects": [
+          "在调用者明确指定且获批准写入的父目录下创建一级临时目录，使用安全随机名称；不递归创建父级，也不会访问或自动授权系统 TEMP。"
+        ],
+        "coordinateSpace": "none",
+        "permissionNotes": "Worker 在 IPC 前检查本次 Grant，主进程对每条 IPC 再次检查。源文件操作需要批准读取根；移动/重命名还要求源路径位于批准写入根；目标必须位于批准写入根。拒绝 reparse point/符号链接和多硬链接文件；该机制不是恶意同用户进程的 OS 级沙箱。"
+      },
+      "example": "local tempDirectory = CreateTempDirectory(\"data\")",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.9.0-dev.1",
+      "runtime": {
+        "definition": "function(parentDirectoryPath) return __AnjianBridge_CreateTempDirectory(parentDirectoryPath) end",
+        "bindings": [
+          {
+            "name": "__CreateTempDirectory",
+            "method": "CreateTempDirectory",
+            "localName": "__AnjianBridge_CreateTempDirectory"
           }
         ]
       }

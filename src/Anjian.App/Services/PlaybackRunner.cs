@@ -392,6 +392,13 @@ internal sealed class PlaybackRunner : IDisposable
             case "directory-create":
                 return ScriptFileSystemHostDispatcher.Dispatch(
                     _launchPermissions, _launchScriptDirectory, message.Type, message.Name, message.Text, token);
+            case "file-copy":
+            case "file-move":
+            case "file-rename":
+            case "file-create-temp":
+            case "directory-create-temp":
+                return ScriptFileSystemHostDispatcher.Dispatch(
+                    _launchPermissions, _launchScriptDirectory, message.Type, message.Name, message.Text, token);
             default:
                 throw new InvalidDataException($"未知执行命令：{message.Type}");
         }
