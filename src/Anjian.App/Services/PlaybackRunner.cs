@@ -327,6 +327,10 @@ internal sealed class PlaybackRunner : IDisposable
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
+                    if (worker.HasExited)
+                        throw new InvalidOperationException(
+                            $"Worker 在宿主处理 IPC 命令 {message.Type} 时意外退出（exitCode={worker.ExitCode}）。", ex);
+
                     Log?.Invoke("命令执行失败：" + ex.Message);
                     await writer.WriteLineAsync(JsonSerializer.Serialize(new
                     {
