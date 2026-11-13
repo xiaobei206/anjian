@@ -228,6 +228,7 @@ internal sealed class PlaybackRunner : IDisposable
         start.ArgumentList.Add(scriptPath);
         var worker = Process.Start(start) ?? throw new InvalidOperationException("无法启动脚本执行进程。");
         _worker = worker;
+        var workerExitTask = worker.WaitForExitAsync();
 
         var handshake = new WorkerHandshake
         {
@@ -295,7 +296,20 @@ internal sealed class PlaybackRunner : IDisposable
 
                 try
                 {
-                    var payload = await DispatchAsync(message, debugOptions, token).ConfigureAwait(false);
+                    using var dispatchCts = CancellationTokenSource.CreateLinkedTokenSource(token);
+                    var dispatchTask = DispatchAsync(message, debugOptions, dispatchCts.Token);
+                    var dispatchOrExit = await Task.WhenAny(dispatchTask, workerExitTask).ConfigureAwait(false);
+                    if (dispatchOrExit == workerExitTask)
+                    {
+                        dispatchCts.Cancel();
+                        try { await dispatchTask.ConfigureAwait(false); }
+                        catch (OperationCanceledException) { }
+                        var exitCode = worker.HasExited ? worker.ExitCode : -1;
+                        throw new InvalidOperationException(
+                            $"Worker 在宿主处理 IPC 命令 {message.Type} 时意外退出（exitCode={exitCode}）。");
+                    }
+
+                    var payload = await dispatchTask.ConfigureAwait(false);
                     if (message.Type == "worker-ready")
                     {
                         _workerReadyReceived = true;
