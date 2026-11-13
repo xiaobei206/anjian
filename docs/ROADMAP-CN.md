@@ -460,3 +460,12 @@ M13 代码/自动化工作已结束，但不代表真实 Windows 10/11 桌面验
 - 最终 Windows Actions：Windows Actions [43517955937](https://github.com/xiaobei206/anjian/actions/runs/43517955937)，代码 HEAD `6d9513bec5de35ed8f20f656d8520217d949733a`：Restore/Build PASS（0 warnings、0 errors），Core tests 228/228，API handbook check PASS（内置 API 1.2 / 103），win-x64 self-contained publish PASS，发布包 smoke 4/4 PASS，ZIP/SHA256 与 artifact 上传 PASS。Artifact `14081741612`，87,373,960 bytes，Actions artifact archive digest `sha256:7ea0e15aff79bf89defafdf995ec7739a53045f59d264354c271dae1ef28bc29`，有效至 2026-12-13；仅临时 Actions artifact，不是 Release。
 - 本地容器未安装 .NET SDK，local Restore/Build/Test 为 NOT RUN。实际 WinForms 操作、DPI/多显示器、真实 SendInput/KeyUp、人工恢复交互、关闭到托盘/明确退出和长时稳定性全部 NOT RUN（M14）。CI 不能代替桌面验收。
 - M13-04 不增加 Lua API（registry 仍 1.2 / 103），不修改 VERSION / AssemblyVersion / FileVersion，不建 tag/Release。
+
+
+## M14 会话执行尝试记录（2026-11-13）
+
+本次只执行 handoff 指定的 M14 桌面实机验收准备与环境核查。当前会话运行环境为 Linux x86_64（kernel 6.18.57）；未安装 .NET SDK（`dotnet --info` 返回 command not found），也没有可交互的 Windows 10/11 桌面、物理键盘/鼠标、屏幕拓扑或系统托盘访问通道。因此本次 **没有执行任何 M14 桌面测试**，不能记录真实键鼠、WinForms、DPI/多屏、权限弹窗、托盘/退出或 2 小时稳定性为 PASS；这些项目继续保持 NOT RUN。此状态表示当前会话缺少必要的实机环境，并非已确认产品代码缺陷。
+
+开始时核对的 main HEAD 为 `3fc67c4e5d60163ad686be397389028b36947d4b`（`docs: record M13-04 documentation CI evidence`）。本会话能据现有 handoff 核实的最近一次完整成功 Windows Actions 为 [43518664871](https://github.com/xiaobei206/anjian/actions/runs/43518664871)，对应文档 HEAD `a2edd7fdc6176c7963a815d1939a522ef7c84262`，228/228 Core tests、0 warnings/0 errors、API 手册检查、自包含 win-x64 publish、package smoke 4/4、ZIP/SHA 与 artifact upload 均通过。该包应用代码基线仍为 `6d9513bec5de35ed8f20f656d8520217d949733a`；Actions artifact ID `14081447842`（artifact archive digest `sha256:a702a44769706fd06dbbc197aa3f34f83cd6fe1dc9f550930326359239e34897`）。当前 HEAD `3fc67c4...` 的独立 workflow 结果在本次工具中未能核实，故不将前述 CI 结果冒称为该 HEAD 的 CI，也不将任何 CI 结果视作桌面验收。
+
+下一步仍是 M14：必须在实际 Windows 10/11 x64 机器上使用该开发包完成 `docs/ACCEPTANCE-TEST-CN.md` 中的实机清单，并记录 Windows build、DPI、显示器拓扑、脚本/步骤、逐项结果、日志与截图。拿到实际结果前，不修改 M14 项目状态、不创建新 Release，也不转做其他里程碑。
