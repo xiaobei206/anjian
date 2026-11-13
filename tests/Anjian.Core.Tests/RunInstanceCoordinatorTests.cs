@@ -107,6 +107,25 @@ public sealed class RunInstanceCoordinatorTests
     }
 
     [Fact]
+    public void StartupWatchdogLocksTimedOutOutcomeBeforeCleanup()
+    {
+        var coordinator = new RunInstanceCoordinator();
+        var admission = coordinator.Admit(Guid.NewGuid().ToString("N"), "script.lua");
+
+        var timeout = coordinator.RequestTimeout(admission.InstanceId);
+        Assert.True(timeout.Changed);
+        Assert.Equal(RunInstanceState.Cancelling, timeout.Snapshot.State);
+        Assert.Equal(RunInstanceOutcome.TimedOut, timeout.Snapshot.Outcome);
+
+        var completed = coordinator.Complete(
+            admission.InstanceId, RunInstanceOutcome.Failed, RunInstanceCleanupStatus.Succeeded);
+        Assert.Equal(RunInstanceState.Cleaned, completed.Completed.State);
+        Assert.Equal(RunInstanceOutcome.TimedOut, completed.Completed.Outcome);
+        Assert.Equal(RunInstanceTerminationMode.Graceful, completed.Completed.TerminationMode);
+        Assert.Equal(RunInstanceCleanupStatus.Succeeded, completed.Completed.CleanupStatus);
+    }
+
+    [Fact]
     public void RejectsMalformedRequestIdentityAndKeepsRequestIdStableAfterCompletion()
     {
         var coordinator = new RunInstanceCoordinator();
