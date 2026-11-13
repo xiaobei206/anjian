@@ -545,7 +545,7 @@ M4 基础调试器与 M5 可视化录制/动作列表均已完成 Windows CI 验
 
 ### 核查结果
 - 会话开始时 main HEAD：`b06910f93a40780c3ffa10a04d64d41d176b2767`，仅为文档同步提交。
-- M8 实现代码基线：`c2b30c1d9aabd876cd848d6203376060f294c34e`。关联 Windows Actions run [43358188770](https://github.com/xiaobei206/anjian/actions/runs/43358188770) SUCCESS：Restore PASS；Release Build 0 warnings / 0 errors；85/85 Core tests；API handbook `--check)；self-contained win-x64 publish；ZIP/SHA256 与 artifact upload 全 PASS。Artifact ID `14006903094`，76,460,671 bytes。
+- M8 实现代码基线：`c2b30c1d9aabd876cd848d6203376060f294c34e`。关联 Windows Actions run [43358188770](https://github.com/xiaobei206/anjian/actions/runs/43358188770) SUCCESS：Restore PASS；Release Build 0 warnings / 0 errors；85/85 Core tests；API handbook `--check`；self-contained win-x64 publish；ZIP/SHA256 与 artifact upload 全 PASS。Artifact ID `14006903094`，76,460,671 bytes。
 - 该 run 使用 Windows Server 2025 runner。它证明代码构建和自动化测试通过，不证明 Windows 10/11 用户桌面的 GDI 截图、DPI、多显示器、WinForms 资源 UI、overlay 点击穿透或 Display Affinity 行为通过。
 
 ### 本轮实际执行与限制
