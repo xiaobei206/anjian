@@ -330,3 +330,28 @@ preview.4 当前采用低级鼠标/键盘 Hook，已纳入 Windows CI 编译与�
 - `src/Anjian.App/Controls/ScriptParameterDialog.cs`：由 schema 生成的运行表单、文件/目录选择、恢复默认、JSON 导入/导出和敏感值导出确认。
 - `PlaybackRunner` 的 worker-ready 握手将已验证参数作为独立 JSON payload 传递；`WorkerProgram` 注入 `Args`。MainForm 在播放和调试前统一收集、验证参数，并把路径值按脚本目录规范化为绝对路径。
 - 配置文件为本地 JSON 明文；Sensitive 只做 UI 遮蔽、导出提醒和日志不记录，不提供静态加密。
+
+
+## 16. M11 小精灵发布包与启动边界
+
+### 16.1 包构建输入和依赖解析
+- SpritePackageBuilder 只接受完整的 self-contained win-x64 发布目录，必须能找到 apphost、Anjian.App.dll、deps/runtimeconfig、hostfxr.dll 和 coreclr.dll；framework-dependent 开发输出拒绝打包。
+- 入口脚本必须位于选定工程根目录内。每个入口单独建立内容根；脚本和 sidecar 保留工程相对路径。
+- LuaStaticDependencyScanner 词法扫描注释、字符串和调用，识别字面量 require("module.name") 与 LoadImage("path")。模块解析为工程根下 module/name.lua 或 module/name/init.lua，递归扫描并放入该入口的 Modules。动态 require 无法静态证明依赖闭包，构建直接拒绝。
+- 图片资源按入口脚本目录解析并限制在工程根内；既有 .images.json / .assets 用 ImageResourceCatalog 的校验结果作依据。动态 LoadImage 要求 manifest，且会发出“无法证明清单外动态路径”的 warning。
+- OCR 不通过联网下载补齐。只有 UI 中明确勾选且缓存文件完整的语言模型会被复制到 Content/Ocr/Models；识别 Worker 以该目录覆盖模型缓存，并使用 offline 选项。
+
+### 16.2 文件布局、清单与校验
+- 文件夹名为 <ProductName>-<SemVer>-win-x64，启动 ZIP 名为文件夹名加 -launcher.zip。ZIP 内保留整个根目录。入口 EXE 是 .NET apphost 的重命名副本，不是真正单文件；不能删除伴随 DLL、hostfxr/coreclr 或 Content。
+- Anjian.Sprite.json schema v1 包含稳定 PackageId、产品元数据、入口/参数/模块/图像 manifest 路径、OCR 语言/文件、运行选项、最低 API/.NET 版本、构建 UTC 时间和每个伴随文件的尺寸/SHA-256/kind。
+- SHA256SUMS.txt 覆盖包内所有 payload 文件和 manifest；ZIP 旁另写 .sha256。哈希是完整性校验，不是数字签名或来源真实性证明。
+- 启动前先验证 manifest JSON/schema、清单与真实目录闭合、逐文件大小/hash、参数 schema、图像 manifest/assets、OCR 文件、启动入口和最低兼容版本；路径必须为安全相对路径，符号链接/重解析点拒绝。
+- 包同时包含 build.log、README-Sprite.txt 和 Content/Help/FUNCTION-REFERENCE-CN.md。离线函数手册目前为 Markdown；HTML 生成仍未实现。
+
+### 16.3 Worker 与用户数据隔离
+- 小精灵复用主程序和既有 Worker IPC；Worker-ready payload 增加可选模块根目录与 OCR 模型目录，不改变普通 IDE 播放的默认路径。
+- 小精灵 require 由 SpriteLuaModuleLoader 注册的受限加载器替代：仅允许模块标识符字符集映射到包内 .lua / init.lua，拒绝目录穿越、符号链接和超过 2 MiB 的模块；缓存已加载模块并检测循环加载。
+- 参数表单仍使用 M10 ScriptParameterSchema / ScriptParameterValidator / ScriptParameterDialog，不会在包端引入第二套参数语义。
+- PackageId 基于规范化工程路径和产品名；EntryId 基于 PackageId 与入口工程相对路径。相同工程升级只变版本不换 ID；用户值存放到 %LOCALAPPDATA%\\Anjian2026\\Sprites\\<PackageIdHash>\\<EntryIdHash>.json，不写入发布目录。
+- 启动器用 Mutex 实现按包单实例，用 RegisterHotKey 注册可选启动热键；支持自动运行、循环、间隔、暂停/继续/停止与失败重试。Stop 仍强制终止 Worker 并释放输入；退出清理是不可关闭的安全项。
+- CI 增加真实 self-contained 发布包冒烟：运行重命名后的 apphost，经 Worker IPC 运行 package-local require 模块并注入 Args，检查完整执行结果；这不覆盖 WinForms UI/DPI/真实输入实机验收。

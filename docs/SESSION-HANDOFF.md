@@ -448,3 +448,37 @@ M4 基础调试器已在 main 实现并通过 Windows CI。具体实现提交与
 ### 本会话之后的状态
 - M10 实现与自动化已收尾，**下一会话只做 M11**；不回头要求先跑 M10/M8 桌面实测。
 - M11 完成前不提前启动 M12；M14 正式 1.0.0 仍等待 M1–M13 集中桌面验收和缺陷修复。
+
+
+---
+
+## 2026-11-13 会话收尾状态覆盖（优先于上方旧交接内容）
+
+- 本会话已完成 M11 实施范围；代码提交基线 7e2ed0f52c08b5b76069d405688c8af2aa0ec097，文档收尾与本 handoff 一并进入 main。
+- 小精灵生成 portable folder + launcher ZIP；启动 EXE 是 self-contained apphost，必须保留 companion DLL、hostfxr/coreclr、Content，不宣传单文件。
+- M11 已覆盖多入口、静态 require 递归、图像资源 manifest/assets、显式 OCR 缓存模型、M10 参数 schema/validator/UI、稳定包/入口 ID、用户配置隔离、启动/暂停/继续/停止、循环/间隔、热键、自动启动、单实例、失败重试、退出资源释放、manifest/hash/版本校验、构建日志和离线函数参考 Markdown。
+- Windows 真实包 smoke 使用发布目录生成小精灵并启动改名 EXE，由包内 Worker 执行 require 与 Args；M11 桌面 WinForms/DPI/真实输入手工项仍 NOT RUN，统一延期 M14。
+- Run 227（代码 HEAD a006103...）、Run 228（代码 HEAD 86de4e6...）和最终 Run 229（代码 HEAD 7e2ed0f...）均 SUCCESS；Run 229 的 Build 0 warnings/0 errors、Core tests 110/110、API handbook check、自包含发布、含离线函数参考 Markdown 的真实包/Worker smoke 1/1（33 秒）、ZIP/SHA256、artifact 上传全 PASS。最终 artifact ID 14014490869，87,162,650 bytes，digest sha256:6a7bfaee6d0af15f3e80a6c48071a62c8459e9c0db2e4fc450568e317bd6654b，有效期至 2026-12-13。
+- 本地没有 .NET SDK；本地 Build/Test NOT RUN。未改版本/未发 Release；v0.1.0-preview.4 保持不变。
+- PRD 2.14 HTML 离线参考手册仍待实现；当前发布包包含 Markdown。
+
+## 下一会话唯一任务：M12 — 内置扩展 API 与插件系统
+
+### 开始前
+1. 核对 main 最新 HEAD，读取 AGENTS.md、README.md、本 handoff、PRD 中扩展/插件章节、ROADMAP、FEATURE-MATRIX、ARCHITECTURE、DECISIONS、API registry、当前 Worker/权限边界。
+2. 只做 M12，不回头重做已通过 CI 的 M11；M11 WinForms/DPI/真实输入人工验收保留 M14。
+3. 继续直接在 main 小步提交，不创建长期分支/PR；除非明确提出发布要求，不改 VERSION、不创建 tag/Release。
+
+### M12 唯一实施范围
+- 按 PRD/FEATURE-MATRIX 实现内置扩展 API：文件、剪贴板、对话框、进程、HTTP/JSON；定义准确的输入/输出/错误/超时/取消契约。
+- 插件 manifest、插件包结构、稳定 ID、版本/API 兼容字段、来源和权限声明；加载/卸载和禁用流程。
+- 最小权限模型：默认拒绝；明确授予文件根目录、剪贴板、进程启动、HTTP 域名/方法等能力；Worker 端执行强制检查，UI 展示权限审阅。
+- 依赖 Worker IPC，主 UI 不执行用户 Lua/第三方插件代码；停止/超时/卸载时可靠取消并清理资源。
+- API registry 为唯一来源；新增公开 API 同步生成函数手册/IDE 提示/命令面板和契约测试。
+- 不做云商城、强制联网授权和远程执行；HTTP 是脚本声明授权的显式能力。
+- CI 覆盖权限默认拒绝、授权/撤销、路径越界、进程退出/取消、HTTP 超时/取消、插件兼容性与损坏包拒绝；真实 WinForms/OS 交互留 M14。
+
+### M12 开始前的约束
+- 先读最新 handoff 与现有 API registry；避免重复实现 M8/M9/M10/M11 的现有能力。
+- 对敏感 OS API 所有操作落实在 Worker/能力代理，不允许仅 UI 隐藏按钮作为权限边界。
+- 每次增加 API 要同步 registry、FUNCTION-REFERENCE、IDE 补全/提示和自动化检查。

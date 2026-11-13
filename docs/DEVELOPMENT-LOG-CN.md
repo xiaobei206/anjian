@@ -653,3 +653,24 @@ M4 基础调试器与 M5 可视化录制/动作列表均已完成 Windows CI 验
 - 临时 artifact `Anjian2026-preview-win-x64`，ID `14010789337`，87,099,638 bytes，archive digest `sha256:324ed884d9938548d2d35b94cd372a4bc46bf081f7abd1c77e17b28d1acf1323`，有效至 2026-12-13；这不是正式 Release。日志另有 GitHub Actions Node.js 20 弃用提示，非项目编译 warning。
 - 本地执行环境为 Debian/Linux 且无 .NET SDK；本地 Restore/Build/Test 均 NOT RUN。最终自动化结果来自 Windows Actions。
 - M10-01..M10-10 真实 WinForms/UI/运行时桌面验收仍 NOT RUN，按用户决定延期至 M14 集中执行。没有修改 VERSION、AssemblyVersion、FileVersion；没有创建 tag 或 Release；v0.1.0-preview.4 官方资产不变。
+
+
+## 2026-11-13 — M11 小精灵独立打包器与发布包
+
+### 实施内容（直接提交 main）
+- 4cab72a：Core 静态 Lua 依赖扫描、self-contained 包构建器、manifest/SHA256/ZIP 与首批测试。
+- 78c641a：可空性修复并扩充依赖/多入口覆盖；CI 找到模块图片路径基准偏差。
+- cfba85d：模块中的 LoadImage 也按入口脚本目录语义解析；Windows CI Run 223 SUCCESS（Build 0 warnings/0 errors，Core tests 109/109，API 检查、自包含发布、ZIP/SHA256、artifact 全通过）。
+- ecbde35：集成打包器窗体、小精灵启动器、受限模块加载器、Worker 可选模块/OCR路径、M10参数配置复用。
+- d516a5c：manifest 完整性校验加入参数 schema、图像资源和 OCR 模型文件验证。
+- 3bb692e：加入真实 self-contained 发布包/Worker smoke：CI 从发布目录构建小精灵、启动改名 apphost，并经 Worker 执行模块与 Args；修正打包窗体 Services namespace。
+- a006103：xUnit timeout assertion 修正；Run 227 SUCCESS，110/110 Core tests、Build 0 warnings/0 errors、API check、自包含发布、实际 package/Worker smoke、ZIP/SHA256/artifact 全通过。
+- 86de4e6：PackageId/EntryId 改为稳定派生标识，确保同工程/产品的版本升级复用 LocalAppData 参数配置；加入升级 ID 回归测试；Run 228 SUCCESS，110/110 Core tests、实际包/Worker smoke 1/1、ZIP/SHA256/artifact 全通过。
+- 7e2ed0f：把 FUNCTION-REFERENCE-CN.md 纳入 App publish 输出，打包至 Content/Help 并设为 manifest 必需文件；Run 229 SUCCESS：110/110 Core tests、Build 0 warnings/0 errors、API check、自包含 win-x64 publish、实际包/Worker smoke 1/1（33 秒）、ZIP/SHA256、artifact upload 全通过。artifact ID 14014490869，87,162,650 bytes，digest sha256:6a7bfaee6d0af15f3e80a6c48071a62c8459e9c0db2e4fc450568e317bd6654b，有效期至 2026-12-13。
+- 未新增公开 Lua API；registry 仍为 0.7 / 81 个函数；API 参考手册契约无变更。
+- 产物结构：<Product>-<Version>-win-x64/ 文件夹和 -launcher.zip；EXE 是 apphost 启动入口，需要所有伴随文件，不是真正单文件。包内有 Anjian.Sprite.json、SHA256SUMS.txt、build.log、README-Sprite.txt 和离线函数参考 Markdown。
+- 配置与发布内容分离：稳定 PackageId/EntryId 映射用户 LocalAppData；升级不会因为随机 ID 换目录。
+- OCR 不在打包时联网补模型；用户显式选择本地完整模型才复制。
+- SHA256 是完整性校验而非发布签名。离线手册 HTML 未实现，明确保留。
+- M11 WinForms/DPI/真实输入/暂停恢复桌面验收 NOT RUN，延期 M14；CI smoke 不等于用户机器实机验收。
+- 未修改 VERSION、AssemblyVersion、FileVersion；未创建 tag/Release；v0.1.0-preview.4 官方发布资产不变。

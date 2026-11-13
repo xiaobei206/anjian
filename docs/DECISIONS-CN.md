@@ -144,3 +144,14 @@
 - 持久化：配置写入同目录临时文件、flush、原子替换；替换前保留上一份有效备份。设计器保存现有 sidecar 前必须成功读取/验证其 schemaVersion，未知未来版本或损坏定义不得被静默覆盖。损坏配置可恢复有效备份或使用默认值并给出明确状态；导入 JSON 必须经过同一 validator。导出时默认对敏感参数进行提示/脱敏，显式导出才允许包含敏感值。
 - UI：从 schema 生成参数对话框；开发者通过“参数设计器”新增/编辑/删除/排序定义。表单控件和 validator 共用类型定义；取消参数对话框不启动 Worker。打包器 M11 复用同一 schema/validator。
 - 测试：Core 单元测试覆盖每种类型、边界/必填/选项、多选、路径/热键/颜色、序列化往返、未知 schema、损坏备份恢复、原子替换故障、注入类型与恶意字符串。Windows CI 不代替 WinForms 实机验收；M10 桌面项延后 M14。
+
+
+## ADR-023：小精灵使用自包含目录 apphost、稳定身份和启动前完整性验证
+- 状态：ACCEPTED（M11）。
+- 交付形式：portable 文件夹 + 带 <ProductName>.exe 启动入口的 launcher ZIP。EXE 是 self-contained .NET apphost 的重命名副本，伴随文件不可删除；不宣传单文件。
+- 包 ID 使用规范化 ProjectRoot + ProductName 派生稳定标识，入口 ID 使用包 ID + 工程相对路径派生；同一工程同一产品的版本升级不更换配置路径。用户配置独立存储 LocalAppData，绝不写进发布包。
+- 依赖策略：静态 require 递归解析；动态 require 在构建时拒绝。LoadImage 路径相对入口脚本目录并限制在项目根目录；图像 catalog 以既有 manifest/hash 校验。OCR 只打包用户显式选择且本地缓存完整的模型，运行时离线。
+- Anjian.Sprite.json 列明所有包 payload 文件、尺寸、kind、SHA-256、最低 API/.NET 版本与入口元数据；SHA256SUMS.txt 和 ZIP .sha256 供完整性检查。SHA-256 不提供签名/发行者认证。
+- Launcher 启动前校验清单闭合、hash、入口、参数 schema、图像 manifest/assets、OCR 文件和 API/runtime 兼容性；验证失败时禁止执行 Worker。
+- 参数沿用 ADR-022；Worker 只增加可选包模块目录和 OCR 模型目录，不改变既有 typed Args 语义。
+- 包内包含 Markdown 函数参考；PRD 2.14 的离线 HTML 仍待帮助系统后续实现。Windows 自动化 smoke 不是桌面 UI/真实输入验收，后者统一留给 M14。

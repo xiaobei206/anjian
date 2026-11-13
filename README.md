@@ -102,3 +102,10 @@ dotnet run --project tools/Anjian.ApiDocsGenerator -c Release -- --check
 dotnet publish src/Anjian.App/Anjian.App.csproj -c Release -r win-x64 --self-contained true
 
 版本号见 VERSION。Windows 构建与测试由 .github/workflows/windows-build.yml 执行。
+
+
+### M11 小精灵发布（main 开发版，尚未创建正式 Release）
+
+M11 已在 main 加入独立小精灵打包流程：多入口 Lua 依赖收集、可验证的便携目录与 EXE 启动 ZIP、产品元数据、参数界面、独立用户配置、循环/热键/单实例/重试、显式选择的离线 OCR 模型、图像资源校验、manifest/SHA-256、构建日志和随包离线函数参考 Markdown。EXE 是自包含目录中的启动入口，不是单文件程序；必须保留所有运行时伴随文件。Windows CI 自动化通过不等于 WinForms/DPI/真实键鼠输入的桌面验收；M11 桌面项目仍按计划延期至 M14。详见 [用户指南中的小精灵章节](docs/USER-GUIDE-CN.md)。
+
+本轮不修改 VERSION、AssemblyVersion、FileVersion，不创建 tag 或 Release；v0.1.0-preview.4 官方下载资产不变。

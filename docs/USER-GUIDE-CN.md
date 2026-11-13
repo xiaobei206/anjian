@@ -345,3 +345,40 @@ end
 - 标记为 `Sensitive` 的输入在表单中遮蔽；应用自身的常规运行日志不自动写入参数值，导出时会询问是否包含敏感字段。脚本若主动打印/抛出包含秘密的内容，仍可能把它写进日志。当前本地配置文件**不加密**，不要把高敏感凭据保存在其中。
 - `Args` 的常规顶层/嵌套赋值和通过 `pairs` 获取的嵌套表赋值会报只读错误；Lua `rawset`/debug 可绕过代理，因此这不是针对恶意脚本的安全沙箱。
 - 当前功能已通过 Windows CI 自动化验证；参数表单的 DPI、文件/目录选择、真实播放/调试交互仍待 M14 后统一 Windows 10/11 桌面验收。
+
+
+## 12. 小精灵打包与运行（M11，main 开发版）
+
+> 本功能当前进入 main，并未包含在正式 v0.1.0-preview.4 Release。只有使用包含 M11 的 Windows x64 开发构建才能看到“小精灵打包”按钮。
+
+### 12.1 构建小精灵
+1. 在按键精灵 IDE 工具栏点击“小精灵打包”。
+2. 选择脚本工程根目录，添加一个或多个 .lua 入口。入口必须位于工程根目录内。
+3. 选择 .NET 10 self-contained win-x64 发布目录。若当前应用目录本身不是完整自包含发布目录，请选择开发构建产出的 artifacts/publish/win-x64；不能用仅有 .dll 的 framework-dependent 输出。
+4. 填写产品名、SemVer 版本、说明、作者、版权、可选 About 文本和 .ico 图标。图标用于小精灵运行窗口；产品文件和运行时伴随文件仍按 manifest 完整保留。
+5. 设置重复次数（0 无限）、轮间隔、失败重试、启动热键、自动启动、单实例与详细日志。退出时清理 Worker/模拟输入为强制安全项，不能关闭。
+6. OCR 语言仅在本机缓存模型完整时可勾选（简体中文 ch、英语 en、日语 japan）。打包器不会自动联网下载模型；用户需先通过 OCR 模型管理功能显式下载。
+7. 选择输出目录，生成文件夹包和 launcher ZIP。若输出目标已存在，构建会拒绝覆盖，请选择新的目录或版本号。
+
+### 12.2 产物内容与启动
+- 文件夹：<产品名>-<版本>-win-x64。
+- ZIP：<产品名>-<版本>-win-x64-launcher.zip，旁边有同名 .sha256 sidecar。ZIP 内包含完整文件夹。
+- 在文件夹内双击 <产品名>.exe 启动。不得只复制 EXE 或删除同目录的 DLL、hostfxr/coreclr、Content 等伴随文件；这不是单文件程序，也不需要额外安装 Lua/IDE。
+- 首次运行前检查 Anjian.Sprite.json、SHA256SUMS.txt、逐文件 hash、参数 schema、图像资源、OCR 模型和最低 API/.NET 版本；校验失败时不会运行脚本。
+- 随包离线函数参考位于 Content/Help/FUNCTION-REFERENCE-CN.md；简要启动说明为 README-Sprite.txt。
+
+### 12.3 模块、图像与 OCR 依赖规则
+- require("lib.helper") 解析为工程根下 lib/helper.lua 或 lib/helper/init.lua，并递归收集其静态 require 依赖；动态 require(name) 无法保证依赖闭包，打包时会拒绝。
+- LoadImage("images/button.png") 的相对路径以入口脚本目录为基准，且不能越出工程根目录；.images.json 和对应 .assets 会一起校验/收集。
+- 动态 LoadImage(...) 需要 .images.json 资源清单；清单外动态路径无法静态保证，构建日志会有警告。
+- OCR 模型仅随显式选择的已下载语言复制进包，运行时使用离线模型目录。
+
+### 12.4 参数配置与升级
+- 入口脚本同目录 <脚本名>.params.json 定义参数；运行时表单直接复用 M10 schema、validator 和表单控件，用户取消或校验失败不会启动 Worker。
+- 参数值存放在 %LOCALAPPDATA%\\Anjian2026\\Sprites\\ 下，按稳定 PackageId/EntryId 派生子路径；升级同一工程版本会复用原用户值，包内容不会覆盖配置。
+- 更改工程根路径或产品名会形成新的包身份；若要迁移用户值，应在备份后手动迁移对应 LocalAppData 配置。
+- 标记 Sensitive 的字段仍遵循 M10 行为：表单遮蔽、默认导出脱敏；本地 JSON 配置不加密。
+
+### 12.5 验收边界
+- Windows CI 已使用真实 self-contained 发布目录生成包，并启动重命名 EXE，经包内 Worker 执行模块加载和 M10 参数注入。
+- 该自动化冒烟不覆盖 WinForms 的 DPI/布局、真实用户热键交互、实际键鼠输入、暂停/恢复/长时间稳定性；这些桌面项仍为 NOT RUN，延期到 M14。离线手册 HTML 版本亦未实现，当前包提供 Markdown。

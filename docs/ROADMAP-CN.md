@@ -21,7 +21,7 @@
 | M8 截图、图色与模板资源 | DONE（实现/Windows CI；桌面验收延期至 M14 后） | 图像资源 UI、manifest/assets、相对路径/依赖、RGB/hex/颜色块、透明模板、视觉调试 overlay 已进入 main 并通过 Windows CI；M8-01..M8-18 仍 NOT RUN，集中验收 |
 | M9 OCR 与文本识别 | DONE（实现与 Windows CI PASS；桌面验收延期至 M14 后，NOT RUN） | PaddleOcrNet 2.4.0 CPU 适配器、显式 ch/en/japan 模型管理、严格离线推理、行级结果/置信度/边界框、OCR/FindText/WaitText、暂停/停止与资源释放 |
 | M10 参数、配置与脚本自定义 UI | DONE（实现与 Windows 自动化验收完成；WinForms/桌面实测延期 M14） | 参数 sidecar schema v1、10 种类型、统一 validator、配置持久化/恢复、播放/调试前表单、参数设计器、JSON 导入导出、typed Worker IPC、递归只读 Lua Args、脚本目录相对路径解析 |
-| M11 小精灵打包器 | TODO | 独立包/EXE 入口、独立参数界面、图标、依赖收集、运行控制、清单与校验 |
+| M11 小精灵打包器 | DONE（Windows CI run 229 PASS；WinForms/DPI/真实输入桌面验收延期 M14，NOT RUN） | 独立便携目录 + EXE 启动 ZIP、依赖/资源收集、M10 参数 UI、运行控制、manifest/SHA256、构建日志与离线函数参考 Markdown |
 | M12 内置扩展 API 与插件系统 | TODO | 文件、剪贴板、对话框、进程、HTTP/JSON，插件 manifest/权限/API 版本 |
 | M13 多实例与定时任务 | TODO | 独立运行实例、任务状态、定时、超时、失败策略与隔离 |
 | M14 1.0 稳定化与发布 | TODO | 自动与手工验收、依赖许可、离线帮助、性能/长时测试和正式稳定版发布 |
@@ -224,11 +224,16 @@ M7 实现/CI 已完成不代表 M7-01..M7-10 Windows 桌面验收通过；这些
 
 ## M11 — 小精灵独立打包
 
-- 收集入口脚本、依赖模块、资源、模板、配置与运行时要求。
-- 可配置应用名、版本、图标、关于信息、参数表单、运行选项和单实例行为。
-- 输出独立运行入口/包、依赖清单、SHA256、构建报告和对应版本的离线说明。
-- 在干净 Windows 10/11 x64 环境验证，不要求用户安装 IDE 或手工配置 Lua。
-- 配置和包升级有 schema 迁移/备份策略。
+- [x] 多入口脚本选择；静态 Lua require("module.name") 递归收集，动态 require(...) 因无法静态保证完整性而在打包前拒绝。
+- [x] LoadImage("relative/path") 资源按入口脚本目录收集；图像 manifest / .assets 由既有 ImageResourceCatalog 校验；动态图像加载需要既有 .images.json 清单。
+- [x] OCR 仅在用户勾选并且本机缓存模型完整时复制；不在打包期间自动下载；包内离线模型根目录在 Worker 中显式指定。
+- [x] 复制实际 self-contained win-x64 发布目录，产出 <产品名>-<版本>-win-x64 文件夹和 -launcher.zip；重命名 apphost 作为启动入口，所有 .dll、hostfxr/coreclr、Content 文件必须保留。
+- [x] 产品名称/版本/说明/作者/版权/About/窗口图标；循环次数、轮间隔、启动热键、自动启动、单实例、失败重试、详细日志策略；停止始终释放 Worker 和模拟输入。
+- [x] M10 参数 sidecar/schema/validator/运行表单复用；小精灵配置保存到 LocalAppData，不写入包；包 ID/入口 ID 对相同工程路径、产品名和入口相对路径保持稳定，升级时沿用用户配置位置。
+- [x] 输出 Anjian.Sprite.json、逐文件 SHA256SUMS.txt、ZIP .sha256、build.log、README-Sprite.txt 和 Content/Help/FUNCTION-REFERENCE-CN.md；启动前校验 hash、文件清单、参数 schema、图像清单、OCR 路径及最低 API/.NET 版本。
+- [x] Windows CI 用真实 self-contained 发布目录构建小精灵，并启动改名后的 EXE，由包内 Worker 实际执行 Lua require 和 M10 Args 参数注入。
+- [ ] Windows 10/11 WinForms 界面、DPI、热键交互、真实键鼠输入、暂停/继续/停止和长时间运行的人工验收：延期 M14，当前 NOT RUN。
+- [ ] PRD 2.14 所述离线函数参考 HTML 生成链尚未建立；当前包先包含 Markdown，HTML 任务保留到后续帮助系统完善。
 
 ## M12–M13 — 扩展 API、插件和自动运行
 

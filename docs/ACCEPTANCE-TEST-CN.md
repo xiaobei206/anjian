@@ -332,3 +332,25 @@ M1–M13 的桌面实测不再作为进入下一开发阶段的前置条件，�
 - 新增自动化覆盖脚本目录相对路径在配置中保持可移植、运行时解析绝对路径、非法路径和 Lua 保留字拒绝、`pairs(Args)` 遍历返回值递归只读；schema 未来版本防覆盖与既有路径/正则/数值/空值测试也已保留。
 - 临时 artifact ID `14010789337`，87,099,638 bytes；artifact archive SHA-256 `324ed884d9938548d2d35b94cd372a4bc46bf081f7abd1c77e17b28d1acf1323`，保留至 2026-12-13。该 artifact 不是 Release。
 - 自动化测试不等于桌面验收；M10-01..M10-10 以及 M1–M13 所有未执行的 Windows 10/11 手工项目仍保持 NOT RUN，统一延期至 M14 后。
+
+
+## 17. M11 小精灵独立打包与发布包
+
+| ID | 场景 | 自动化覆盖/结果 | Windows 桌面验收 |
+|---|---|---|---|
+| M11-01 | 多入口与 self-contained 运行时 | builder/Core tests；拒绝不完整 framework-dependent 目录 | NOT RUN（M14） |
+| M11-02 | 静态 require 递归 | 扫描器忽略注释/字符串、递归包含模块；动态 require 拒绝 | NOT RUN（M14） |
+| M11-03 | 图像资源 | LoadImage 相对路径、工程根限制、manifest/assets/hash 验证、动态资源清单警告 | NOT RUN（M14） |
+| M11-04 | OCR 资源 | 显式已下载模型拷贝到包内离线模型目录；模型清单验证 | NOT RUN（M14） |
+| M11-05 | M10 参数 UI 与持久化 | schema/validator 复用；参数 sidecar；PackageId/EntryId 稳定升级；Worker smoke 验证 Args | NOT RUN（M14） |
+| M11-06 | manifest 与完整性 | 文件列表闭合、逐文件 SHA-256、大小、SHA256SUMS、ZIP sidecar、损坏/未登记文件拒绝 | NOT RUN（M14） |
+| M11-07 | 打包后真实 Worker | Windows CI 从实际 self-contained 发布目录生成包，启动改名 EXE 并通过 Worker 执行 require + Args | 自动化 PASS（Run 229；真实 self-contained 包/Worker smoke 1/1 PASS） |
+| M11-08 | 运行控制 | Start/Pause/Resume/Stop、循环/间隔、热键、自动启动、单实例、重试与退出清理代码接线 | NOT RUN（M14，真实输入/交互） |
+| M11-09 | 清洁用户环境、DPI 与视觉 | 非开发机双击、热键/参数窗体布局、缩放、多显示器 | NOT RUN（M14） |
+
+### M11 自动化结果记录
+- Run 227（head a006103910885263b3b57603fd2cb077e1544dab）SUCCESS：Restore PASS；Release Build 0 warnings / 0 errors；Core tests 110/110 PASS；API handbook check PASS；self-contained win-x64 publish PASS；实际包/Worker smoke 1/1 PASS（12 秒）；ZIP/SHA256 和 artifact upload PASS。artifact ID 14012924919，87,142,009 bytes，digest e3765922f3719d6b8d0b4994d31ee8fed4c5dea3189ee52b60c4bb0575ad0cd。
+- Run 228（head 86de4e6f5e7abbfeba7d8219480e24a07e7329b6）SUCCESS：Build 0 warnings / 0 errors；Core tests 110/110 PASS；API handbook check、自包含发布、实际包/Worker smoke 1/1 PASS（10 秒）、ZIP/SHA256 和 artifact upload PASS。artifact ID 14014515367，87,142,240 bytes，digest f5bbc0e2c233cf71a52ffda2793b7e516a86ffbd4ef97d059fc475062b500e2a。
+- Run 229（head 7e2ed0f52c08b5b76069d405688c8af2aa0ec097）SUCCESS：Build 0 warnings / 0 errors；Core tests 110/110 PASS；API handbook check PASS；self-contained win-x64 publish PASS；实际小精灵 EXE/Worker smoke 1/1 PASS（33 秒，包含包内 Markdown 函数参考）；ZIP/SHA256 和 artifact upload PASS。artifact ID 14014490869，87,162,650 bytes，archive digest sha256:6a7bfaee6d0af15f3e80a6c48071a62c8459e9c0db2e4fc450568e317bd6654b，有效期至 2026-12-13。Run 229 是包含离线 Markdown 手册后的最终代码 HEAD 验证。
+- 旧的中间 CI 失败均已修复：Run 221 nullable compile、Run 222 图像资源基准路径测试、Run 224/225 manifest/namespace 编译、Run 226 xUnit2020 分析器规则。最终状态以 Run 229 为准。
+- 本地执行环境没有 .NET SDK；本地 Build/Test NOT RUN。GitHub Actions Windows runner 是构建和自动化测试来源。
