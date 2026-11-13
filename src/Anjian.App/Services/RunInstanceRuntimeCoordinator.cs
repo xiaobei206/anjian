@@ -413,6 +413,18 @@ internal sealed class RunInstanceRuntimeCoordinator : IDisposable
         catch (Exception ex)
         {
             failure = ex;
+            if (ex is TimeoutException)
+            {
+                RunInstanceStopResult? timeout = null;
+                lock (_sync)
+                {
+                    var current = _model.GetSnapshot(entry.InstanceId);
+                    if (current.State is RunInstanceState.Starting or RunInstanceState.Running or RunInstanceState.Paused)
+                        timeout = _model.RequestTimeout(entry.InstanceId);
+                }
+                if (timeout is { Changed: true })
+                    StateChanged?.Invoke(timeout.Snapshot);
+            }
             PublishLog(entry.InstanceId, "实例运行失败：" + ex);
         }
         finally
