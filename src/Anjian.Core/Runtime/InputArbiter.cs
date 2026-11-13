@@ -68,6 +68,8 @@ public sealed class InputArbiter : IDisposable
                     tuple.Arbiter.CancelWaiter(tuple.Waiter);
                 },
                 (this, waiter));
+            if (waiter.Completion.Task.IsCompleted)
+                waiter.Registration.Dispose();
         }
 
         return new ValueTask<InputArbiterLease>(waiter.Completion.Task);
@@ -133,6 +135,7 @@ public sealed class InputArbiter : IDisposable
     private void Release(RunInstanceId owner)
     {
         Waiter? next = null;
+        List<Waiter> cancelled = [];
         lock (_sync)
         {
             if (_owner != owner || _leaseCount <= 0)
@@ -153,8 +156,7 @@ public sealed class InputArbiter : IDisposable
                 candidate.Node = null;
                 if (candidate.Token.IsCancellationRequested)
                 {
-                    candidate.Registration.Dispose();
-                    candidate.Completion.TrySetCanceled(candidate.Token);
+                    cancelled.Add(candidate);
                     continue;
                 }
 
@@ -163,6 +165,12 @@ public sealed class InputArbiter : IDisposable
                 next = candidate;
                 break;
             }
+        }
+
+        foreach (var waiter in cancelled)
+        {
+            waiter.Registration.Dispose();
+            waiter.Completion.TrySetCanceled(waiter.Token);
         }
 
         if (next is not null)
