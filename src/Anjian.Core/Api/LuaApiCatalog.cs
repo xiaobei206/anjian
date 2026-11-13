@@ -6,6 +6,7 @@ using NLua;
 using Anjian.Core.Windows;
 using Anjian.Core.Ocr;
 using Anjian.Core.Permissions;
+using Anjian.Core.Plugins;
 
 namespace Anjian.Core.Api;
 
@@ -56,6 +57,65 @@ public sealed class LuaApiRegistry
         }
         Unique(Runtime.DisabledGlobals,"hidden global");
     }
+    public LuaApiRegistry WithPluginContributions(IEnumerable<PluginApiRuntimePlan> plans)
+    {
+        ArgumentNullException.ThrowIfNull(plans);
+        var entries = plans.SelectMany(plan => (plan.Functions ?? [])
+            .Select(function => (Plan: plan, Function: function))).ToArray();
+        if (entries.Length == 0)
+            return this;
+
+        var categories = Categories.ToList();
+        if (categories.Any(category => category.Id.Equals("plugins", StringComparison.Ordinal)))
+            throw new InvalidDataException("内置 API registry 已占用 plugins 分类。");
+        categories.Add(new LuaApiCategory
+        {
+            Id = "plugins",
+            Title = "本地插件函数",
+            Description = "来自已启用本地插件的纯 Lua helper；不扩展宿主权限。"
+        });
+
+        var apis = Apis.ToList();
+        var contributedNames = new HashSet<string>(Apis.Select(api => api.Name), StringComparer.OrdinalIgnoreCase);
+        foreach (var (plan, function) in entries)
+        {
+            if (!contributedNames.Add(function.Name))
+                throw new InvalidDataException("插件 API 名称与内置函数或其他启用插件冲突：" + function.Name);
+            apis.Add(new LuaApiDefinition
+            {
+                Id = $"plugin:{plan.PluginId}:{function.Id}",
+                Name = function.Name,
+                Category = "plugins",
+                Title = function.Title,
+                Description = $"[{plan.PluginId} {plan.Version}] {function.Description}",
+                Signature = function.Signature,
+                Parameters = function.Parameters,
+                Returns = function.Returns,
+                Errors = function.Errors,
+                Behavior = function.Behavior,
+                Example = function.Example,
+                ImplementationStatus = "implemented",
+                VerificationStatus = "plugin-declared-runtime-contract",
+                IntroducedIn = $"plugin:{plan.PluginId}@{plan.Version}",
+                Runtime = new LuaApiRuntimeDefinition { Definition = "verified-plugin-lua-helper", Bindings = [] }
+            });
+        }
+
+        var merged = new LuaApiRegistry
+        {
+            SchemaVersion = SchemaVersion,
+            ApiVersion = ApiVersion,
+            Product = Product,
+            Categories = categories,
+            Apis = apis,
+            Runtime = Runtime
+        };
+        merged.Validate();
+        if (merged.Apis.Select(api => api.Name).Distinct(StringComparer.OrdinalIgnoreCase).Count() != merged.Apis.Count)
+            throw new InvalidDataException("插件 API 名称存在大小写冲突。");
+        return merged;
+    }
+
     public string RenderGeneratedReferenceSection()
     {
         var lines=new List<string>();var group=1;

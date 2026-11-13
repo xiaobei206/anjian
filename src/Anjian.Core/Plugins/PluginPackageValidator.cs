@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using Anjian.Core.Permissions;
+using Anjian.Core.Api;
 
 namespace Anjian.Core.Plugins;
 
@@ -20,6 +21,7 @@ public sealed class PluginManifest
     public string Entry { get; set; } = "";
     public string? ModulesRoot { get; set; }
     public PluginPermissionManifest Permissions { get; set; } = new();
+    public PluginApiContributionSet? Contributions { get; set; }
     public List<PluginPackageFile> Files { get; set; } = [];
 }
 
@@ -120,6 +122,16 @@ public static class PluginPackageValidator
             _ = GetRequiredPropertyValue(document.RootElement, "entry", "插件 entry");
             var permissionElement = GetRequiredProperty(document.RootElement, "permissions", "插件 permissions");
             RequireSchemaVersion(permissionElement, "插件 permissions");
+            var contributionProperties = document.RootElement.EnumerateObject()
+                .Where(property => property.Name.Equals("contributions", StringComparison.OrdinalIgnoreCase)).ToArray();
+            if (contributionProperties.Length > 1)
+                throw new InvalidDataException("插件 contributions 只能声明一次。");
+            if (contributionProperties.Length == 1 &&
+                contributionProperties[0].Value.ValueKind is not (JsonValueKind.Null or JsonValueKind.Object))
+                throw new InvalidDataException("插件 contributions 必须是 JSON 对象或省略。");
+            if (contributionProperties.Length == 1 &&
+                contributionProperties[0].Value.ValueKind == JsonValueKind.Object)
+                RequireSchemaVersion(contributionProperties[0].Value, "插件 contributions");
             manifest = JsonSerializer.Deserialize<PluginManifest>(manifestJson, JsonOptions)
                 ?? throw new InvalidDataException("插件 manifest 为空。");
         }
@@ -195,6 +207,8 @@ public static class PluginPackageValidator
                 throw new InvalidDataException("插件文件 SHA-256 不匹配：" + pair.Key);
         }
 
+        ValidateApiContributions(manifest.Contributions, normalizedModulesRoot, hashes.Keys);
+
         ScriptPermissionRequest manifestPermissions;
         try
         {
@@ -230,6 +244,117 @@ public static class PluginPackageValidator
             manifest, root, GetSafeFullPath(root, manifest.Entry), modulesRootPath,
             new Dictionary<string, string>(hashes, StringComparer.OrdinalIgnoreCase),
             manifestPermissions, scriptPermissions);
+    }
+
+
+    private static readonly Regex ContributionIdPattern =
+        new("^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$", RegexOptions.CultureInvariant);
+    private static readonly Regex LuaIdentifierPattern =
+        new("^[A-Za-z_][A-Za-z0-9_]{0,63}$", RegexOptions.CultureInvariant);
+    private static readonly Regex LuaModuleNamePattern =
+        new("^[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*$", RegexOptions.CultureInvariant);
+    private static readonly HashSet<string> LuaReservedNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "and","break","do","else","elseif","end","false","for","function","goto","if","in","local",
+        "nil","not","or","repeat","return","then","true","until","while","_G","_VERSION","assert",
+        "collectgarbage","coroutine","debug","dofile","error","getmetatable","io","ipairs","load",
+        "loadfile","math","next","os","package","pairs","pcall","print","rawequal","rawget","rawlen",
+        "rawset","require","select","setmetatable","string","table","tonumber","tostring","type",
+        "utf8","warn","xpcall","luanet"
+    };
+
+    private static void ValidateApiContributions(
+        PluginApiContributionSet? contributions,
+        string? modulesRoot,
+        IEnumerable<string> filePaths)
+    {
+        if (contributions is null)
+            return;
+        if (contributions.SchemaVersion != 1 || contributions.Functions is null ||
+            contributions.Functions.Count > 64)
+            throw new InvalidDataException("插件 contributions 必须为 schemaVersion=1，且最多声明 64 个函数。");
+        if (contributions.Functions.Count == 0)
+            return;
+        if (string.IsNullOrWhiteSpace(modulesRoot))
+            throw new InvalidDataException("声明插件 API 函数时必须提供 modulesRoot。");
+
+        var files = filePaths.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var baseNames = LuaApiRegistry.Load().Apis.Select(api => api.Name)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var ids = new HashSet<string>(StringComparer.Ordinal);
+        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var function in contributions.Functions)
+        {
+            if (function is null)
+                throw new InvalidDataException("插件 API 函数清单不能包含 null。");
+            if (string.IsNullOrWhiteSpace(function.Id) || function.Id.Length > 80 ||
+                !ContributionIdPattern.IsMatch(function.Id) || !ids.Add(function.Id))
+                throw new InvalidDataException("插件 API 函数 id 必须稳定、唯一并符合小写 ASCII 格式。");
+            if (string.IsNullOrWhiteSpace(function.Name) || !LuaIdentifierPattern.IsMatch(function.Name) ||
+                function.Name.StartsWith("__", StringComparison.Ordinal) ||
+                LuaReservedNames.Contains(function.Name) || baseNames.Contains(function.Name) ||
+                !names.Add(function.Name))
+                throw new InvalidDataException("插件 API 函数名非法、保留或与内置/其他贡献函数冲突：" + function.Name);
+            if (string.IsNullOrWhiteSpace(function.Title) || function.Title.Length > 128 ||
+                string.IsNullOrWhiteSpace(function.Description) || function.Description.Length > 2048 ||
+                string.IsNullOrWhiteSpace(function.Example) || function.Example.Length > 4096 ||
+                function.Title.Any(char.IsControl) || function.Description.Any(char.IsControl))
+                throw new InvalidDataException("插件 API 标题、说明或示例缺失/超长。");
+            if (string.IsNullOrWhiteSpace(function.Module) || !LuaModuleNamePattern.IsMatch(function.Module) ||
+                string.IsNullOrWhiteSpace(function.Export) || !LuaIdentifierPattern.IsMatch(function.Export))
+                throw new InvalidDataException("插件 API 必须引用有效的 modulesRoot 模块名与导出标识符。");
+            var moduleRelative = ResolveContributionModulePath(modulesRoot, function.Module, files);
+            if (!files.Contains(moduleRelative))
+                throw new InvalidDataException("插件 API 引用的 Lua 模块未在 files/hash 清单内：" + moduleRelative);
+            if (function.Parameters is null || function.Parameters.Count > 16 ||
+                function.Parameters.Any(parameter => parameter is null))
+                throw new InvalidDataException("插件 API 参数最多 16 个且不能为 null。");
+            var parameterNames = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var parameter in function.Parameters)
+            {
+                if (string.IsNullOrWhiteSpace(parameter.Name) || !LuaIdentifierPattern.IsMatch(parameter.Name) ||
+                    !parameterNames.Add(parameter.Name) || !parameter.Required ||
+                    parameter.DefaultValue.HasValue && parameter.DefaultValue.Value.ValueKind != JsonValueKind.Null ||
+                    parameter.Type is not ("string" or "number" or "integer" or "boolean") ||
+                    string.IsNullOrWhiteSpace(parameter.Description) || parameter.Description.Length > 512 ||
+                    parameter.Minimum.HasValue || parameter.Maximum.HasValue || !string.IsNullOrEmpty(parameter.Unit) ||
+                    parameter.AllowedValues.Count != 0 || parameter.ValuePatterns.Count != 0 ||
+                    parameter.MinimumCount.HasValue || parameter.Variadic)
+                    throw new InvalidDataException("插件 API 参数仅支持必填标量 string/number/integer/boolean，且提示元数据必须与运行时契约一致。");
+            }
+            var expectedSignature = function.Name + "(" + string.Join(", ", function.Parameters.Select(parameter => parameter.Name)) + ")";
+            if (!string.Equals(function.Signature, expectedSignature, StringComparison.Ordinal))
+                throw new InvalidDataException("插件 API signature 必须与函数名和有序参数名完全一致：" + function.Name);
+            if (function.Returns is null ||
+                function.Returns.Type is not ("string" or "number" or "integer" or "boolean" or "table" or "nil") ||
+                string.IsNullOrWhiteSpace(function.Returns.Description) || function.Returns.Description.Length > 512)
+                throw new InvalidDataException("插件 API 返回值必须声明受限类型和说明。");
+            if (function.Errors is null || function.Errors.Count == 0 || function.Errors.Count > 16 ||
+                function.Errors.Any(error => string.IsNullOrWhiteSpace(error) || error.Length > 512))
+                throw new InvalidDataException("插件 API 必须声明 1–16 个明确错误契约。");
+            if (function.Behavior is null ||
+                string.IsNullOrWhiteSpace(function.Behavior.PauseBehavior) ||
+                string.IsNullOrWhiteSpace(function.Behavior.CancellationBehavior) ||
+                string.IsNullOrWhiteSpace(function.Behavior.CoordinateSpace) ||
+                string.IsNullOrWhiteSpace(function.Behavior.PermissionNotes) ||
+                function.Behavior.SideEffects is null || function.Behavior.SideEffects.Count != 0)
+                throw new InvalidDataException("插件 API 必须声明运行语义；纯 Lua helper 不得声明外部副作用。");
+        }
+    }
+
+    public static string ResolveContributionModulePath(
+        string modulesRoot, string moduleName, IEnumerable<string> manifestFilePaths)
+    {
+        var root = NormalizeRelativePath(modulesRoot);
+        if (!LuaModuleNamePattern.IsMatch(moduleName ?? ""))
+            throw new InvalidDataException("插件 API 模块名不合法：" + moduleName);
+        var relative = moduleName.Replace('.', '/');
+        var candidates = new[] { root + "/" + relative + ".lua", root + "/" + relative + "/init.lua" };
+        var files = manifestFilePaths.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var matches = candidates.Where(files.Contains).ToArray();
+        if (matches.Length != 1)
+            throw new InvalidDataException("插件 API 模块必须且只能映射到一个已登记的 Lua 文件：" + moduleName);
+        return matches[0];
     }
 
     public static string NormalizeRelativePath(string path)
