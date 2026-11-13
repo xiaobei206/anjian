@@ -211,6 +211,8 @@ public sealed class InputArbiter : IDisposable
         private InputArbiter? _arbiter;
         private readonly RunInstanceId _owner;
 
+        public string OwnerId => _owner.Value;
+
         internal InputArbiterLease(InputArbiter arbiter, RunInstanceId owner)
         {
             _arbiter = arbiter;
