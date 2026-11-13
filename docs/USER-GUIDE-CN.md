@@ -382,3 +382,31 @@ end
 ### 12.5 验收边界
 - Windows CI 已使用真实 self-contained 发布目录生成包，并启动重命名 EXE，经包内 Worker 执行模块加载和 M10 参数注入。
 - 该自动化冒烟不覆盖 WinForms 的 DPI/布局、真实用户热键交互、实际键鼠输入、暂停/恢复/长时间稳定性；这些桌面项仍为 NOT RUN，延期到 M14。离线手册 HTML 版本亦未实现，当前包提供 Markdown。
+
+## M12-07 剪贴板与对话框（main 开发版；不包含在 preview.4）
+
+这些函数要求脚本权限 sidecar 声明，并且用户在每次运行的权限审阅中单独批准。声明本身不会自动授予权限；小精灵暂未接入 sidecar 审阅，相关 API 因空 Grant 默认拒绝。
+
+```json
+{
+  "schemaVersion": 1,
+  "clipboardRead": true,
+  "clipboardWrite": true,
+  "dialogs": ["message", "input", "confirm"]
+}
+```
+
+Lua 示例：
+
+```lua
+local oldText = GetClipboardText()
+SetClipboardText("要复制的文本")
+MessageBox("文本已经复制。", "完成")
+
+local answer = InputBox("请输入关键词", "搜索", "默认值")
+if answer ~= nil and Confirm("使用“" .. answer .. "”继续？") then
+  Log("用户确认继续")
+end
+```
+
+剪贴板 API 仅处理文本，最多 1,048,576 个 UTF-16 字符；空字符串传给 SetClipboardText 会清空剪贴板。MessageBox 和 Confirm 正文上限为 32,768 个字符，标题 256 个字符；InputBox 的提示、默认值和输入上限均为 32,768 个字符。InputBox 取消返回 nil；Confirm 点否/关闭返回 false。剪贴板与自定义对话框经 WinForms UI STA 线程执行；Stop 会关闭挂起的自定义对话框。真实 Windows 10/11 行为仍待 M14 实机验收。

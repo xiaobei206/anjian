@@ -405,3 +405,17 @@ M1–M13 的桌面实测不再作为进入下一开发阶段的前置条件，�
 | 目录复制/移动/重命名 | 明确不在本批能力范围，仅普通文件 API | 不支持（按本 handoff 约定） |
 
 Windows Actions run [43385033936](https://github.com/xiaobei206/anjian/actions/runs/43385033936) 最终全 PASS：Build 0 warnings/0 errors，142/142 Core tests、0 skipped，API 文档生成区一致（94 函数）、win-x64 publish、包内 Sprite/Worker smoke、ZIP/SHA256 和 artifact upload。Artifact ID 14018690914，87,196,057 bytes，artifact archive SHA-256 5ebc2dae013634a0018f1ffed5c0e74e49d7cef253f9e33bc0f4e630452fe431。本地 .NET SDK 缺失，本地 Restore/Build/Test NOT RUN。Windows 10/11 桌面实机仍 NOT RUN（M14）；CI 不等于实机验收。
+
+## 19. M12-07 剪贴板与对话框 API（自动化/Windows 实机分开记录）
+
+| ID | 场景 | 自动化覆盖/期望 | Windows 桌面状态 |
+|---|---|---|---|
+| M12-07-01 | 权限默认拒绝 | 无 Grant 时 Worker bridge 和 host policy 均拒绝 clipboard read/write、message/input/confirm；未发送授权 IPC | NOT RUN（M14） |
+| M12-07-02 | 主进程二次授权与伪造 IPC | 对每个命令重复验证当前 Grant；错误能力、未知命令、损坏 JSON 与超长载荷均 fail-closed | 自动化策略测试；待最新 CI |
+| M12-07-03 | 剪贴板读取 | Unicode 文本原样返回；无文本时空字符串；大于 1,048,576 UTF-16 字符拒绝 | NOT RUN（M14） |
+| M12-07-04 | 剪贴板写入 | Unicode 文本写入；空字符串清空；大于 1,048,576 字符拒绝；Windows clipboard busy/访问错误明确传播 | NOT RUN（M14） |
+| M12-07-05 | MessageBox / Confirm | message/confirm 权限分离；正文 32,768 字符、标题 256 字符边界；确定/是/否/关闭返回值正确 | NOT RUN（M14） |
+| M12-07-06 | InputBox | prompt/title/default/input 上限有效；确定返回文本，取消/关闭返回 nil；默认标题和值生效 | NOT RUN（M14） |
+| M12-07-07 | UI 线程与 Stop | Clipboard / modal forms 在 WinForms UI STA 线程执行；Stop 可取消 IPC 并关闭自定义模态窗体；Pause 在命令边界生效；已提交剪贴板写入不保证回滚 | NOT RUN（M14） |
+
+真实剪贴板访问、权限审阅窗体、模态布局/DPI、剪贴板被占用与 Stop 关闭行为必须在 Windows 10/11 桌面执行；Windows CI 自动化通过也不能作为桌面 PASS。

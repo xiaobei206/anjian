@@ -740,3 +740,17 @@ M4 基础调试器与 M5 可视化录制/动作列表均已完成 Windows CI 验
 ### 最终 Windows CI
 - 最终代码 HEAD `057f400657c8ebaf673eeefae17030476d71789b` 对应 Windows Actions [run 43385033936](https://github.com/xiaobei206/anjian/actions/runs/43385033936) 全 PASS：Restore；Release Build 0 warnings/0 errors；142/142 Core tests、0 skipped；API handbook check（94 个函数）；自包含 win-x64 publish；包内 Sprite/Worker smoke；ZIP/SHA256；artifact upload。Artifact ID 14018690914，87,196,057 bytes，GitHub 上传 artifact archive SHA-256 `5ebc2dae013634a0018f1ffed5c0e74e49d7cef253f9e33bc0f4e630452fe431`。runner 提供 C: 与 D:，CrossVolumeMove 测试实际进入跨卷成功与超上限拒绝场景。
 - M14 Windows 10/11 桌面实机验收继续 NOT RUN；CI 不等于实机通过。未修改 VERSION、AssemblyVersion、FileVersion；没有创建 tag/Release；preview.4 正式资产不变。
+
+## 2026-11-13 — M12-07 — 剪贴板与对话框 API（Windows CI 修正记录）
+
+### 实现
+- 提交 7c561f9d342d7d6f64a9a14535898b8790bb08f6 增加 Core ScriptClipboardDialogPolicy 与 WorkerLuaApi.ClipboardDialogs.cs，新增 GetClipboardText、SetClipboardText、MessageBox、InputBox、Confirm 共 5 项公开 API；registry 提升至 1.0/99 项。
+- App 由 PlaybackRunner 与 ClipboardDialogHost 负责 Worker/host 双层 Grant/载荷校验；剪贴板操作和自定义模态窗体经所属 WinForms Form 的 BeginInvoke 调度到 STA UI 线程。Stop 会取消挂起请求并关闭自定义对话框；InputBox 取消返回 nil；文本和标题长度上限明确。
+- API 契约与 Lua 规格提交 bd316e26c34f6ddf3198036875baba06cb568d9a；架构/路线图范围记录提交 21886b64d31623e74ac96bfee7d988b6780ff9ee；手册按 Catalog 规则重生成提交 6d1ae9e64764dd55bec9c55b439b3f8b6fcff4f0。
+
+### Windows Actions 的真实结果与修正
+- Run 248（HEAD 7c561f9d342d7d6f64a9a14535898b8790bb08f6）：Restore/Build PASS（0 warnings/0 errors）；145/146 测试通过。ManualGeneratedRegionMatchesCatalog 失败，因为 registry 已加 5 个 API 而函数手册未同步。
+- Run 249（HEAD bd316e26c34f6ddf3198036875baba06cb568d9a）：Restore/Build PASS（0 warnings/0 errors）；146/147 测试通过。剩余失败是手册生成规则不一致：Catalog 会给数字默认值加反引号，手动生成版本遗漏。
+- Run 250（HEAD 21886b64d31623e74ac96bfee7d988b6780ff9ee）执行的是手册修正前的树，不作为修正后的验证结果。按 Catalog 规则重新生成后的 HEAD 为 6d1ae9e64764dd55bec9c55b439b3f8b6fcff4f0；对应 Windows Actions run 43407935185 正在验证，完成后需把真实结论追加至日志与 handoff。
+- 在 run 43407935185 完成前，不能宣称 M12-07 CI 已通过。
+- Windows 10/11 真实剪贴板、权限审阅和模态对话框/DPI/停止交互均 NOT RUN（M14）；未修改产品 VERSION、未创建 tag/Release，preview.4 资产不变。
