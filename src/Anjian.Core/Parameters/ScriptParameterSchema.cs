@@ -137,9 +137,10 @@ public static class ScriptParameterValidator
                 continue;
             }
 
-            if (p.Required && IsEmpty(value))
+            if (IsEmpty(value))
             {
-                issues.Add(new(p.Id ?? string.Empty, p.Label, "此参数为必填项，不能为空。"));
+                if (p.Required)
+                    issues.Add(new(p.Id ?? string.Empty, p.Label, "此参数为必填项，不能为空。"));
                 continue;
             }
 
