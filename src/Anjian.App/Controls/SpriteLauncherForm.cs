@@ -258,11 +258,16 @@ internal sealed class SpriteLauncherForm : Form
                 throw new InvalidDataException("小精灵入口权限 sidecar 校验失败，未启动脚本：" +
                     string.Join("；", sidecarIssues));
 
+            var expectedSidecarSha256 = choice.Entry.PermissionManifestPath is null
+                ? null
+                : _manifest.Files.Single(file => string.Equals(
+                    file.Path, choice.Entry.PermissionManifestPath, StringComparison.OrdinalIgnoreCase)).Sha256;
             if (!ScriptPermissionService.TryReviewPackagedEntry(
                     this, scriptPath,
                     choice.Entry.PermissionManifestPath is null
                         ? null
                         : ResolvePackagePath(choice.Entry.PermissionManifestPath),
+                    expectedSidecarSha256,
                     out var permissions))
             {
                 AppendLog("本次权限审阅被拒绝或取消；入口未启动。");

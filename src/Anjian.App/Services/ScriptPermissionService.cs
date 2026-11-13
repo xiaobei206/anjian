@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using Anjian.App.Controls;
 using Anjian.Core.Permissions;
 
@@ -12,13 +14,14 @@ internal static class ScriptPermissionService
     {
         var fullScriptPath = Path.GetFullPath(scriptPath);
         return TryReviewSidecar(owner, fullScriptPath, fullScriptPath + ".permissions.json",
-            required: false, out grant);
+            required: false, expectedSha256: null, out grant);
     }
 
     public static bool TryReviewPackagedEntry(
         IWin32Window owner,
         string scriptPath,
         string? packagedSidecarPath,
+        string? expectedSha256,
         out ScriptPermissionGrant grant)
     {
         grant = ScriptPermissionGrant.Empty;
@@ -27,6 +30,11 @@ internal static class ScriptPermissionService
 
         if (packagedSidecarPath is null)
         {
+            if (expectedSha256 is not null)
+            {
+                ShowSidecarError(owner, expectedSidecarPath, "没有绑定权限 sidecar，却提供了哈希记录；已拒绝启动。");
+                return false;
+            }
             if (File.Exists(expectedSidecarPath))
             {
                 ShowSidecarError(owner, expectedSidecarPath,
@@ -47,7 +55,15 @@ internal static class ScriptPermissionService
             return false;
         }
 
-        return TryReviewSidecar(owner, fullScriptPath, fullSidecarPath, required: true, out grant);
+        if (string.IsNullOrWhiteSpace(expectedSha256) || expectedSha256.Length != 64 ||
+            expectedSha256.Any(character => !Uri.IsHexDigit(character)))
+        {
+            ShowSidecarError(owner, fullSidecarPath, "manifest 中缺少有效的权限 sidecar SHA-256；已拒绝启动。");
+            return false;
+        }
+
+        return TryReviewSidecar(owner, fullScriptPath, fullSidecarPath,
+            required: true, expectedSha256: expectedSha256, out grant);
     }
 
     private static bool TryReviewSidecar(
@@ -55,6 +71,7 @@ internal static class ScriptPermissionService
         string fullScriptPath,
         string sidecarPath,
         bool required,
+        string? expectedSha256,
         out ScriptPermissionGrant grant)
     {
         grant = ScriptPermissionGrant.Empty;
@@ -71,13 +88,20 @@ internal static class ScriptPermissionService
 
         try
         {
-            var info = new FileInfo(sidecarPath);
-            if (info.Length > ScriptPermissionPolicy.MaximumManifestBytes)
-                throw new InvalidDataException($"权限清单超过 {ScriptPermissionPolicy.MaximumManifestBytes} 字节上限。");
             if (HasReparsePointOnPath(scriptDirectory, Path.GetFileName(sidecarPath)))
                 throw new InvalidDataException("权限清单路径不能包含符号链接或重解析点。");
 
-            var request = ScriptPermissionPolicy.ParseRequest(File.ReadAllText(sidecarPath), scriptDirectory);
+            var bytes = ReadSidecarBytes(sidecarPath);
+            if (expectedSha256 is not null)
+            {
+                var actualSha256 = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
+                if (!string.Equals(actualSha256, expectedSha256, StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidDataException("权限 sidecar SHA-256 与 manifest 不一致。");
+            }
+
+            using var reader = new StreamReader(
+                new MemoryStream(bytes), new UTF8Encoding(false, true), detectEncodingFromByteOrderMarks: true);
+            var request = ScriptPermissionPolicy.ParseRequest(reader.ReadToEnd(), scriptDirectory);
             if (!HasRequests(request))
                 return true;
 
@@ -94,6 +118,25 @@ internal static class ScriptPermissionService
                 "权限清单无法安全读取，脚本不会启动。" + Environment.NewLine + ex.Message);
             return false;
         }
+    }
+
+    private static byte[] ReadSidecarBytes(string sidecarPath)
+    {
+        using var stream = new FileStream(sidecarPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+        if (stream.Length > ScriptPermissionPolicy.MaximumManifestBytes)
+            throw new InvalidDataException($"权限清单超过 {ScriptPermissionPolicy.MaximumManifestBytes} 字节上限。");
+
+        using var output = new MemoryStream((int)stream.Length);
+        var buffer = new byte[8192];
+        int read;
+        while ((read = stream.Read(buffer, 0, buffer.Length)) > 0)
+        {
+            if (output.Length + read > ScriptPermissionPolicy.MaximumManifestBytes)
+                throw new InvalidDataException($"权限清单超过 {ScriptPermissionPolicy.MaximumManifestBytes} 字节上限。");
+            output.Write(buffer, 0, read);
+        }
+
+        return output.ToArray();
     }
 
     private static bool HasReparsePointOnPath(string root, string relativePath)

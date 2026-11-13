@@ -406,8 +406,10 @@ public static class SpritePackageBuilder
 
                 var permissionSourcePath = entryScript + ".permissions.json";
                 string? packagedPermissionManifestPath = null;
-                if (File.Exists(permissionSourcePath))
+                if (FileSystemEntryExists(permissionSourcePath))
                 {
+                    if (!File.Exists(permissionSourcePath) || Directory.Exists(permissionSourcePath))
+                        throw new InvalidDataException("权限 sidecar 必须是可读取的普通文件：" + permissionSourcePath);
                     EnsureInside(projectRoot, permissionSourcePath, "权限 sidecar 必须位于所选工程目录中。");
                     if (HasReparsePointOnPath(projectRoot, ToPackagePath(Path.GetRelativePath(projectRoot, permissionSourcePath))))
                         throw new InvalidDataException("不允许通过符号链接/重解析点打包权限 sidecar：" + permissionSourcePath);
@@ -660,7 +662,7 @@ public static class SpritePackageBuilder
                 issues.Add("权限 sidecar 无效：" + expectedPath + "：" + ex.Message);
             }
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or InvalidDataException or NotSupportedException or PathTooLongException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or InvalidDataException or NotSupportedException)
         {
             issues.Add("无法安全验证权限 sidecar：" + ex.Message);
         }
@@ -876,6 +878,22 @@ public static class SpritePackageBuilder
         }
 
         return issues;
+    }
+
+    private static bool FileSystemEntryExists(string path)
+    {
+        if (File.Exists(path) || Directory.Exists(path))
+            return true;
+
+        var parent = Path.GetDirectoryName(Path.GetFullPath(path));
+        if (parent is null || !Directory.Exists(parent))
+            return false;
+        var comparison = OperatingSystem.IsWindows()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
+        var name = Path.GetFileName(path);
+        return Directory.EnumerateFileSystemEntries(parent)
+            .Any(candidate => string.Equals(Path.GetFileName(candidate), name, comparison));
     }
 
     private static bool HasReparsePointOnPath(string root, string relativePath)
