@@ -50,18 +50,32 @@ internal sealed class WindowsInputController
     public async Task MouseDownAsync(string button, CancellationToken token)
     {
         var normalized = NormalizeMouseButton(button);
+        lock (_sync)
+        {
+            if (_heldMouse.ContainsKey(normalized))
+                return;
+        }
+
         var lease = await _arbiter.AcquireAsync(_owner, token).ConfigureAwait(false);
         var stored = false;
         try
         {
             token.ThrowIfCancellationRequested();
-            SendMouse(GetMouseDownFlag(normalized));
             lock (_sync)
             {
-                if (_heldMouse.TryGetValue(normalized, out _))
+                if (_heldMouse.ContainsKey(normalized))
                     return;
-                _heldMouse.Add(normalized, lease);
-                stored = true;
+                try
+                {
+                    SendMouse(GetMouseDownFlag(normalized));
+                    _heldMouse.Add(normalized, lease);
+                    stored = true;
+                }
+                catch (Exception ex)
+                {
+                    _arbiter.MarkFaulted(_owner, $"按下鼠标 {normalized} 失败：{ex.Message}");
+                    throw;
+                }
             }
         }
         finally
@@ -139,18 +153,32 @@ internal sealed class WindowsInputController
     public async Task KeyDownAsync(string key, CancellationToken token)
     {
         var normalized = NormalizeKey(key);
+        lock (_sync)
+        {
+            if (_heldKeys.ContainsKey(normalized))
+                return;
+        }
+
         var lease = await _arbiter.AcquireAsync(_owner, token).ConfigureAwait(false);
         var stored = false;
         try
         {
             token.ThrowIfCancellationRequested();
-            SendKeyboard(GetVirtualKey(normalized), 0);
             lock (_sync)
             {
-                if (_heldKeys.TryGetValue(normalized, out _))
+                if (_heldKeys.ContainsKey(normalized))
                     return;
-                _heldKeys.Add(normalized, lease);
-                stored = true;
+                try
+                {
+                    SendKeyboard(GetVirtualKey(normalized), 0);
+                    _heldKeys.Add(normalized, lease);
+                    stored = true;
+                }
+                catch (Exception ex)
+                {
+                    _arbiter.MarkFaulted(_owner, $"按下按键 {normalized} 失败：{ex.Message}");
+                    throw;
+                }
             }
         }
         finally
@@ -168,27 +196,35 @@ internal sealed class WindowsInputController
     public async Task TypeTextAsync(string text, CancellationToken token)
     {
         using var lease = await _arbiter.AcquireAsync(_owner, token).ConfigureAwait(false);
-        foreach (var rune in text.EnumerateRunes())
+        try
         {
+            foreach (var rune in text.EnumerateRunes())
+            {
+                token.ThrowIfCancellationRequested();
+                var value = rune.Value;
+                if (value <= 0xFFFF)
+                {
+                    SendUnicode((ushort)value, false);
+                    SendUnicode((ushort)value, true);
+                }
+                else
+                {
+                    var scalar = value - 0x10000;
+                    var high = (ushort)(0xD800 + (scalar >> 10));
+                    var low = (ushort)(0xDC00 + (scalar & 0x3FF));
+                    SendUnicode(high, false);
+                    SendUnicode(low, false);
+                    SendUnicode(high, true);
+                    SendUnicode(low, true);
+                }
+            }
             token.ThrowIfCancellationRequested();
-            var value = rune.Value;
-            if (value <= 0xFFFF)
-            {
-                SendUnicode((ushort)value, false);
-                SendUnicode((ushort)value, true);
-            }
-            else
-            {
-                var scalar = value - 0x10000;
-                var high = (ushort)(0xD800 + (scalar >> 10));
-                var low = (ushort)(0xDC00 + (scalar & 0x3FF));
-                SendUnicode(high, false);
-                SendUnicode(low, false);
-                SendUnicode(high, true);
-                SendUnicode(low, true);
-            }
         }
-        token.ThrowIfCancellationRequested();
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _arbiter.MarkFaulted(_owner, "Unicode 文本输入失败，键盘状态可能不完整：" + ex.Message);
+            throw;
+        }
     }
 
     public Task<bool> ReleaseAllAsync()
@@ -266,13 +302,21 @@ internal sealed class WindowsInputController
         try
         {
             token.ThrowIfCancellationRequested();
-            SendMouse(GetMouseDownFlag(normalized));
             lock (_sync)
             {
-                if (_heldMouse.TryGetValue(normalized, out _))
+                if (_heldMouse.ContainsKey(normalized))
                     return;
-                _heldMouse.Add(normalized, lease);
-                stored = true;
+                try
+                {
+                    SendMouse(GetMouseDownFlag(normalized));
+                    _heldMouse.Add(normalized, lease);
+                    stored = true;
+                }
+                catch (Exception ex)
+                {
+                    _arbiter.MarkFaulted(_owner, $"按下鼠标 {normalized} 失败：{ex.Message}");
+                    throw;
+                }
             }
         }
         finally
@@ -290,13 +334,21 @@ internal sealed class WindowsInputController
         try
         {
             token.ThrowIfCancellationRequested();
-            SendKeyboard(GetVirtualKey(normalized), 0);
             lock (_sync)
             {
-                if (_heldKeys.TryGetValue(normalized, out _))
+                if (_heldKeys.ContainsKey(normalized))
                     return;
-                _heldKeys.Add(normalized, lease);
-                stored = true;
+                try
+                {
+                    SendKeyboard(GetVirtualKey(normalized), 0);
+                    _heldKeys.Add(normalized, lease);
+                    stored = true;
+                }
+                catch (Exception ex)
+                {
+                    _arbiter.MarkFaulted(_owner, $"按下按键 {normalized} 失败：{ex.Message}");
+                    throw;
+                }
             }
         }
         finally
