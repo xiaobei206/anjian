@@ -1,3 +1,5 @@
+using System.ComponentModel;
+using System.Runtime.InteropServices;
 using Anjian.Core.Permissions;
 using Xunit;
 
@@ -81,7 +83,7 @@ public sealed class ScriptFileSystemTests
         Assert.True(service.DirectoryExists("created"));
         Assert.Throws<DirectoryNotFoundException>(() => service.CreateDirectory("missing-parent/child"));
         Assert.Equal(["a.txt"], service.ListFiles("."));
-        Assert.Equal(["nested"], service.ListDirectories("."));
+        Assert.Equal(["created", "nested"], service.ListDirectories("."));
     }
 
     [Fact]
@@ -116,9 +118,9 @@ public sealed class ScriptFileSystemTests
             File.CreateSymbolicLink(linkFile, externalFile);
             var service = new ScriptFileSystem(sandbox.Grant(read: true, write: true), sandbox.Root);
 
-            Assert.Throws<UnauthorizedAccessException>(() => service.ReadTextFile(Path.Combine(linkDirectory, "outside.txt")));
-            Assert.Throws<UnauthorizedAccessException>(() => service.ReadTextFile(linkFile));
-            Assert.Throws<UnauthorizedAccessException>(() => service.WriteTextFile(Path.Combine(linkDirectory, "new.txt"), "no"));
+            Assert.ThrowsAny<UnauthorizedAccessException>(() => service.ReadTextFile(Path.Combine(linkDirectory, "outside.txt")));
+            Assert.ThrowsAny<UnauthorizedAccessException>(() => service.ReadTextFile(linkFile));
+            Assert.ThrowsAny<UnauthorizedAccessException>(() => service.WriteTextFile(Path.Combine(linkDirectory, "new.txt"), "no"));
             Assert.DoesNotContain("linked-file.txt", service.ListFiles("."));
             Assert.DoesNotContain("linked-dir", service.ListDirectories("."));
         }
@@ -156,12 +158,41 @@ public sealed class ScriptFileSystemTests
     }
 
     [Fact]
+    public void HardLinksCannotExposeOrModifyFilesOutsideAnApprovedRoot()
+    {
+        using var sandbox = new FileSandbox();
+        var outside = Path.Combine(Path.GetTempPath(), "Anjian2026-HardLink-" + Guid.NewGuid().ToString("N") + ".txt");
+        var linked = Path.Combine(sandbox.Root, "linked.txt");
+        File.WriteAllText(outside, "outside");
+        try
+        {
+            if (!CreateHardLinkW(linked, outside, IntPtr.Zero))
+                throw new Win32Exception(Marshal.GetLastWin32Error(), "无法为硬链接安全测试创建硬链接。");
+
+            var service = new ScriptFileSystem(sandbox.Grant(read: true, write: true), sandbox.Root);
+            Assert.ThrowsAny<UnauthorizedAccessException>(() => service.ReadTextFile(linked));
+            Assert.ThrowsAny<UnauthorizedAccessException>(() => service.WriteTextFile(linked, "changed"));
+            Assert.DoesNotContain("linked.txt", service.ListFiles("."));
+            Assert.Equal("outside", File.ReadAllText(outside));
+        }
+        finally
+        {
+            try { File.Delete(linked); } catch { }
+            try { File.Delete(outside); } catch { }
+        }
+    }
+
+    [Fact]
     public void ResolverRejectsDeviceDriveRelativeAndAlternateDataStreamPaths()
     {
         Assert.Throws<InvalidDataException>(() => ScriptFileSystem.ResolvePath(@"C:relative.txt", @"C:\scripts"));
         Assert.Throws<InvalidDataException>(() => ScriptFileSystem.ResolvePath(@"\\?\C:\secret.txt", @"C:\scripts"));
         Assert.Throws<InvalidDataException>(() => ScriptFileSystem.ResolvePath(@"file.txt:stream", @"C:\scripts"));
     }
+
+    [DllImport("kernel32.dll", EntryPoint = "CreateHardLinkW", CharSet = CharSet.Unicode, SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool CreateHardLinkW(string fileName, string existingFileName, IntPtr securityAttributes);
 
     private sealed class FileSandbox : IDisposable
     {

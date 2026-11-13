@@ -155,21 +155,22 @@ public sealed class ScriptFileSystem
         var fullPath = ResolveAndDemand(path, write: false);
         using var directory = LockDirectoryChain(fullPath);
         var results = new List<string>();
+        var visited = 0;
         foreach (var candidate in Directory.EnumerateFiles(fullPath, "*", SearchOption.TopDirectoryOnly))
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (++visited > MaximumListEntries)
+                throw new InvalidDataException($"目录文件超过 {MaximumListEntries} 项上限。");
             try
             {
                 using var handle = OpenFileHandle(candidate, FileReadAttributes,
                     FileShareRead | FileShareWrite, OpenExisting);
                 results.Add(Path.GetFileName(candidate));
             }
-            catch (ReparsePointException)
+            catch (Exception ex) when (ex is ReparsePointException or HardLinkException)
             {
-                // Links are not ordinary files and are intentionally omitted.
+                // Links and hard-linked files are not ordinary in-root files.
             }
-            if (results.Count > MaximumListEntries)
-                throw new InvalidDataException($"目录文件超过 {MaximumListEntries} 项上限。");
         }
         return results.OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToArray();
     }
@@ -181,9 +182,12 @@ public sealed class ScriptFileSystem
         var fullPath = ResolveAndDemand(path, write: false);
         using var directory = LockDirectoryChain(fullPath);
         var results = new List<string>();
+        var visited = 0;
         foreach (var candidate in Directory.EnumerateDirectories(fullPath, "*", SearchOption.TopDirectoryOnly))
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (++visited > MaximumListEntries)
+                throw new InvalidDataException($"目录子目录超过 {MaximumListEntries} 项上限。");
             try
             {
                 using var child = LockDirectoryChain(candidate);
@@ -193,8 +197,6 @@ public sealed class ScriptFileSystem
             {
                 // Links are not ordinary directories and are intentionally omitted.
             }
-            if (results.Count > MaximumListEntries)
-                throw new InvalidDataException($"目录子目录超过 {MaximumListEntries} 项上限。");
         }
         return results.OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToArray();
     }
@@ -343,10 +345,10 @@ public sealed class ScriptFileSystem
 
         try
         {
-            var attributes = GetAttributes(handle, path);
-            if ((attributes & FileAttributeReparsePoint) != 0)
+            var info = GetFileInformation(handle, path);
+            if ((info.FileAttributes & FileAttributeReparsePoint) != 0)
                 throw new ReparsePointException($"拒绝经过符号链接/重解析点访问目录：{path}");
-            if ((attributes & FileAttributeDirectory) == 0)
+            if ((info.FileAttributes & FileAttributeDirectory) == 0)
                 throw new DirectoryNotFoundException($"路径不是目录：{path}");
             return handle;
         }
@@ -372,11 +374,13 @@ public sealed class ScriptFileSystem
 
         try
         {
-            var attributes = GetAttributes(handle, path);
-            if ((attributes & FileAttributeReparsePoint) != 0)
+            var info = GetFileInformation(handle, path);
+            if ((info.FileAttributes & FileAttributeReparsePoint) != 0)
                 throw new ReparsePointException($"拒绝打开符号链接/重解析点文件：{path}");
-            if ((attributes & FileAttributeDirectory) != 0)
+            if ((info.FileAttributes & FileAttributeDirectory) != 0)
                 throw new FileNotFoundException($"目标是目录而不是普通文件：{path}", path);
+            if (info.NumberOfLinks > 1)
+                throw new HardLinkException($"拒绝访问具有多个硬链接的文件：{path}");
             return handle;
         }
         catch
@@ -386,11 +390,11 @@ public sealed class ScriptFileSystem
         }
     }
 
-    private static uint GetAttributes(SafeFileHandle handle, string path)
+    private static ByHandleFileInformation GetFileInformation(SafeFileHandle handle, string path)
     {
         if (!GetFileInformationByHandle(handle, out var info))
             throw new IOException($"无法检查文件句柄属性：{path}", new Win32Exception(Marshal.GetLastWin32Error()));
-        return info.FileAttributes;
+        return info;
     }
 
     private static Exception CreatePathException(string path, int error, bool directory) => error switch
@@ -410,6 +414,7 @@ public sealed class ScriptFileSystem
     }
 
     private sealed class ReparsePointException(string message) : UnauthorizedAccessException(message) { }
+    private sealed class HardLinkException(string message) : UnauthorizedAccessException(message) { }
 
     private sealed class DirectoryHandleSet(List<SafeFileHandle> handles) : IDisposable
     {
