@@ -230,3 +230,27 @@ M6 自动化测试可以验证坐标纯计算、API 注册/包装和 IPC 数据�
 - LuaApiRegistryTests：18 个新函数注册、内部桥接隐藏、旧 MoveTo 绝对坐标语义、窗口数据表转 Lua 表、40 个函数生成手册一致性。
 - WindowsWindowManager 的实际 Win32 行为仍要求本节桌面测试；不能用跨平台 Core 单测或 GitHub Actions 构建替代。
 
+
+
+## 13. M7 控件自动化与前后台能力适配（main 开发版，未包含在 preview.4）
+
+M7 使用 Windows 自带 UI Automation Control View / Pattern，不宣称任意控件或任意应用都有可操作接口。UIA 运行在可被停止的独立 Lua worker 内；主进程仍掌握 M6 窗口引用并执行前台 SendInput。以下 Windows 桌面项目初始均为 NOT RUN，CI 通过不能替代手工实测。
+
+| ID | 场景 | 操作 | 通过标准 | 当前状态 |
+|---|---|---|---|---|
+| M7-01 | 能力探测矩阵 | 启动 `--automation-probe` 测试窗；对根窗口执行 WindowBind/WindowGetCapabilities | 每项返回 name/status/backend/reason/limitations；不将通用后台鼠标/键盘/文本标成支持；前台/后台语义操作区分明确 | NOT RUN（桌面） |
+| M7-02 | 控件树及字段 | ControlEnumerate 测试窗，检查文本框、密码框、复选框、组合框、列表、按钮的 name/automationId/className/controlType/bounds/state/patterns | 只返回 UIA Control View 中实际暴露的元素；深度和数量有限制；窗口/控件失效后重新枚举，不复用旧 controlId | NOT RUN（桌面） |
+| M7-03 | Value/Text | 对普通文本框读取 Value/Text，使用 ControlSetValue 改为新文本再读取；对密码框分别调用 ControlGetValue/ControlGetText | 普通文本框返回准确值；密码字段读值明确拒绝；只读/无 Pattern 控件不伪造成功 | NOT RUN（桌面） |
+| M7-04 | Selection / SelectionItem | 读取组合框/列表当前选择，并调用 ControlSelect 选择另一项 | 返回值对应真实选择；只对实际暴露 Selection/SelectionItem 的节点工作；不支持时返回明确错误 | NOT RUN（桌面） |
+| M7-05 | Toggle / Invoke | 读取并切换复选框；调用按钮 Invoke，检查测试窗状态计数 | Toggle 状态变化可再次读取；Invoke 触发可见计数变化；API 返回只代表 provider 接受调用，不保证远端业务最终完成 | NOT RUN（桌面） |
+| M7-06 | 后台语义操作边界 | 把测试窗置于非前台，使用 UIA SetValue/Toggle/Select/Invoke；再尝试 WindowInput 的 move/click/key-press/text | 支持的 UIA Pattern 可按 provider 状态执行；通用后台鼠标/键盘/文本明确 unsupported；无静默回退或谎报成功 | NOT RUN（桌面） |
+| M7-07 | 前台输入安全边界 | 令测试窗在前台/后台、最小化、无焦点，并分别把坐标置于客户区内外调用 WindowInput | 非前台/最小化/不可见目标拒绝；键盘/文本要求已有焦点；move/click 越过客户区边界拒绝；不自动激活/抢焦点 | NOT RUN（桌面） |
+| M7-08 | 生命周期与窗口身份 | 绑定后关闭目标或重新打开同类窗口；调用旧 binding/control ID | 旧 M6 引用或身份变化被拒绝；旧控件 ID 失效；重新查找、绑定、枚举才可继续 | NOT RUN（桌面） |
+| M7-09 | Stop/失去响应 provider | 运行循环探测脚本并按 F12；如自建可控 provider 能制造阻塞，再验证 worker 终止 | 主窗口仍可响应 Stop；被阻塞的 UIA COM 调用随 worker 终止；主进程释放自己持有的输入；下一轮运行可新建干净 binding | NOT RUN（桌面） |
+| M7-10 | 权限边界 | 普通权限应用操作普通权限与管理员级窗口，尝试 UAC/安全桌面 | UIPI/UAC/安全桌面拒绝如实报告；不提权、不绕过、不将权限限制变成“后台成功” | NOT RUN（桌面） |
+
+### M7 自动化测试范围
+
+- LuaApiRegistryTests 覆盖：14 个新增公开函数绑定、worker-local UIA service 接口、内部 HWND 目标描述的 IPC 传递不向 Lua 返回 HWND、字符串结果、WindowInput 必填动作参数。
+- Windows Actions 负责 .NET Restore/Release Build/Core Tests、API 函数手册 `--check`、self-contained win-x64 publish 与 artifact/package；最终 run 结果将在 DEVELOPMENT-LOG-CN.md 记录。
+- 当前未在用户的 Windows 10/11 桌面执行 M7-01..M7-10，不能把这些项目标记为 PASS。

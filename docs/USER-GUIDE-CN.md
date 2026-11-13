@@ -102,10 +102,36 @@
 
 脚本重命名、复制、删除时会同步管理对应 sidecar；保存 sidecar 会保留 .bak 备份。遇到不支持的 schema 时，编辑入口会禁用且不会自动覆盖原文件。
 
-## 8. 注意事项
+## 9. 注意事项
 
 - 首版输入坐标为全屏虚拟桌面绝对坐标；副屏位于主屏左侧或上方时可能出现负坐标。
 - SendInput 受 UIPI 影响，普通权限程序不能保证向管理员权限程序注入输入。
 - 无限循环可能持续重复点击、输入或提交操作；使用前确认脚本和目标窗口。
 - 停止时执行输入释放，但如果进程崩溃、系统拒绝注入或目标应用丢失输入，仍应自行确认目标状态。
 - 当前 preview.4 尚不含图像识别、OCR、完整窗口相对坐标、插件或经过验证的后台输入。它们已进入完整产品正式目标；当前缺失项以 FEATURE-MATRIX-CN.md 为准。
+
+
+## 8. 窗口控件自动化（main 开发版，未包含在 preview.4）
+
+本节 API 仅在 main 开发版可用；已发布的 v0.1.0-preview.4 包未包含 M7。
+
+基本用法是先通过 M6 查找窗口，再绑定控件自动化会话：
+
+```lua
+local w = WindowFind("目标窗口", "", "notepad", 0, true)
+if not w then error("窗口未找到") end
+
+local binding = WindowBind(w.id)
+local caps = WindowGetCapabilities(binding)
+local controls = ControlEnumerate(binding, 256)
+for _, c in ipairs(controls) do
+    Log(c.name .. " | " .. c.controlType .. " | " .. table.concat(c.supportedPatterns, ","))
+end
+WindowUnbind(binding)
+```
+
+`WindowBind`、`controlId` 与其缓存只在本轮脚本运行有效；窗口身份由主进程通过 M6 引用复核。不要把 binding/control ID 保存到脚本文件用于下次运行，也不要尝试传递 HWND。
+
+只有控件真正暴露对应 UI Automation Pattern 时，才可读取/设置值、读取/选择项目、切换勾选状态或调用 Invoke。用 `supportedPatterns` 先检查声明支持的模式。不支持的控件会报错；密码字段的 Value/Text 读取会被拒绝。控件更新、关闭或重建后重新执行 ControlEnumerate，不复用旧 ID。
+
+UI Automation 的后台 `ValuePattern.SetValue`、`SelectionItem.Select`、`Toggle`、`Invoke` 是控件语义操作，不等于向后台应用发送键盘或鼠标。M7 当前没有通用后台鼠标/键盘/文本注入。需要可见输入时使用 `WindowInput(binding, "foreground", ...)`；目标窗口必须可见、未最小化、在前台且键盘/文本操作有焦点，鼠标坐标必须位于客户区。它不会自动抢占焦点或静默回退。所有 API 都受 UIA provider、UIPI/UAC 和交互桌面权限限制。

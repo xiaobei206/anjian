@@ -17,7 +17,7 @@
 | M4 调试器 | DONE（基础能力 Windows CI PASS；桌面实机验收 NOT RUN） | 文件/行号断点、单步、运行到光标、变量快照、调用栈 |
 | M5 可视化录制/动作列表 | DONE（Windows CI PASS；桌面手工验收 NOT RUN） | 结构化原始事件/动作、虚拟化动作编辑器、参数/延时/分组/注释/启用状态、Lua 区块同步保护、sidecar 和单步试运行 |
 | M6 坐标系统与窗口自动化 | DONE（按本 handoff 的 API/Win32 范围；最终 Windows CI PASS；桌面验收 NOT RUN） | screen/window/client/anchor/ratio、双向坐标转换、安全窗口引用/枚举/属性/操作/等待 |
-| M7 控件与前后台能力适配 | TODO | UI Automation/标准控件能力探测、后台输入适配、失败回退和边界说明 |
+| M7 控件与前后台能力适配 | IN_PROGRESS（代码已接入；CI 与文档一致性验证中） | UI Automation Control View/Pattern；worker 隔离与可停止性；按能力报告语义后台控件操作、受限前台输入和明确 unsupported 边界 |
 | M8 截图、图色与模板资源 | TODO | 截图区域、找色、多点找色、找图、阈值/多结果和资源管理 |
 | M9 OCR 与文本识别 | TODO | 本地 OCR、语言/字库配置、文字区域/置信度与等待文本 |
 | M10 参数、配置与脚本自定义 UI | TODO | 参数声明、类型/默认值/范围/选项、校验、持久化和通用表单 |
