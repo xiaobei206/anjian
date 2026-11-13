@@ -17,7 +17,7 @@ internal sealed class MainForm : Form
     private readonly ScriptRepository _repository = new();
     private readonly AppSettingsStore _settingsStore = new();
     private readonly GlobalRecorder _recorder = new();
-    private readonly PlaybackRunner _playback = new();
+    private readonly RunInstanceRuntimeCoordinator _playback = new();
     private readonly ListBox _scripts = new();
     private LuaApiRegistry _apiRegistry = LuaApiRegistry.Load();
     private readonly TabControl _editorTabs = new() { Dock = DockStyle.Fill };
@@ -57,11 +57,12 @@ internal sealed class MainForm : Form
     private ScriptEntry? _current;
     private bool _recording;
     private bool _dirty;
-    private Task? _runTask;
     private FloatingForm? _floating;
     private NotifyIcon? _trayIcon;
     private Icon? _applicationIcon;
     private bool _allowExit;
+    private bool _shutdownStarted;
+    private bool _shutdownComplete;
     private bool _refreshingScripts;
     private bool _suppressTabSelection;
     private VisualDebugOverlayForm? _visualDebugOverlay;
@@ -97,8 +98,8 @@ internal sealed class MainForm : Form
         _playback.Log += message => Ui(() =>
         {
             AppendLog(message);
-            if (message.StartsWith("播放完成", StringComparison.Ordinal) ||
-                message.StartsWith("播放已停止", StringComparison.Ordinal))
+            if (message.Contains("播放完成", StringComparison.Ordinal) ||
+                message.Contains("播放已停止", StringComparison.Ordinal))
                 SetIdle();
         });
         _playback.IterationChanged += (current, total) => Ui(() =>
@@ -1153,7 +1154,7 @@ internal sealed class MainForm : Form
         _recordButton.Enabled = !_playback.IsRunning;
         _scripts.Enabled = !_recordSessionActive;
         _clickOnlyCheck.Enabled = !_recordSessionActive;
-        _playButton.Enabled = !_recordSessionActive && !_playback.IsRunning;
+        _playButton.Enabled = !_recordSessionActive && _playback.CanAccept;
         _status.Text = !_recordSessionActive ? "未运行" : _recordingPaused ? "录制已暂停" : "正在录制…";
         UpdateFloatingState();
         UpdateDebuggerButtons(isPaused: false);
@@ -1167,7 +1168,7 @@ internal sealed class MainForm : Form
             MessageBox.Show(this, "请先结束录制。");
             return;
         }
-        if (_playback.IsRunning || _current is null || !SaveCurrent()) return;
+        if (!_playback.CanAccept || _current is null || !SaveCurrent()) return;
         var scriptPath = _current.FullPath;
         if (!TryCollectScriptParameters(scriptPath, out var launchParameters)) return;
         var options = new PlaybackOptions
@@ -1185,7 +1186,7 @@ internal sealed class MainForm : Form
         if (!ScriptPermissionService.TryReview(this, scriptPath, out var launchPermissions)) return;
 
         SaveSettings();
-        _playButton.Enabled = false;
+        _playButton.Enabled = _playback.CanAccept;
         _recordButton.Enabled = false;
         _pauseButton.Enabled = true;
         _stopButton.Enabled = true;
@@ -1197,9 +1198,9 @@ internal sealed class MainForm : Form
 
         try
         {
-            _runTask = _playback.RunAsync(scriptPath, options, parameters: launchParameters, permissions: launchPermissions);
+            var runTask = _playback.RunAsync(scriptPath, options, parameters: launchParameters, permissions: launchPermissions);
             UpdateFloatingState();
-            await _runTask;
+            await runTask;
         }
         catch (Exception ex)
         {
@@ -1208,7 +1209,6 @@ internal sealed class MainForm : Form
         }
         finally
         {
-            _runTask = null;
             SetIdle();
         }
     }
@@ -1236,22 +1236,23 @@ internal sealed class MainForm : Form
     private async Task StopPlaybackAsync()
     {
         if (!_playback.IsRunning) return;
-        _status.Text = "正在停止";
-        _playback.Stop();
-        if (_runTask is not null)
-        {
-            try { await _runTask; } catch { }
-        }
+        _status.Text = "正在停止所选实例";
+        try { await _playback.StopSelectedAsync(); }
+        catch (Exception ex) { AppendLog("停止实例时发生错误：" + ex.Message); }
         SetIdle();
     }
 
     private void SetIdle()
     {
-        _playButton.Enabled = !_recordSessionActive;
-        _pauseButton.Enabled = false;
-        _stopButton.Enabled = false;
-        _pauseButton.Text = "暂停";
-        _status.Text = !_recordSessionActive ? "未运行" : _recordingPaused ? "正在录制…" : "录制已暂停";
+        _playButton.Enabled = !_recordSessionActive && _playback.CanAccept;
+        _pauseButton.Enabled = !_recordSessionActive && _playback.IsRunning && !_playback.IsPaused;
+        _stopButton.Enabled = !_recordSessionActive && _playback.IsRunning;
+        _pauseButton.Text = _playback.IsPaused ? "继续" : "暂停";
+        _status.Text = !_recordSessionActive
+            ? (_playback.HasActiveInstances
+                ? $"运行中 {_playback.ActiveCount} 个实例，排队 {_playback.QueuedCount} 个"
+                : "未运行")
+            : _recordingPaused ? "正在录制…" : "录制已暂停";
         _progress.Text = "";
         _scripts.Enabled = !_recordSessionActive;
         _editorTabs.Enabled = true;
@@ -1356,8 +1357,8 @@ internal sealed class MainForm : Form
 
     private async Task RunRecorderActionPreviewAsync(RecorderAction action)
     {
-        if (_playback.IsRunning)
-            throw new InvalidOperationException("当前已有脚本在运行。");
+        if (!_playback.CanAccept)
+            throw new InvalidOperationException("运行实例容量已满或全局输入仲裁处于故障锁定。");
         if (!action.Enabled)
             throw new InvalidOperationException("已禁用动作不能试运行。");
 
@@ -1390,15 +1391,14 @@ internal sealed class MainForm : Form
             _stopButton.Enabled = true;
             _pauseButton.Text = "暂停";
             _status.Text = "正在试运行动作";
-            _runTask = _playback.RunAsync(
+            var runTask = _playback.RunAsync(
                 temporaryPath,
                 new PlaybackOptions { RepeatCount = 1, IntervalMilliseconds = 0 });
             UpdateActionEditorButton();
-            await _runTask;
+            await runTask;
         }
         finally
         {
-            _runTask = null;
             SetIdle();
             try { if (File.Exists(temporaryPath)) File.Delete(temporaryPath); } catch { }
         }
@@ -1406,7 +1406,7 @@ internal sealed class MainForm : Form
 
     private async Task StartDebugAsync()
     {
-        if (_recordSessionActive || _playback.IsRunning || _activeTab is null || _current is null || !SaveCurrent())
+        if (_recordSessionActive || !_playback.CanAccept || _activeTab is null || _current is null || !SaveCurrent())
             return;
 
         if (string.IsNullOrWhiteSpace(_editor.Text))
@@ -1440,9 +1440,9 @@ internal sealed class MainForm : Form
 
         try
         {
-            _runTask = _playback.RunAsync(scriptPath, playbackOptions, launchOptions, launchParameters, permissions: launchPermissions);
+            var runTask = _playback.RunAsync(scriptPath, playbackOptions, launchOptions, launchParameters, permissions: launchPermissions);
             UpdateFloatingState();
-            await _runTask;
+            await runTask;
         }
         catch (Exception ex)
         {
@@ -1451,7 +1451,6 @@ internal sealed class MainForm : Form
         }
         finally
         {
-            _runTask = null;
             ClearDebuggerView();
             SetIdle();
         }
@@ -1541,7 +1540,7 @@ internal sealed class MainForm : Form
     {
         var running = _playback.IsRunning;
         var debugging = _playback.IsDebugging;
-        _debugStartButton.Enabled = !_recordSessionActive && !running && _activeTab is not null;
+        _debugStartButton.Enabled = !_recordSessionActive && _playback.CanAccept && _activeTab is not null;
         _debugContinueButton.Enabled = debugging && isPaused;
         _debugStepIntoButton.Enabled = debugging && isPaused;
         _debugStepOverButton.Enabled = debugging && isPaused;
@@ -1608,7 +1607,7 @@ internal sealed class MainForm : Form
 
     private void OpenImageResources()
     {
-        if (_recordSessionActive || _playback.IsRunning || _current is null || _activeTab is null)
+        if (_recordSessionActive || _playback.HasActiveInstances || _playback.QueuedCount > 0 || _current is null || _activeTab is null)
         {
             AppendLog("请先选择一个空闲脚本，再打开图像资源管理。");
             return;
@@ -1677,7 +1676,7 @@ internal sealed class MainForm : Form
 
     private bool CanHandleGlobalHotkey(int action) => action switch
     {
-        GlobalHotkeyManager.StartAction => !_recordSessionActive && !_playback.IsRunning,
+        GlobalHotkeyManager.StartAction => !_recordSessionActive && _playback.CanAccept,
         GlobalHotkeyManager.PauseResumeAction or GlobalHotkeyManager.StopAction => !_recordSessionActive && _playback.IsRunning,
         _ => false
     };
@@ -1707,7 +1706,7 @@ internal sealed class MainForm : Form
             switch (m.WParam.ToInt32())
             {
                 case GlobalHotkeyManager.StartAction:
-                    if (!_recordSessionActive && !_playback.IsRunning)
+                    if (!_recordSessionActive && _playback.CanAccept)
                         _ = StartPlaybackAsync();
                     break;
                 case GlobalHotkeyManager.PauseResumeAction:
@@ -1725,7 +1724,7 @@ internal sealed class MainForm : Form
         base.WndProc(ref m);
     }
 
-    protected override void OnFormClosing(FormClosingEventArgs e)
+    protected override async void OnFormClosing(FormClosingEventArgs e)
     {
         if (!_allowExit && e.CloseReason == CloseReason.UserClosing)
         {
@@ -1734,10 +1733,29 @@ internal sealed class MainForm : Form
             return;
         }
 
-        if (_recordSessionActive) StopRecording();
+        if (!_shutdownComplete)
+        {
+            e.Cancel = true;
+            if (_shutdownStarted)
+                return;
+            _shutdownStarted = true;
+            try
+            {
+                if (_recordSessionActive) StopRecording();
+                await _playback.StopAllAsync();
+            }
+            catch (Exception ex)
+            {
+                AppendLog("应用退出时停止运行实例失败：" + ex);
+            }
+            _shutdownComplete = true;
+            _allowExit = true;
+            Close();
+            return;
+        }
+
         SaveSettings();
         SaveCurrent();
-        _playback.Stop();
         _playback.VisualDebugEnabled = false;
         _visualDebugOverlay?.Close();
         _visualDebugOverlay?.Dispose();
@@ -1804,7 +1822,7 @@ internal sealed class MainForm : Form
 
     private void OpenPluginManager()
     {
-        if (_recordSessionActive || _playback.IsRunning)
+        if (_recordSessionActive || _playback.HasActiveInstances || _playback.QueuedCount > 0)
         {
             MessageBox.Show(this, "请先停止当前录制或脚本，再管理/运行插件。",
                 "插件管理", MessageBoxButtons.OK, MessageBoxIcon.Information);
