@@ -216,3 +216,20 @@
 - 等待：`WaitProcess` 默认 30,000ms，范围 0–600,000ms；0 表示立即查询。每 100ms 或更短轮询一次，并经 ExecutionGate 处理 Pause/Stop；超时返回 false，进程已退出返回 true，GetProcessInfo 在退出后读取 exitCode。
 - 生命周期：Stop 只取消 Worker/等待，不终止已启动外部应用。单轮运行结束后释放 Process 对象句柄；已启动的外部进程继续由 Windows 独立运行。当前子任务不提供任意进程终止、Shell、HTTP/JSON 或插件。
 - 限制：路径/reparse 检查降低误启动风险，但进程 API 不是 OS 沙箱；用户批准的 EXE 本身仍可以执行其自身逻辑并访问该用户已有能力。
+
+## ADR-029：受控 HTTP(S)/JSON 请求 API 使用逐跳授权与有界缓冲
+
+- 状态：ACCEPTED（M12-09 首批网络 API；Windows 自动化验证不代替 M14 桌面验收）。
+- 公开 API：`HttpRequest(url, options?)`，API registry 从 1.1 / 102 项递增为 1.2 / 103 项。options 可包含 method、headers、body、json、timeoutMs、followRedirects；body 与 json 互斥。json 值必须能无损映射为有限深度的 JSON object/array/scalar。
+- 权限：复用 ADR-024 的 `httpHosts`、`httpMethods`、`allowInsecureHttp`。主机名必须是精确 DNS 名称，不接受通配符；方法仅 GET/POST/PUT/PATCH/DELETE/HEAD。HTTPS 默认；HTTP 必须同时被请求和本次用户批准。权限不包含任意 IP 字面量。由于 sidecar 的 host 字段不表达端口，本批只允许 HTTP 80 / HTTPS 443 默认端口，非默认端口拒绝。URI 不允许 userinfo 与 fragment。
+- 双层检查：Worker bridge 在发 IPC 前使用当前 Grant 验证 URL、method、头和正文；PlaybackRunner host 每次接收 IPC 都重新解析并验证，不信任 Worker 的预检。Host 对首次请求以及每次 redirect 都重新验证目标 scheme、精确 host 和当时实际使用的 method；method 经 redirect 规则变化后也必须另行授权。
+- 请求契约：默认 GET，timeout 默认 30,000ms、范围 1,000–120,000ms；URL 最多 2,048 字符；请求头最多 32 项，名称最多 128 字符，单值最多 8,192 字符、合计最多 32 KiB；禁止 Host、Cookie、Proxy-Authorization、Connection、Transfer-Encoding、Content-Length、Upgrade、TE 等 hop-by-hop/由传输栈管理的头。请求正文严格 UTF-8，body/json 序列化后最多 1 MiB。json 作为 Lua 值序列化并默认补 `Content-Type: application/json; charset=utf-8`，显式 Content-Type 优先。
+- JSON 契约：响应始终返回 UTF-8 文本正文；只有 Content-Type 为 application/json 或 `+json` 时解析为 Lua table/原生 scalar，JSON 最大深度 32；声明为 JSON 但内容无效时产生明确错误。非 JSON 响应的 `json` 字段为 nil。状态码不代表传输异常：4xx/5xx 仍作为正常响应对象返回，调用方检查 `ok`。
+- 返回值：`{ statusCode, reasonPhrase, ok, url, headers, body, json }`。url 为最终响应 URL；headers 为有界且过滤敏感响应头后的字典；body 最多 4 MiB（按解压后实际读取字节数计），响应头上限 32 KiB。正文按严格 UTF-8 解码；不支持其他 charset。超 Content-Length 或流式累计上限均拒绝，不截断、不返回部分正文。
+- 重定向：禁用 HttpClient 自动跳转，由 Host 手动最多跟随 5 次；followRedirects 默认 true，false 时将 3xx 作为普通响应返回。301/302 的 POST 与 303 的非 HEAD 请求转 GET 并丢弃正文；307/308 保留 method/body。每一跳均重新授权；HTTPS 降级到 HTTP 仍需独立明文授权。跨 origin 重定向不转发 Authorization 或用户自定义凭据头；Cookie 容器关闭。
+- 网络栈：不继承默认凭据、不使用 Cookie、不使用外部代理凭据；不把请求 URL、头、正文或响应正文自动写入日志。不得在应用 UI 线程上同步等待网络。
+- 取消/暂停：请求在 PlaybackRunner 命令边界等待 Pause；启动后 Pause 不暂停 socket 或延长 timeout，响应完成后下一命令边界继续等待。Stop 令牌贯穿发送、重定向和响应流读取；Stop 立即取消本次操作。timeout 与 Stop 区分报告；两者都不得返回半截响应。
+- 错误：参数/JSON/header/URL 无效、缺少 host/method/明文批准、重定向越权、超时、Stop 取消、响应体/头超限、非 UTF-8 正文、无效 JSON 和网络异常均有明确失败路径；未知 IPC 一律 fail-closed。
+- 范围限制：本批提供有上限的缓冲请求，不是任意 TCP、WebSocket、代理配置、Cookie jar、下载器、上传器或浏览器会话。通过 body/json 可以向已授权服务发送文本/JSON；大文件/流式传输保留后续独立设计。网络请求只由脚本显式调用，不会自动联网。
+- 验证：Core 契约测试使用可注入 HttpMessageHandler 覆盖授权、重定向、请求头、timeout、Stop、响应上限、JSON 与 Worker Lua table；Windows Actions 继续执行 Release Build、全量 Core tests、API handbook、自包含包及 Sprite/Worker smoke。WinForms 权限审阅、真实网络/DPI/Stop 交互仍留 M14。
+

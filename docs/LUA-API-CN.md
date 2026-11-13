@@ -365,3 +365,60 @@ end
 ```
 
 参数通过 `.NET ProcessStartInfo.ArgumentList` 逐项传递；UseShellExecute=false。不拼接 shell 命令、不调用 cmd.exe/PowerShell。当前不提供进程终止、任意进程枚举或附加、HTTP/JSON 和插件 API。已启动的外部进程在脚本停止/结束后继续独立运行。
+
+## 14. M12-09 受控 HTTP(S)/JSON API（API 1.2；main 开发版）
+
+唯一新增公开 API 为 `HttpRequest(url, options?)`。该 API 只在脚本显式调用时联网，不提供后台自动请求。
+
+### 14.1 权限声明与逐次批准
+
+在脚本同目录的 `<script>.permissions.json` 声明精确主机、HTTP 方法与可选明文权限。声明只是请求；每次运行仍必须在权限审阅窗口由用户逐项批准，默认全不勾选：
+
+```json
+{
+  "schemaVersion": 1,
+  "httpHosts": ["api.example.com"],
+  "httpMethods": ["GET", "POST"],
+  "allowInsecureHttp": false
+}
+```
+
+主机不接受通配符，IP 字面量也不接受。sidecar 不包含端口字段，因此本批仅允许 HTTPS 默认端口 443 和 HTTP 默认端口 80。HTTP 必须由 sidecar 请求且由用户单独勾选明文 HTTP。每次 redirect 都重新检查目标 host、scheme 和实际 method；仅批准初始 URL 不代表自动批准重定向目标。
+
+### 14.2 请求参数
+
+`HttpRequest(url, options?)` 的 options 是 Lua table，可选字段如下：
+
+| 字段 | 默认值 | 契约 |
+|---|---|---|
+| method | `"GET"` | GET、POST、PUT、PATCH、DELETE、HEAD |
+| headers | `{}` | 字符串键值表；最多 32 个请求头 |
+| body | `nil` | UTF-8 文本，最多 1 MiB |
+| json | `nil` | Lua JSON 值；与 body 互斥，自动设置 JSON Content-Type（除非显式提供） |
+| timeoutMs | `30000` | 1,000–120,000 毫秒 |
+| followRedirects | `true` | 是否手动跟随重定向，最多 5 次 |
+
+URL 最长 2,048 字符；请求头名称最长 128 字符、单个值最长 8,192 字符、总值长度最多 32 KiB。由 HTTP 栈管理的 Host、Cookie、Content-Length、Transfer-Encoding、Connection、Upgrade、TE、Proxy-Authorization 等头拒绝设置。请求正文只接受 UTF-8。json 值支持对象、连续数组、字符串、布尔、有限数值及嵌套 JSON 值；拒绝循环引用、混合/稀疏 key、非有限数字、userdata 和超过最大深度的值。
+
+### 14.3 返回值、状态码与错误
+
+返回 Lua table：
+
+- `statusCode`：HTTP 状态码。
+- `reasonPhrase`：响应状态文本。
+- `ok`：状态码是否为 2xx；4xx/5xx 不作为传输异常。
+- `url`：最终响应 URL。
+- `headers`：有界响应头字典，过滤 Set-Cookie 与认证挑战类敏感头。
+- `body`：UTF-8 文本正文，最多 4 MiB（按自动解压后的实际读取量计算）。
+- `json`：Content-Type 为 application/json 或 `+json` 时解析后的 Lua table/标量；非 JSON 为 nil。JSON 深度最多 32；声明 JSON 但语法错误会报错。
+
+响应头限制 32 KiB。响应只接受 UTF-8（charset 缺省或明确 utf-8）；未知编码、无效 UTF-8、响应超限和无效 JSON 均报告错误，不静默截断。状态 204/无正文时 body 为空字符串。
+
+### 14.4 重定向、超时与停止
+
+Host 关闭 HttpClient 自动重定向，逐跳手动处理：301/302 的 POST 以及 303 的非 HEAD 转 GET 并清除正文；307/308 保留方法和正文。每一跳重新验证 host/method/HTTPS 或单独批准的 HTTP，跨 origin 不转发 Authorization 或自定义凭据头。followRedirects=false 时直接返回 3xx 响应。
+
+默认超时 30 秒，允许 1–120 秒。timeout、Stop 取消和权限错误分别报告；Stop 令牌贯穿连接、重定向与响应流读取，取消后不返回部分正文。Pause 只在请求启动前的命令边界生效，不暂停已发出的网络请求，也不延长其 timeout。
+
+本批只实现最大 1 MiB 请求正文、最大 4 MiB 响应正文的缓冲请求；不提供任意 TCP、WebSocket、Cookie jar、代理配置或大文件流式上传/下载。请求/响应数据不会自动写入日志。真实 WinForms 权限审阅和 Windows 10/11 网络交互需在 M14 实机验收。
+
