@@ -123,8 +123,7 @@ public sealed class ScriptParameterTests
         try
         {
             File.WriteAllText(path, "{\"SchemaVersion\":9,\"Values\":{}}");
-            var loaded = ParameterConfigurationStore.LoadOrRecover(path);
-            Assert.NotNull(loaded.Warning);
+            Assert.Throws<NotSupportedException>(() => ParameterConfigurationStore.LoadOrRecover(path));
             Assert.Contains("\"SchemaVersion\":9", File.ReadAllText(path));
         }
         finally

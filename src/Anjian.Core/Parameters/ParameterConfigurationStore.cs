@@ -91,7 +91,7 @@ public static class ParameterConfigurationStore
         if (info.Length > MaximumFileBytes)
             throw new InvalidDataException("参数配置超过 1 MiB 限制。");
         using var stream = File.OpenRead(path);
-        var result = JsonSerializer.Deserialize<ParameterConfiguration>(stream)
+        var result = JsonSerializer.Deserialize<ParameterConfiguration>(stream, JsonOptions)
             ?? throw new InvalidDataException("参数配置为空。");
         if (result.SchemaVersion > 1)
             throw new NotSupportedException($"参数配置版本 {result.SchemaVersion} 高于当前支持版本 1；为保护原文件，拒绝回退或覆盖。");
