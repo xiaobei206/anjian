@@ -23,6 +23,7 @@ internal sealed class PlaybackRunner : IDisposable
     private IReadOnlyDictionary<string, JsonElement> _launchParameters = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
     private SpriteWorkerRuntimeOptions? _spriteRuntimeOptions;
     private ScriptPermissionGrant _launchPermissions = ScriptPermissionGrant.Empty;
+    private string _launchScriptDirectory = string.Empty;
     private TaskCompletionSource<LuaDebugCommand>? _debugCommandSource;
 
     public PlaybackRunner()
@@ -70,6 +71,8 @@ internal sealed class PlaybackRunner : IDisposable
         _launchParameters = parameters ?? new Dictionary<string, JsonElement>(StringComparer.Ordinal);
         _spriteRuntimeOptions = spriteRuntimeOptions;
         _launchPermissions = permissions ?? ScriptPermissionGrant.Empty;
+        _launchScriptDirectory = Path.GetDirectoryName(Path.GetFullPath(scriptPath))
+            ?? throw new InvalidDataException("无法确定脚本目录。");
         _gate.Resume();
         var token = cts.Token;
         var completed = 0;
@@ -109,6 +112,7 @@ internal sealed class PlaybackRunner : IDisposable
             _launchParameters = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
             _spriteRuntimeOptions = null;
             _launchPermissions = ScriptPermissionGrant.Empty;
+            _launchScriptDirectory = string.Empty;
             _runCts = null;
             _gate.Resume();
             DebugSessionCompleted?.Invoke();
@@ -378,6 +382,16 @@ internal sealed class PlaybackRunner : IDisposable
                 var request = ReadWindowPayload<ImageWaitColorRequest>(message.Text);
                 return JsonSerializer.Serialize(await WaitForColorGoneAsync(request, token).ConfigureAwait(false));
             }
+            case "file-read-text":
+            case "file-write-text":
+            case "file-append-text":
+            case "file-exists":
+            case "directory-exists":
+            case "directory-list-files":
+            case "directory-list-directories":
+            case "directory-create":
+                return ScriptFileSystemHostDispatcher.Dispatch(
+                    _launchPermissions, _launchScriptDirectory, message.Type, message.Name, message.Text, token);
             default:
                 throw new InvalidDataException($"未知执行命令：{message.Type}");
         }
