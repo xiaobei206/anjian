@@ -139,6 +139,7 @@ internal sealed class PlaybackRunner : IDisposable
         _launchScriptDirectory = Path.GetDirectoryName(Path.GetFullPath(scriptPath))
             ?? throw new InvalidDataException("无法确定脚本目录。");
         _gate.Resume();
+        LastCleanupSucceeded = true;
         var token = cts.Token;
         var completed = 0;
         try
@@ -152,6 +153,8 @@ internal sealed class PlaybackRunner : IDisposable
                     ? $"开始第 {next} 轮（无限循环）"
                     : $"开始第 {next}/{options.RepeatCount} 轮");
                 await RunOneAsync(scriptPath, debugOptions, token).ConfigureAwait(false);
+                if (!LastCleanupSucceeded)
+                    throw new InvalidOperationException("实例输入清理失败；全局输入仲裁已锁定，停止后续轮次。");
                 completed++;
                 if (!options.HasNextIteration(completed))
                     break;
@@ -172,7 +175,7 @@ internal sealed class PlaybackRunner : IDisposable
         {
             KillWorker();
             _processSession.ClearHandles();
-            LastCleanupSucceeded = await _input.ReleaseAllAsync().ConfigureAwait(false);
+            LastCleanupSucceeded &= await _input.ReleaseAllAsync().ConfigureAwait(false);
             if (!LastCleanupSucceeded)
                 Log?.Invoke("严重：实例输入清理失败，全局输入仲裁器已锁定；恢复前不会允许其他实例注入键鼠。");
             Volatile.Read(ref _debugCommandSource)?.TrySetCanceled();
@@ -227,18 +230,16 @@ internal sealed class PlaybackRunner : IDisposable
 
         try
         {
-            using (var startupCts = CancellationTokenSource.CreateLinkedTokenSource(token))
+            using var startupCts = CancellationTokenSource.CreateLinkedTokenSource(token);
+            startupCts.CancelAfter(RunInstanceLimits.WorkerStartupTimeoutMilliseconds);
+            try
             {
-                startupCts.CancelAfter(RunInstanceLimits.WorkerStartupTimeoutMilliseconds);
-                try
-                {
-                    await server.WaitForConnectionAsync(startupCts.Token).ConfigureAwait(false);
-                }
-                catch (OperationCanceledException) when (!token.IsCancellationRequested)
-                {
-                    throw new TimeoutException(
-                        $"Worker 在 {RunInstanceLimits.WorkerStartupTimeoutMilliseconds} ms 内未建立 IPC 连接。");
-                }
+                await server.WaitForConnectionAsync(startupCts.Token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (!token.IsCancellationRequested)
+            {
+                throw new TimeoutException(
+                    $"Worker 在 {RunInstanceLimits.WorkerStartupTimeoutMilliseconds} ms 内未建立 IPC 连接。");
             }
 
             using var reader = new StreamReader(server, new UTF8Encoding(false), false, 4096, leaveOpen: true);
@@ -250,7 +251,18 @@ internal sealed class PlaybackRunner : IDisposable
 
             while (!token.IsCancellationRequested)
             {
-                var line = await reader.ReadLineAsync(token).ConfigureAwait(false);
+                string? line;
+                try
+                {
+                    line = _workerReadyReceived
+                        ? await reader.ReadLineAsync(token).ConfigureAwait(false)
+                        : await reader.ReadLineAsync(startupCts.Token).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) when (!token.IsCancellationRequested && !_workerReadyReceived)
+                {
+                    throw new TimeoutException(
+                        $"Worker 在 {RunInstanceLimits.WorkerStartupTimeoutMilliseconds} ms 内未完成身份握手。");
+                }
                 if (line is null)
                     break;
 
@@ -741,13 +753,17 @@ internal sealed class PlaybackRunner : IDisposable
                     throw new ArgumentOutOfRangeException(nameof(request), "move/click 坐标必须位于目标客户区（屏幕物理像素）。");
                 if (!_windows.IsForeground(request.WindowId))
                     throw new InvalidOperationException("目标窗口失去前台状态，拒绝输入。");
-                await _input.MoveToAsync(request.X, request.Y, token).ConfigureAwait(false);
                 if (action == "click")
                 {
                     var button = request.Name.Trim().ToLowerInvariant();
                     if (button is not ("left" or "right" or "middle"))
                         throw new ArgumentException("click name 必须为 left/right/middle。", nameof(request));
-                    await _input.ClickAsync(button, request.HoldMilliseconds, token).ConfigureAwait(false);
+                    await _input.ClickAtAsync(
+                        request.X, request.Y, button, request.HoldMilliseconds, token).ConfigureAwait(false);
+                }
+                else
+                {
+                    await _input.MoveToAsync(request.X, request.Y, token).ConfigureAwait(false);
                 }
                 break;
             }
