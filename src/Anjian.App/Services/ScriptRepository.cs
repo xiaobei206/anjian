@@ -81,6 +81,7 @@ public sealed class ScriptRepository
             var imageManifestMoved = false;
             var assetDirectoryMoved = false;
             var assetReferencesRewritten = false;
+            var imagePathsRebased = false;
             try
             {
                 File.Move(entry.FullPath, target);
@@ -104,6 +105,9 @@ public sealed class ScriptRepository
                 {
                     File.Move(oldImageManifest, newImageManifest);
                     imageManifestMoved = true;
+                    RebaseImageManifest(newImageManifest, Path.GetFileName(oldAssetDirectory),
+                        Path.GetFileName(newAssetDirectory), regenerateScriptId: false);
+                    imagePathsRebased = true;
                 }
                 if (Directory.Exists(oldAssetDirectory))
                 {
@@ -119,6 +123,9 @@ public sealed class ScriptRepository
                     File.Move(newScriptBackup, oldScriptBackup);
                 if (assetReferencesRewritten && File.Exists(target))
                     RewriteAssetReferences(target, Path.GetFileName(newAssetDirectory), Path.GetFileName(oldAssetDirectory));
+                if (imagePathsRebased && File.Exists(newImageManifest))
+                    RebaseImageManifest(newImageManifest, Path.GetFileName(newAssetDirectory),
+                        Path.GetFileName(oldAssetDirectory), regenerateScriptId: false);
                 if (assetDirectoryMoved && Directory.Exists(newAssetDirectory))
                     Directory.Move(newAssetDirectory, oldAssetDirectory);
                 if (imageManifestMoved && File.Exists(newImageManifest))
@@ -224,12 +231,12 @@ public sealed class ScriptRepository
         }
     }
 
-    private static void RebaseImageManifest(string manifestPath, string oldAssetName, string newAssetName)
+    private static void RebaseImageManifest(string manifestPath, string oldAssetName, string newAssetName, bool regenerateScriptId = true)
     {
         var root = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(manifestPath))?.AsObject()
             ?? throw new InvalidDataException("复制的图像资源清单不是有效 JSON。");
         var scriptIdKey = root.Select(x => x.Key).FirstOrDefault(x => string.Equals(x, "ScriptId", StringComparison.OrdinalIgnoreCase));
-        if (scriptIdKey is not null)
+        if (regenerateScriptId && scriptIdKey is not null)
             root[scriptIdKey] = Guid.NewGuid().ToString("N");
         var resourcesKey = root.Select(x => x.Key).FirstOrDefault(x => string.Equals(x, "Resources", StringComparison.OrdinalIgnoreCase));
         if (resourcesKey is not null && root[resourcesKey] is System.Text.Json.Nodes.JsonArray resources)
