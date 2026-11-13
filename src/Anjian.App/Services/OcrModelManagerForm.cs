@@ -132,19 +132,21 @@ internal sealed class OcrModelManagerForm : Form
         {
             _downloadCts?.Dispose();
             _downloadCts = null;
-            if (IsDisposed || Disposing)
-                return;
-
-            _download.Enabled = true;
-            _cancel.Enabled = false;
-            _language.Enabled = true;
-            if (_closeAfterDownload)
+            if (!IsDisposed && !Disposing)
             {
-                _closeAfterDownload = false;
-                BeginInvoke(new Action(Close));
-                return;
+                _download.Enabled = true;
+                _cancel.Enabled = false;
+                _language.Enabled = true;
+                if (_closeAfterDownload)
+                {
+                    _closeAfterDownload = false;
+                    BeginInvoke(new Action(Close));
+                }
+                else
+                {
+                    RefreshModelState();
+                }
             }
-            RefreshModelState();
         }
     }
 
