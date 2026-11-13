@@ -193,7 +193,8 @@ public static class RunInstanceLifecycle
                 if (cleanupStatus != RunInstanceCleanupStatus.NotStarted)
                     throw new InvalidOperationException("清理开始时不能提前指定最终清理状态。");
                 nextCleanupStatus = RunInstanceCleanupStatus.InProgress;
-                if (nextTerminationMode == RunInstanceTerminationMode.None)
+                if (current.State == RunInstanceState.Cancelling &&
+                    nextTerminationMode == RunInstanceTerminationMode.None)
                     nextTerminationMode = RunInstanceTerminationMode.Graceful;
                 break;
 
