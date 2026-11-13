@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using Anjian.Core.Api;
 using Anjian.Core.Editor;
+using Anjian.Core.Parameters;
 using KeraLua;
 using NLua;
 
@@ -25,10 +26,12 @@ internal static class WorkerProgram
             using var reader = new StreamReader(pipe, new UTF8Encoding(false), false, 4096, leaveOpen: true);
             using var writer = new StreamWriter(pipe, new UTF8Encoding(false), 4096, leaveOpen: true) { AutoFlush = true };
             var client = new WorkerPipeClient(reader, writer);
-            var debugPayload = client.Request("worker-ready");
-            var debugOptions = string.IsNullOrWhiteSpace(debugPayload)
-                ? null
-                : JsonSerializer.Deserialize<LuaDebugLaunchOptions>(debugPayload);
+            var launchPayload = client.Request("worker-ready");
+            var launch = string.IsNullOrWhiteSpace(launchPayload)
+                ? new WorkerLaunchPayload()
+                : JsonSerializer.Deserialize<WorkerLaunchPayload>(launchPayload)
+                    ?? throw new InvalidDataException("主进程返回了无效的启动参数。");
+            var debugOptions = launch.DebugOptions;
 
             try
             {
@@ -37,6 +40,7 @@ internal static class WorkerProgram
                 using var lua = new NLua.Lua(openLibs: true);
                 var api = new WorkerLuaApi(client, lua, automation, ocr);
                 LuaApiRuntime.Register(lua, api);
+                LuaParameterInjector.Inject(lua, launch.Parameters);
                 var fullPath = Path.GetFullPath(scriptPath);
                 if (debugOptions is null)
                 {

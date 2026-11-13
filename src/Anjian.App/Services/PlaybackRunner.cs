@@ -5,6 +5,7 @@ using System.Text.Json;
 using Anjian.Core;
 using Anjian.Core.Editor;
 using Anjian.Core.Imaging;
+using Anjian.Core.Parameters;
 using Anjian.Core.Windows;
 
 namespace Anjian.App.Services;
@@ -18,6 +19,7 @@ internal sealed class PlaybackRunner : IDisposable
     private CancellationTokenSource? _runCts;
     private Process? _worker;
     private LuaDebugLaunchOptions? _debugLaunchOptions;
+    private IReadOnlyDictionary<string, JsonElement> _launchParameters = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
     private TaskCompletionSource<LuaDebugCommand>? _debugCommandSource;
 
     public PlaybackRunner()
@@ -48,7 +50,8 @@ internal sealed class PlaybackRunner : IDisposable
     public async Task RunAsync(
         string scriptPath,
         PlaybackOptions options,
-        LuaDebugLaunchOptions? debugOptions = null)
+        LuaDebugLaunchOptions? debugOptions = null,
+        IReadOnlyDictionary<string, JsonElement>? parameters = null)
     {
         options.Validate();
         if (_runCts is not null)
@@ -59,6 +62,7 @@ internal sealed class PlaybackRunner : IDisposable
         using var cts = new CancellationTokenSource();
         _runCts = cts;
         _debugLaunchOptions = debugOptions;
+        _launchParameters = parameters ?? new Dictionary<string, JsonElement>(StringComparer.Ordinal);
         _gate.Resume();
         var token = cts.Token;
         var completed = 0;
@@ -95,6 +99,7 @@ internal sealed class PlaybackRunner : IDisposable
             _input.ReleaseAll();
             Volatile.Read(ref _debugCommandSource)?.TrySetCanceled();
             _debugLaunchOptions = null;
+            _launchParameters = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
             _runCts = null;
             _gate.Resume();
             DebugSessionCompleted?.Invoke();
@@ -171,7 +176,7 @@ internal sealed class PlaybackRunner : IDisposable
         CancellationToken token)
     {
         if (message.Type == "worker-ready")
-            return debugOptions is null ? null : JsonSerializer.Serialize(debugOptions);
+            return JsonSerializer.Serialize(new WorkerLaunchPayload { DebugOptions = debugOptions, Parameters = _launchParameters.ToDictionary(x => x.Key, x => x.Value, StringComparer.Ordinal) });
 
         if (message.Type == "debug-break")
         {
