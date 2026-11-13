@@ -655,3 +655,10 @@ M12-02 验收前不做剪贴板、对话框、进程、HTTP 或插件加载。�
 
 
 - 第二轮 run [43414314883](https://github.com/xiaobei206/anjian/actions/runs/43414314883) 对 commit `0f7a424da9481be2123bd1fedb3205eb04dda8ac`：Restore PASS，Build 因 `ScriptProcessSession.cs` 缺少 `using System.Diagnostics` 导致 CS0246 失败（0 warnings / 1 error）；Test/后续步骤跳过。已定位，随下一修正提交补回引用。
+
+
+## M12-08 最新提交与 Actions 追踪
+- `90a86e7af8c391308288c6116ce12288a7287002`：首轮 CI run 43413876754；Build 0 warnings/0 errors，151/152 tests，失败为旧 API 版本断言 1.0。
+- `0f7a424da9481be2123bd1fedb3205eb04dda8ac`：run 43414314883；Build 因缺少 `using System.Diagnostics` 导致 Process CS0246 失败。
+- `0ebd376629cca035bd71cd5b3a7b51c1689beeb3`：run 43414416720；同一编译错误，Build 0 warnings/1 error，后续步骤跳过。此 commit 同时把旧测试函数数量断言从 99 更新至 102。
+- 当前 main 最新：`bd848281b1125e4c8441d941119de54fdd252744`，恢复 `using System.Diagnostics`。Windows Actions run [43414530292](https://github.com/xiaobei206/anjian/actions/runs/43414530292) 正在执行，必须以此 run 的最终结果继续修复或记录 PASS。

@@ -786,3 +786,9 @@ M4 基础调试器与 M5 可视化录制/动作列表均已完成 Windows CI 验
 - Restore PASS。
 - Build FAILED，0 warnings / 1 error：`ScriptProcessSession.cs(145,63)` 的 `Process` 类型无法解析（CS0246）。原因是调整 WaitProcess 暂停计时后移除了 `using System.Diagnostics`，但该文件仍使用 `System.Diagnostics.Process` 类型；下一提交补回 using。
 - Test 与 API handbook / publish / Sprite Worker / package/upload 因 Build 失败全部跳过。此 run 对应 commit 0f7a424da9481be2123bd1fedb3205eb04dda8ac；不能作为验证通过。
+
+
+### M12-08 后续 Windows Actions Build 修正（2026-11-13）
+- Run [43414314883](https://github.com/xiaobei206/anjian/actions/runs/43414314883)（HEAD `0f7a424da9481be2123bd1fedb3205eb04dda8ac`）：Restore PASS，Build FAILED，0 warnings / 1 error；CS0246 无法解析 `System.Diagnostics.Process`，因为 pause-aware timeout 修正中误删了仍为 Process 对象字段所需的 using。
+- Run [43414416720](https://github.com/xiaobei206/anjian/actions/runs/43414416720)（HEAD `0ebd376629cca035bd71cd5b3a7b51c1689beeb3`）：同样在 Build 阶段遇到上项未修复错误，0 warnings / 1 error；Test 与发布步骤跳过。
+- 已在提交 `bd848281b1125e4c8441d941119de54fdd252744` 补回 `using System.Diagnostics`，该提交触发最新 run [43414530292](https://github.com/xiaobei206/anjian/actions/runs/43414530292)；当前状态以 Actions 实时结果为准。
