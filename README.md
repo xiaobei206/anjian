@@ -20,6 +20,7 @@ ZIP SHA256：`6b59ab27f825aa48b2ec5343cec826ad8b0ded759e9989af02d51f8b949f09aa`�
 - [Lua 5.4 命令 API 规格](docs/LUA-API-CN.md)
 - [完整功能矩阵（与经典 PC 功能对应）](docs/FEATURE-MATRIX-CN.md)
 - [中文函数与参数参考手册](docs/FUNCTION-REFERENCE-CN.md)
+- [插件 Lua API 贡献契约](docs/PLUGIN-API-CONTRIBUTIONS-CN.md)
 - [录制器与动作/代码生成设计](docs/RECORDER-DESIGN-CN.md)
 - [架构决策记录（ADR）](docs/DECISIONS-CN.md)
 - [技术选型与 PoC 验证清单](docs/TECHNICAL-VALIDATION-CN.md)

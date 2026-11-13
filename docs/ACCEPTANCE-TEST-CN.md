@@ -507,3 +507,22 @@ M12-09 只实现有上限的显式 HTTP 缓冲请求；不代表大文件流式�
 - Run [43436997492](https://github.com/xiaobei206/anjian/actions/runs/43436997492) SUCCESS，代码 HEAD `ff5dc1510f4f68fe23e4abf54e2c291f6df6229b`：Release Build 0 warnings / 0 errors；Core tests 173 passed / 0 failed / 0 skipped；API handbook check；self-contained win-x64 publish；published Sprite/Plugin Worker smoke；ZIP/SHA256 与 artifact upload 全 PASS。
 - Artifact ID `14044230189`，87,267,435 bytes，archive SHA-256 `8c4312eb072012db084917bd025d5640e105d623a4d7df819632bf7cf1e58fc0`，这是 Actions 临时 artifact，不是 GitHub Release。
 - 本地 Restore/Build/Test NOT RUN（无 .NET SDK）。真实 Windows 10/11 WinForms 权限窗口、批准/拒绝交互、DPI/多屏仍 NOT RUN，统一留 M14。
+
+## M12-12 插件 Lua API/命令贡献（2026-11-13）
+
+| 验收项 | 验收条件 | 自动化结果 | Windows 桌面状态 |
+|---|---|---|---|
+| M12-12-01 | contributions 可选节点与 schemaVersion=1；拒绝未知/未来 schema、重复/非法 ID、坏模块引用 | PluginApiContributionTests 通过：schema 及文件篡改路径已覆盖 | NOT RUN（M14） |
+| M12-12-02 | 内置 API/保留名称冲突拒绝；跨启用插件冲突拒绝启用且 catalog 不变 | 自动化测试覆盖 LeftClick 与跨插件冲突、拒绝后 disabled 状态 | NOT RUN（M14） |
+| M12-12-03 | 已启用插件进入内存 registry extension view，IDE completion 使用同一 metadata | 测试验证合并 registry 含内置与插件函数，LuaEditorService 能发现贡献 | NOT RUN（M14） |
+| M12-12-04 | Worker 内实际调用 helper，参数数量/类型约束、异常传播与宿主自动化 API 隔离 | NLua 集成测试通过；调用路径不新增 host IPC 或 Grant | NOT RUN（M14） |
+| M12-12-05 | disabled/损坏插件不能继续贡献；启动重验 enabled/catalog/manifest/files/hash | 启停和 hash tamper tests 通过 | NOT RUN（M14） |
+| M12-12-06 | API 命令面板、IDE 补全/签名与动态参考生成器读取同一合并视图；内置 handbook check 一致 | Windows Actions Build/Test、API handbook、self-contained 发布与 Worker smoke 全 PASS | 命令面板实机交互 NOT RUN（M14） |
+| M12-12-07 | Windows 10/11 插件管理、命令面板、DPI/多显示器、实际用户操作 | 自动化不能替代桌面验收 | NOT RUN（M14） |
+
+### M12-12 Windows Actions 最终自动化结果
+
+- [Run 43441156420](https://github.com/xiaobei206/anjian/actions/runs/43441156420) SUCCESS，对代码 HEAD `6cb86e9111fa6ea792122ec07667c0e9ee0f3b94`：Restore、Release Build **0 warnings / 0 errors**、Core tests **177 passed / 0 failed / 0 skipped**、API handbook check（103 个内置函数）、self-contained win-x64 publish、已发布包内 Sprite/Plugin Worker smoke、ZIP/SHA256 与 artifact upload 全 PASS。
+- Actions artifact ID `14044284665`，87,281,040 bytes，archive SHA-256 `29b125cbb56b21f8e52075713474c72591c8df9a38f5e8cd5383d8c3e26c5a0d`，有效至 2026-12-13；是临时 Actions artifact，不是 GitHub Release。
+- 上述 run 验证代码和测试基线；后续文档提交会另行触发 Actions。local Restore/Build/Test NOT RUN（当前容器无 .NET SDK）。未修改版本号/创建 tag/Release；M14 Windows 10/11 桌面验收仍 NOT RUN。
+

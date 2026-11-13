@@ -487,7 +487,7 @@ end
 
 入口是一个包根目录下的 Lua 文件，模块只通过 manifest 登记的 modulesRoot / SHA-256 清单加载。插件 Lua 在独立 Worker 中运行；包内 DLL/EXE、原生模块和未登记文件不被加载。SHA-256 是完整性检查，不是数字签名；独立 Worker 也不是完整 OS 沙箱。请只安装可信来源的插件。
 
-本次 M12-10 没有增加公开 Lua 函数，不改变 API registry 1.2 / 103，也暂不支持第三方插件动态注册全局 Lua API、IDE 补全或命令面板。Windows 桌面权限窗口、DPI/多屏和完整用户操作仍需在 M14 实测；此开发功能不包含在已发布的 v0.1.0-preview.4 中。
+本次 M12-10 原始插件包能力没有增加内置 Lua API；M12-12 在 main 开发版增加可选 contributions schema v1，允许已启用插件贡献纯 Lua helper。内置 API registry 仍为 1.2 / 103，插件签名/说明合入只在内存使用的 registry extension view，不修改静态函数手册；完整规则见 [插件 Lua API 贡献契约](PLUGIN-API-CONTRIBUTIONS-CN.md)。这些开发能力不包含在已发布的 v0.1.0-preview.4 中。
 
 
 ## M12-11 小精灵入口权限 sidecar（main 开发版，不包含在 preview.4）
@@ -497,3 +497,18 @@ end
 - Launcher 在每次启动选中的入口前复核 manifest 绑定和 hash，并复用现有脚本权限审阅窗体逐项询问本次权限；选项默认不勾选。用户拒绝或取消时不会启动 Worker，之前批准的权限不会持久保存或传给其他入口。
 - 没有 sidecar 的入口仍可运行，但使用空 Grant，不会因包内其他入口的声明而获得权限。sidecar 本身只是请求，不是授权；每个实际 IPC 仍由主进程按本次 Grant 再检查。
 - SHA-256 只保证相对清单的完整性，不是发布者签名。此开发版尚未经过 Windows 10/11 的 WinForms 权限审阅、DPI 和多显示器人工验收；这些项目继续列入 M14，且本功能不包含在已发布的 v0.1.0-preview.4 中。
+
+
+## M12-12 插件 Lua API/命令贡献（main 开发版，不包含在 preview.4）
+
+插件 manifest 可选声明 contributions.schemaVersion=1，给纯 Lua helper 提供稳定 ID、公开函数名、签名、参数/返回契约、错误/暂停/取消语义、示例、模块及导出。模块必须位于 modulesRoot 下，并包含在 manifest files/SHA-256 清单中。未知字段/未来 schema、非法或冲突函数名、未登记或哈希不匹配模块会被拒绝；启用操作会检查完整启用集合，冲突时不保存变更。
+
+使用流程：先在“插件管理”显式导入可信目录/ZIP，检查声明并手动启用。普通脚本打开时，编辑器自动把当前启用且通过验证的贡献显示在补全/签名提示中；使用主工具栏“API 命令面板”可按名称、签名、说明或分类筛选函数并插入调用。禁用插件后，下一次刷新/脚本启动的贡献视图不再包含它。函数在该脚本独立 Worker 内惰性执行，不在主 UI 执行。
+
+插件 helper 的环境不提供宿主键鼠、文件、剪贴板、对话框、进程、窗口、图像、OCR、HTTP 等自动化 API，也不增加用户本次批准的 Grant。SHA-256 不是数字签名，Worker 也不是完整 OS 沙箱，只安装可信来源插件。
+
+可额外生成当前本机启用插件的完整动态参考文档，输出路径由调用方指定：
+
+    dotnet run --project tools/Anjian.ApiDocsGenerator -- --write-plugin-reference "$env:LOCALAPPDATA\\Anjian2026\\Plugins" .\\PLUGIN-API-REFERENCE-CN.md
+
+该命令不修改仓库中的内置静态 FUNCTION-REFERENCE-CN.md；它仍只反映随应用编译的 103 个内置函数。Windows 10/11 插件管理、命令面板、权限窗口、DPI/多屏和完整用户交互仍为 M14 NOT RUN。CI 通过不代表实机验收通过。
