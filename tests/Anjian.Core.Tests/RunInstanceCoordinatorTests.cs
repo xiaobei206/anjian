@@ -113,6 +113,7 @@ public sealed class RunInstanceCoordinatorTests
         Assert.Throws<ArgumentException>(() => coordinator.Admit("not-guid", "script.lua"));
         var requestId = Guid.NewGuid().ToString("N");
         var admission = coordinator.Admit(requestId, "script.lua");
+        Assert.Throws<InvalidOperationException>(() => coordinator.Admit(requestId, "another.lua"));
         Assert.True(coordinator.TryMarkRunning(admission.InstanceId, out _));
         coordinator.Complete(admission.InstanceId, RunInstanceOutcome.Succeeded, RunInstanceCleanupStatus.Succeeded);
 
