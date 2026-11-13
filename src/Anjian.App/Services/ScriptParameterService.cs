@@ -55,12 +55,12 @@ internal static class ScriptParameterService
         }
     }
 
-    public static IReadOnlyDictionary<string, JsonElement> LoadSavedValues(string path, ScriptParameterSchema schema)
+    public static IReadOnlyDictionary<string, JsonElement> LoadSavedValues(string path, ScriptParameterSchema schema, string? baseDirectory = null)
     {
         var loaded = ParameterConfigurationStore.LoadOrRecover(path);
         if (loaded.Warning is not null)
             MessageBox.Show(loaded.Warning, "参数配置", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-        var validation = ScriptParameterValidator.ValidateValues(schema, loaded.Configuration.Values);
+        var validation = ScriptParameterValidator.ValidateValues(schema, loaded.Configuration.Values, baseDirectory);
         if (!validation.IsValid)
         {
             MessageBox.Show("已保存参数与当前定义不匹配，将使用定义中的默认值。\n" +

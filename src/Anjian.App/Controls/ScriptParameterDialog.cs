@@ -261,7 +261,7 @@ internal sealed class ScriptParameterDialog : Form
                 new JsonSerializerOptions(JsonSerializerDefaults.Web))
                 ?? throw new InvalidDataException("配置文件为空。");
             if (configuration.SchemaVersion != 1) throw new InvalidDataException($"不支持配置版本 {configuration.SchemaVersion}。");
-            var validation = ScriptParameterValidator.ValidateValues(_schema, configuration.Values);
+            var validation = ScriptParameterValidator.ValidateValues(_schema, configuration.Values, Path.GetDirectoryName(_scriptPath));
             if (!validation.IsValid)
                 throw new InvalidDataException(string.Join(Environment.NewLine, validation.Issues.Select(x => $"{x.Label}：{x.Message}")));
             ApplyValues(validation.Values);
