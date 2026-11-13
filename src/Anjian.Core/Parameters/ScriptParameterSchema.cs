@@ -97,7 +97,7 @@ public static class ScriptParameterValidator
             }
             if (p.DefaultValue is { } defaultValue && defaultValue.ValueKind != JsonValueKind.Undefined)
             {
-                var result = ValidateValue(p, defaultValue, baseDirectory: null);
+                var result = ValidateValue(p, defaultValue, baseDirectory: null, checkPathExists: false);
                 issues.AddRange(result.Select(message => new ParameterValidationIssue(p.Id ?? string.Empty, label, "默认值无效：" + message)));
             }
         }
@@ -144,7 +144,7 @@ public static class ScriptParameterValidator
                 continue;
             }
 
-            var errors = ValidateValue(p, value, baseDirectory);
+            var errors = ValidateValue(p, value, baseDirectory, checkPathExists: true);
             foreach (var error in errors)
                 issues.Add(new(p.Id ?? string.Empty, label, error));
             if (errors.Count == 0)
@@ -157,7 +157,7 @@ public static class ScriptParameterValidator
         || value.ValueKind == JsonValueKind.String && string.IsNullOrWhiteSpace(value.GetString())
         || value.ValueKind == JsonValueKind.Array && !value.EnumerateArray().Any();
 
-    private static List<string> ValidateValue(ScriptParameterDefinition p, JsonElement value, string? baseDirectory)
+    private static List<string> ValidateValue(ScriptParameterDefinition p, JsonElement value, string? baseDirectory, bool checkPathExists)
     {
         var errors = new List<string>();
         switch (p.Type)
@@ -201,7 +201,7 @@ public static class ScriptParameterValidator
             case "directoryPath":
                 if (value.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(value.GetString()))
                     errors.Add("必须是非空路径。");
-                else if (p.MustExist)
+                else if (p.MustExist && checkPathExists)
                 {
                     var raw = value.GetString()!;
                     var path = Path.IsPathRooted(raw) ? raw : Path.GetFullPath(raw, baseDirectory ?? Environment.CurrentDirectory);
@@ -233,6 +233,11 @@ public static class ScriptParameterValidator
         catch (ArgumentException)
         {
             errors.Add("正则验证规则无效。");
+            return false;
+        }
+        catch (RegexMatchTimeoutException)
+        {
+            errors.Add("文本验证规则执行超时。");
             return false;
         }
     }

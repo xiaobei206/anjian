@@ -168,8 +168,8 @@ public sealed class ScriptParameterTests
                 Parameters =
                 [
                     new() { Id = "ratio", Name = "ratio", Label = "比例", Type = "number", Required = true, Minimum = 0, Maximum = 1.5 },
-                    new() { Id = "file", Name = "file", Label = "文件", Type = "filePath", Required = true, MustExist = true },
-                    new() { Id = "folder", Name = "folder", Label = "目录", Type = "directoryPath", Required = true, MustExist = true },
+                    new() { Id = "file", Name = "file", Label = "文件", Type = "filePath", Required = true, MustExist = true, DefaultValue = Json("\"exists.txt\"") },
+                    new() { Id = "folder", Name = "folder", Label = "目录", Type = "directoryPath", Required = true, MustExist = true, DefaultValue = Json("\"folder\"") },
                     new() { Id = "code", Name = "code", Label = "代码", Type = "text", Required = true, Pattern = "^[A-Z]{2,4}$" }
                 ]
             };
