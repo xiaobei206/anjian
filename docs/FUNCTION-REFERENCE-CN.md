@@ -2259,6 +2259,37 @@ local info = GetProcessInfo(handle)
 Log("PID: " .. tostring(info.processId))
 ```
 
+### 2.11 HTTP 与 JSON
+
+#### `HttpRequest(url, options?)` — 发送受控 HTTP(S)/JSON 请求
+
+- **稳定 ID：** `anjian.http.request`
+- **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
+- **说明：** 向本次运行明确批准的精确 DNS 主机发送有界 HTTP(S) 请求；默认 HTTPS/GET，可选择 JSON 请求正文并解析 JSON 响应。
+
+| 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
+|---|---|---|---|---|---|
+| `url` | `string` | 是 | — | — | HTTPS 或经单独授权的 HTTP 绝对 URL；仅默认端口 443/80。 |
+| `options` | `table` | 否 | `{}` | — | 可选请求配置：method、headers、body 或 json、timeoutMs、followRedirects。 |
+
+**返回值：** `table` — statusCode、reasonPhrase、ok、url、headers、body、json；非 2xx 状态仍返回响应对象。
+**错误：** URL、方法、请求头、请求正文或 JSON 参数无效，或主机/方法/明文 HTTP 未获本次运行批准。；重定向目标未重新获得精确主机/方法/协议授权，重定向次数超限或响应头/正文超过上限。；请求超时、Stop 取消、网络失败、响应不是有效 UTF-8 或声明 JSON 的响应正文无效。
+**执行/取消语义：** 在请求开始前的执行器命令边界遵循 Pause；已开始的 HTTP 请求不暂停，也不延长其 timeout。 Stop cancellation token 贯穿发送、重定向和响应读取；取消后不返回部分响应。timeout 与 Stop 分别报告。
+**坐标/权限：** 坐标空间：none。Worker bridge 与 PlaybackRunner host dispatcher 分别验证 httpHosts 精确 DNS 主机、httpMethods 和 allowInsecureHttp；HTTPS 默认，HTTP 需单独请求并批准。重定向逐跳重新授权，跨 origin 不转发 Authorization/自定义凭据头。
+
+**示例：**
+```lua
+local response = HttpRequest("https://api.example.com/items", {
+  method = "POST",
+  headers = { ["Accept"] = "application/json" },
+  json = { name = "Anjian", enabled = true },
+  timeoutMs = 10000
+})
+if response.ok and response.json then
+  Log(response.json.id)
+end
+```
+
 <!-- END GENERATED API REFERENCE -->
 
 ## 3. 当前参数约定
