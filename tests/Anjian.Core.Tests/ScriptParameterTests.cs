@@ -199,6 +199,64 @@ public sealed class ScriptParameterTests
     }
 
     [Fact]
+    public void RelativePathsStayPortableInConfigurationAndResolveAgainstScriptDirectoryAtRuntime()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "anjian-runtime-paths-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var relativeFile = Path.Combine("assets", "input.txt");
+            var relativeDirectory = "output";
+            var schema = new ScriptParameterSchema
+            {
+                Parameters =
+                [
+                    new() { Id = "input", Name = "input", Label = "输入文件", Type = "filePath" },
+                    new() { Id = "output", Name = "output", Label = "输出目录", Type = "directoryPath" }
+                ]
+            };
+            var validation = ScriptParameterValidator.ValidateValues(schema, new Dictionary<string, JsonElement>
+            {
+                ["input"] = Json(JsonSerializer.Serialize(relativeFile)),
+                ["output"] = Json(JsonSerializer.Serialize(relativeDirectory))
+            }, directory);
+
+            Assert.True(validation.IsValid);
+            var runtime = ScriptParameterValidator.ResolveRuntimePaths(schema, validation.Values, directory);
+
+            Assert.Equal(relativeFile, validation.Values["input"].GetString());
+            Assert.Equal(relativeDirectory, validation.Values["output"].GetString());
+            Assert.Equal(Path.GetFullPath(relativeFile, directory), runtime["input"].GetString());
+            Assert.Equal(Path.GetFullPath(relativeDirectory, directory), runtime["output"].GetString());
+        }
+        finally
+        {
+            try { Directory.Delete(directory, recursive: true); } catch (IOException) { }
+        }
+    }
+
+    [Fact]
+    public void InvalidPathAndLuaReservedIdentifierAreRejectedAsValidationIssues()
+    {
+        var pathSchema = new ScriptParameterSchema
+        {
+            Parameters = [new() { Id = "path", Name = "path", Label = "路径", Type = "filePath" }]
+        };
+        var invalidPath = ScriptParameterValidator.ValidateValues(pathSchema,
+            new Dictionary<string, JsonElement> { ["path"] = Json("\"bad\\u0000path\"") },
+            Path.GetTempPath());
+        Assert.False(invalidPath.IsValid);
+        Assert.Contains(invalidPath.Issues, x => x.Message.Contains("路径格式无效"));
+
+        var keywordSchema = new ScriptParameterSchema
+        {
+            Parameters = [new() { Id = "keyword", Name = "end", Label = "保留字", Type = "text" }]
+        };
+        var keywordIssues = ScriptParameterValidator.ValidateSchema(keywordSchema);
+        Assert.Contains(keywordIssues, x => x.Message.Contains("保留字"));
+    }
+
+    [Fact]
     public void OptionalBlankValuesAreOmittedButRequiredBlankValuesFail()
     {
         var schema = new ScriptParameterSchema
