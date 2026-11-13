@@ -5,6 +5,7 @@ using System.Text.Json;
 using Anjian.Core.Api;
 using Anjian.Core.Editor;
 using Anjian.Core.Parameters;
+using Anjian.Core.Plugins;
 using KeraLua;
 using NLua;
 
@@ -36,6 +37,23 @@ internal static class WorkerProgram
             try
             {
                 var fullPath = Path.GetFullPath(scriptPath);
+                string scriptSource;
+                if (launch.PluginRuntime is { } pluginRuntime)
+                {
+                    var packageRoot = Path.GetFullPath(pluginRuntime.PackageRootPath);
+                    var expectedEntry = PluginPackageValidator.GetSafeFullPath(packageRoot, pluginRuntime.EntryRelativePath);
+                    var pathComparison = OperatingSystem.IsWindows()
+                        ? StringComparison.OrdinalIgnoreCase
+                        : StringComparison.Ordinal;
+                    if (!fullPath.Equals(expectedEntry, pathComparison))
+                        throw new InvalidDataException("插件 Worker 的入口路径与受信 manifest 不一致。");
+                    scriptSource = PluginPackageValidator.ReadVerifiedText(
+                        packageRoot, pluginRuntime.EntryRelativePath, pluginRuntime.EntrySha256);
+                }
+                else
+                {
+                    scriptSource = File.ReadAllText(fullPath);
+                }
                 var scriptDirectory = Path.GetDirectoryName(fullPath)
                     ?? throw new InvalidDataException("无法确定脚本目录。");
                 using var automation = new WindowsControlAutomationProvider(client);
@@ -43,14 +61,21 @@ internal static class WorkerProgram
                 using var lua = new NLua.Lua(openLibs: true);
                 var api = new WorkerLuaApi(client, lua, automation, ocr, launch.Permissions, scriptDirectory);
                 LuaApiRuntime.Register(lua, api);
-                if (!string.IsNullOrWhiteSpace(launch.ModuleRootPath))
+                if (launch.PluginRuntime is { } pluginOptions)
+                {
+                    PluginLuaModuleLoader.Register(lua, pluginOptions.PackageRootPath,
+                        pluginOptions.ModulesRootRelativePath, pluginOptions.ModuleHashes);
+                }
+                else if (!string.IsNullOrWhiteSpace(launch.ModuleRootPath))
+                {
                     SpriteLuaModuleLoader.Register(lua, launch.ModuleRootPath);
+                }
                 LuaParameterInjector.Inject(lua, launch.Parameters);
                 if (debugOptions is null)
                 {
                     lua.SetDebugHook(LuaHookMask.Count, 10_000);
                     lua.DebugHook += (_, _) => client.Send("checkpoint");
-                    lua.DoString(File.ReadAllText(fullPath), "@" + fullPath);
+                    lua.DoString(scriptSource, "@" + fullPath);
                 }
                 else
                 {
@@ -69,7 +94,7 @@ internal static class WorkerProgram
                             return JsonSerializer.Deserialize<LuaDebugCommand>(commandPayload)
                                 ?? throw new InvalidDataException("调试器返回了无效控制命令。");
                         });
-                    lua.DoString(File.ReadAllText(fullPath), "@" + fullPath);
+                    lua.DoString(scriptSource, "@" + fullPath);
                     debugger.ThrowIfFaulted();
                 }
 

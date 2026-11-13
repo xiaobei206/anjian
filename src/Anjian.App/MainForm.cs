@@ -238,6 +238,7 @@ internal sealed class MainForm : Form
         toolbar.Controls.Add(MakeButton("OCR 模型", (_, _) => OpenOcrModelManager()));
         toolbar.Controls.Add(MakeButton("参数定义", (_, _) => OpenParameterDesigner()));
         toolbar.Controls.Add(MakeButton("小精灵打包", (_, _) => OpenSpritePackager()));
+        toolbar.Controls.Add(MakeButton("插件管理", (_, _) => OpenPluginManager()));
         _visualDebugButton = MakeButton("视觉调试：关", (_, _) => ToggleVisualDebug());
         toolbar.Controls.Add(_visualDebugButton);
         toolbar.Controls.Add(MakeButton("返回悬浮窗", (_, _) => HideMainWindow(showFloatingWindow: true)));
@@ -1754,6 +1755,30 @@ internal sealed class MainForm : Form
         _applicationIcon = null;
         base.OnFormClosing(e);
     }
+    private void OpenPluginManager()
+    {
+        if (_recordSessionActive || _playback.IsRunning)
+        {
+            MessageBox.Show(this, "请先停止当前录制或脚本，再管理/运行插件。",
+                "插件管理", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        try
+        {
+            var pluginRoot = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "Anjian2026", "Plugins");
+            using var form = new PluginManagerForm(pluginRoot, _apiRegistry.ApiVersion);
+            form.ShowDialog(this);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, "打开插件管理失败：" + ex.Message,
+                "插件管理", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
     private void OpenSpritePackager()
     {
         try

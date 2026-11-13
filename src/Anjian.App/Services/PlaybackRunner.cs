@@ -24,6 +24,7 @@ internal sealed class PlaybackRunner : IDisposable
     private LuaDebugLaunchOptions? _debugLaunchOptions;
     private IReadOnlyDictionary<string, JsonElement> _launchParameters = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
     private SpriteWorkerRuntimeOptions? _spriteRuntimeOptions;
+    private PluginWorkerRuntimeOptions? _pluginRuntimeOptions;
     private ScriptPermissionGrant _launchPermissions = ScriptPermissionGrant.Empty;
     private string _launchScriptDirectory = string.Empty;
     private ClipboardDialogHost? _clipboardDialogHost;
@@ -66,9 +67,12 @@ internal sealed class PlaybackRunner : IDisposable
         LuaDebugLaunchOptions? debugOptions = null,
         IReadOnlyDictionary<string, JsonElement>? parameters = null,
         SpriteWorkerRuntimeOptions? spriteRuntimeOptions = null,
-        ScriptPermissionGrant? permissions = null)
+        ScriptPermissionGrant? permissions = null,
+        PluginWorkerRuntimeOptions? pluginRuntimeOptions = null)
     {
         options.Validate();
+        if (spriteRuntimeOptions is not null && pluginRuntimeOptions is not null)
+            throw new ArgumentException("小精灵运行参数与插件运行参数不能同时使用。");
         if (_runCts is not null)
             throw new InvalidOperationException("已有脚本正在运行。");
         if (debugOptions is not null && (options.RepeatCount != 1 || options.IntervalMilliseconds != 0))
@@ -79,6 +83,7 @@ internal sealed class PlaybackRunner : IDisposable
         _debugLaunchOptions = debugOptions;
         _launchParameters = parameters ?? new Dictionary<string, JsonElement>(StringComparer.Ordinal);
         _spriteRuntimeOptions = spriteRuntimeOptions;
+        _pluginRuntimeOptions = pluginRuntimeOptions;
         _launchPermissions = permissions ?? ScriptPermissionGrant.Empty;
         _launchScriptDirectory = Path.GetDirectoryName(Path.GetFullPath(scriptPath))
             ?? throw new InvalidDataException("无法确定脚本目录。");
@@ -121,6 +126,7 @@ internal sealed class PlaybackRunner : IDisposable
             _debugLaunchOptions = null;
             _launchParameters = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
             _spriteRuntimeOptions = null;
+            _pluginRuntimeOptions = null;
             _launchPermissions = ScriptPermissionGrant.Empty;
             _launchScriptDirectory = string.Empty;
             _runCts = null;
@@ -205,6 +211,7 @@ internal sealed class PlaybackRunner : IDisposable
                 Parameters = _launchParameters.ToDictionary(x => x.Key, x => x.Value, StringComparer.Ordinal),
                 ModuleRootPath = _spriteRuntimeOptions?.ModuleRootPath,
                 OcrModelDirectory = _spriteRuntimeOptions?.OcrModelDirectory,
+                PluginRuntime = _pluginRuntimeOptions,
                 Permissions = _launchPermissions
             });
 
