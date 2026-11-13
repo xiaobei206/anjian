@@ -245,7 +245,7 @@ public sealed class LuaApiRegistryTests
 public void ImagingApiDefaultsAndValidationAreRegistered()
 {
  var r=LuaApiRegistry.Load();
- Assert.Equal("0.7",r.ApiVersion);
+ Assert.Equal("0.8",r.ApiVersion);
  Assert.Equal(81,r.Apis.Count);
  var find=r.Apis.Single(a=>a.Name=="FindImage");
  Assert.Equal(0.95,find.Parameters.Single(p=>p.Name=="similarity").DefaultValue?.GetDouble());
