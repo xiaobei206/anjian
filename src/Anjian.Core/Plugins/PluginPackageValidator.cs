@@ -114,8 +114,12 @@ public static class PluginPackageValidator
         PluginManifest manifest;
         try
         {
-            manifest = JsonSerializer.Deserialize<PluginManifest>(
-                new UTF8Encoding(false, true).GetString(manifestBytes), JsonOptions)
+            var manifestJson = new UTF8Encoding(false, true).GetString(manifestBytes);
+            using var document = JsonDocument.Parse(manifestJson, new JsonDocumentOptions { MaxDepth = 32 });
+            RequireSchemaVersion(document.RootElement, "插件 manifest");
+            var permissionElement = GetRequiredProperty(document.RootElement, "permissions", "插件 permissions");
+            RequireSchemaVersion(permissionElement, "插件 permissions");
+            manifest = JsonSerializer.Deserialize<PluginManifest>(manifestJson, JsonOptions)
                 ?? throw new InvalidDataException("插件 manifest 为空。");
         }
         catch (Exception ex) when (ex is JsonException or DecoderFallbackException)
@@ -337,6 +341,33 @@ public static class PluginPackageValidator
         var attributes = File.GetAttributes(path);
         if ((attributes & FileAttributes.ReparsePoint) != 0)
             throw new InvalidDataException(label + "不能是符号链接或重解析点：" + path);
+    }
+
+
+    private static void RequireSchemaVersion(JsonElement element, string label)
+    {
+        if (element.ValueKind != JsonValueKind.Object)
+            throw new InvalidDataException(label + " 必须是 JSON 对象。");
+        var properties = element.EnumerateObject()
+            .Where(property => property.Name.Equals("schemaVersion", StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        if (properties.Length != 1 ||
+            properties[0].Value.ValueKind != JsonValueKind.Number ||
+            !properties[0].Value.TryGetInt32(out var version) ||
+            version != CurrentManifestVersion)
+            throw new InvalidDataException($"{label} 必须且只能声明 schemaVersion={CurrentManifestVersion}。");
+    }
+
+    private static JsonElement GetRequiredProperty(JsonElement element, string name, string label)
+    {
+        if (element.ValueKind != JsonValueKind.Object)
+            throw new InvalidDataException(label + " 缺失或类型错误。");
+        var matches = element.EnumerateObject()
+            .Where(property => property.Name.Equals(name, StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        if (matches.Length != 1 || matches[0].Value.ValueKind != JsonValueKind.Object)
+            throw new InvalidDataException(label + " 必须且只能是一个 JSON 对象。");
+        return matches[0].Value;
     }
 
     private static void ValidateManifestMetadata(PluginManifest manifest, string currentApiVersion)

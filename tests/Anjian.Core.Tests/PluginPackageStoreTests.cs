@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.IO.Compression;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Anjian.Core.Permissions;
 using Anjian.Core.Plugins;
 using Xunit;
@@ -132,6 +133,28 @@ public sealed class PluginPackageStoreTests : IDisposable
         WriteManifest(badHashSource, manifest);
         Assert.Throws<InvalidDataException>(() => PluginPackageValidator.Inspect(badHashSource, "1.2"));
     }
+
+
+    [Fact]
+    public void ValidatorRequiresExplicitTopLevelAndPermissionSchemaVersions()
+    {
+        var manifestlessVersion = CreatePackage(Path.Combine(_temporaryRoot, "missing-top-schema"));
+        var topLevel = JsonNode.Parse(File.ReadAllText(Path.Combine(manifestlessVersion, PluginPackageValidator.ManifestFileName)))!.AsObject();
+        topLevel.Remove("schemaVersion");
+        WriteRawManifest(manifestlessVersion, topLevel);
+        Assert.Throws<InvalidDataException>(() => PluginPackageValidator.Inspect(manifestlessVersion, "1.2"));
+
+        var permissionlessVersion = CreatePackage(Path.Combine(_temporaryRoot, "missing-permission-schema"));
+        var nested = JsonNode.Parse(File.ReadAllText(Path.Combine(permissionlessVersion, PluginPackageValidator.ManifestFileName)))!.AsObject();
+        nested["permissions"]!.AsObject().Remove("schemaVersion");
+        WriteRawManifest(permissionlessVersion, nested);
+        Assert.Throws<InvalidDataException>(() => PluginPackageValidator.Inspect(permissionlessVersion, "1.2"));
+    }
+
+    private static void WriteRawManifest(string root, JsonNode node) =>
+        File.WriteAllText(Path.Combine(root, PluginPackageValidator.ManifestFileName),
+            node.ToJsonString(new System.Text.Json.JsonSerializerOptions { WriteIndented = true }),
+            new UTF8Encoding(false));
 
     [Fact]
     public void ApiCompatibilityIsCheckedBeforeInstalling()
