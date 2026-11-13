@@ -482,3 +482,38 @@ M4 基础调试器已在 main 实现并通过 Windows CI。具体实现提交与
 - 先读最新 handoff 与现有 API registry；避免重复实现 M8/M9/M10/M11 的现有能力。
 - 对敏感 OS API 所有操作落实在 Worker/能力代理，不允许仅 UI 隐藏按钮作为权限边界。
 - 每次增加 API 要同步 registry、FUNCTION-REFERENCE、IDE 补全/提示和自动化检查。
+
+
+---
+
+# 最新交接状态覆盖：M12-01 权限基础层已进入 main（2026-11-13）
+
+本节优先于本文件上方所有历史 M12 任务段落。当前开发阶段仍为 M12，**M12-01 只完成权限请求/批准/Worker 注入基础，不表示文件/剪贴板/进程/HTTP API 或插件系统已完成**。
+
+## 当前代码与验证基线
+- M12-01 代码 HEAD：2a69776374abb9b472aa4db3b6bc5dd32c0f6a92。
+- 最近四个代码提交（均直接进入 main）：e1940930（Core 默认拒绝权限策略 + ADR-024）、41474018（xUnit using 修复）、f378a600（主程序每次播放/调试前审阅 + worker-ready grant 载荷）、2a697763（WorkerLuaApi 接收 grant）。
+- Windows Actions run [234](https://github.com/xiaobei206/anjian/actions/runs/43377155430) SUCCESS：Restore、Build（0 warnings/0 errors）、Core tests 122/122、API handbook check、自包含 win-x64 publish、小精灵包内 Worker smoke、ZIP/SHA256、artifact upload 全通过。Artifact ID 14014463955，87,176,294 bytes，SHA-256 c17f159787d8129031e97e364e991bec9a6ea3a72b9b612567867acd1d93d770。run 231 的漏引用失败已在 run 232 修复后全绿；run 233 同样通过。
+- 本地无 .NET SDK，本地 Restore/Build/Test NOT RUN。Windows CI 不等于权限窗体实机验收。
+- API registry 当前仍是 0.7 / 81 项，未新增公开 Lua 函数；FUNCTION-REFERENCE/IDE API 数据无需添加占位项。
+- VERSION 和发布资产不变：v0.1.0-preview.4；无 tag/Release。M1–M13 真实 Windows 10/11 桌面验收继续 NOT RUN，统一延期到 M14。
+
+## M12-01 当前代码范围
+- Core：src/Anjian.Core/Permissions/ScriptPermissionPolicy.cs，schemaVersion=1、最大 256 KiB；请求/审批/grant 分离；路径根规范化、精确 EXE 路径、精确 DNS 主机/HTTP 方法、IDN、HTTPS 默认及明文 HTTP 独立授权；审批必须是请求子集；无审批为空授权。
+- App：脚本同目录 sidecar 命名为脚本全名加 .permissions.json；主程序播放/调试前展示逐项审阅；默认全不勾选；取消不启动；无 sidecar 为空授权，损坏/未来 schema/重解析点拒绝启动；不持久保存授权。
+- Worker：worker-ready 载荷携带 grant；WorkerProgram 注入 WorkerLuaApi。
+- 重要缺口：目前没有新增扩展 OS API；WorkerLuaApi 还未使用 Grant 执行具体操作；PlaybackRunner 的主进程 IPC 二次授权没有实现；Core 词法路径比较不是符号链接/TOCTOU 防护；小精灵 Launcher 未接入 sidecar/审阅；插件 manifest 和生命周期完全待实现。
+
+## 下一会话唯一任务：M12-02 — 文件/目录 API 与主进程 IPC 二次授权
+
+严格只做以下顺序，不要跳过主机安全边界，也不要重做 M12-01：
+1. 阅读最新版 handoff、ScriptPermissionPolicy、MainForm 审阅、WorkerLaunchPayload、WorkerProgram、WorkerLuaApi 和 PlaybackRunner dispatcher。
+2. 先设计并实现主进程可独立执行的文件操作权限校验：Worker 侧调用前检查 Grant；PlaybackRunner 在处理每个 file IPC 命令时再次检查 Grant，未知/伪造/无授权命令默认拒绝。
+3. 完成第一批受控文件/目录 API（读取文本、写入/追加文本、文件/目录存在性、枚举、创建目录、复制/移动/重命名、临时目录/文件按 PRD 语义选定）；定义 UTF-8、大小上限、路径相对基准、异常映射、暂停/Stop 取消行为。先实现少量闭合 API，不要一次堆全部功能。
+4. 对路径使用规范化目录边界；对每一级现存父目录/文件检查 Windows reparse point/symlink。评估并避免最终打开时的检查-使用竞态；若无法可靠保证，缩小允许路径/文件打开方式并写明限制，不能把词法前缀检查冒充安全沙箱。
+5. 加入 Core 策略测试和 IPC/Worker 契约测试：默认拒绝、批准根内读写、同名兄弟目录越界、.. 穿越、符号链接/reparse point 拒绝、拒绝超限文件、Stop 取消，以及伪造 IPC 不可绕过。
+6. 只有当主进程二次检查已真正接入并有测试后，才新增文件类公开 Lua API；随后同一提交链更新 lua-api-registry.json / API version（预期按项目版本策略由 0.7 递增到 0.8）、自动生成 FUNCTION-REFERENCE、编辑器补全/签名提示和测试。
+7. 普通主程序和小精灵都必须采用同一 Grant/Dispatcher 校验策略。此子任务先把小精灵缺失 sidecar 时固定为空授权；权限 sidecar 打包/逐次审阅可作为 M12 后续任务，但不可默认放宽权限。
+8. Windows Actions Build/Test/API handbook/self-contained package smoke 必须全绿；桌面文件对话框/真实权限体验仍 M14 实机验收。
+
+M12-02 验收前不做剪贴板、对话框、进程、HTTP 或插件加载。完成后 handoff 再指定下一个唯一子任务。不得改 VERSION、创建 tag/Release，不做 FIX 版本名。

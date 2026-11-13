@@ -109,3 +109,7 @@ dotnet publish src/Anjian.App/Anjian.App.csproj -c Release -r win-x64 --self-con
 M11 已在 main 加入独立小精灵打包流程：多入口 Lua 依赖收集、可验证的便携目录与 EXE 启动 ZIP、产品元数据、参数界面、独立用户配置、循环/热键/单实例/重试、显式选择的离线 OCR 模型、图像资源校验、manifest/SHA-256、构建日志和随包离线函数参考 Markdown。EXE 是自包含目录中的启动入口，不是单文件程序；必须保留所有运行时伴随文件。Windows CI 自动化通过不等于 WinForms/DPI/真实键鼠输入的桌面验收；M11 桌面项目仍按计划延期至 M14。详见 [用户指南中的小精灵章节](docs/USER-GUIDE-CN.md)。
 
 本轮不修改 VERSION、AssemblyVersion、FileVersion，不创建 tag 或 Release；v0.1.0-preview.4 官方下载资产不变。
+
+
+### M12 内置扩展 API 与插件系统（main 开发中；当前为权限基座）
+M12 已开始实施权限基础层：新增脚本权限 sidecar schema v1、默认拒绝的权限请求/批准/有效授权模型、每次播放/调试前逐项审阅界面，以及经 worker-ready 将本次授权集合注入独立 Worker 和 WorkerLuaApi。普通播放/调试中，权限清单缺失等同空授权；清单损坏或版本未知时拒绝启动；用户取消审阅不启动脚本。Windows Actions run [234](https://github.com/xiaobei206/anjian/actions/runs/43377155430) 对代码 HEAD 2a69776374abb9b472aa4db3b6bc5dd32c0f6a92 全 PASS：Build 0 warnings/0 errors、122/122 Core tests、API handbook check、自包含发布、包内 Worker smoke、ZIP/SHA256 和 artifact upload；artifact ID 14014463955，87,176,294 bytes，SHA-256 c17f159787d8129031e97e364e991bec9a6ea3a72b9b612567867acd1d93d770。此阶段尚未开放文件/剪贴板/进程/HTTP API，也未实现插件包加载；主进程 IPC 二次授权检查、文件系统 reparse point/TOCTOU 防护、小精灵权限审阅仍待完成。API registry 仍为 0.7 / 81 个函数；没有新增公开函数。权限审阅窗体的真实 Windows 交互仍 NOT RUN，和 M1–M13 桌面验收一起延期 M14。

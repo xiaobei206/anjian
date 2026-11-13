@@ -354,3 +354,29 @@ M1–M13 的桌面实测不再作为进入下一开发阶段的前置条件，�
 - Run 229（head 7e2ed0f52c08b5b76069d405688c8af2aa0ec097）SUCCESS：Build 0 warnings / 0 errors；Core tests 110/110 PASS；API handbook check PASS；self-contained win-x64 publish PASS；实际小精灵 EXE/Worker smoke 1/1 PASS（33 秒，包含包内 Markdown 函数参考）；ZIP/SHA256 和 artifact upload PASS。artifact ID 14014490869，87,162,650 bytes，archive digest sha256:6a7bfaee6d0af15f3e80a6c48071a62c8459e9c0db2e4fc450568e317bd6654b，有效期至 2026-12-13。Run 229 是包含离线 Markdown 手册后的最终代码 HEAD 验证。
 - 旧的中间 CI 失败均已修复：Run 221 nullable compile、Run 222 图像资源基准路径测试、Run 224/225 manifest/namespace 编译、Run 226 xUnit2020 分析器规则。最终状态以 Run 229 为准。
 - 本地执行环境没有 .NET SDK；本地 Build/Test NOT RUN。GitHub Actions Windows runner 是构建和自动化测试来源。
+
+
+## 18. M12 内置扩展 API 与插件系统（开发中）
+
+| ID | 场景 | 自动化/手工验收 | 当前状态 |
+|---|---|---|---|
+| M12-01 | 权限 sidecar schema | v1 解析、256 KiB 上限、未知版本/无效 JSON 拒绝、路径和主机规范化 | PASS（Windows CI run 232/233/234；Core 权限策略测试包含 schema/大小/IDN） |
+| M12-02 | 默认拒绝与批准子集 | 缺少批准即空 Grant；批准不能超过请求；剪贴板/对话框默认拒绝 | PASS（Windows CI run 232/233/234；122/122 Core tests） |
+| M12-03 | 播放/调试前权限审阅 | sidecar 请求逐项显示；默认不勾选；确认批准本次子集；取消不启动 Worker | 代码已接入主程序播放/调试；Build PASS（run 233/234）；WinForms 实际交互 NOT RUN（M14） |
+| M12-04 | Worker 授权传递 | worker-ready 将 Grant 序列化并注入 WorkerLuaApi；无审批使用 Empty | 代码接线完成且 Build/API check/包内 Worker smoke PASS（run 234）；尚无实际扩展 OS 命令可执行，不能据此宣称权限端到端完成 |
+| M12-05 | 主进程 IPC 二次检查 | 对每一种 OS 操作验证 Grant，伪造 IPC 也不能越权 | NOT IMPLEMENTED；M12-02 后续首要任务 |
+| M12-06 | 文件/目录 API | 读取/写入/枚举/复制/移动/创建/临时路径；越界、链接、大小、取消、原子性 | NOT IMPLEMENTED |
+| M12-07 | 剪贴板/对话框 API | 读写剪贴板；消息/输入/确认对话框；主线程调度和取消 | NOT IMPLEMENTED |
+| M12-08 | 进程 API | 精确 EXE 白名单、启动/等待/查询/退出状态、超时与取消；不开放任意 Shell | NOT IMPLEMENTED |
+| M12-09 | HTTP/JSON API | 精确主机/方法；HTTPS 默认；可选明文 HTTP 单独审批；重定向重新授权、超时/响应上限/取消 | NOT IMPLEMENTED |
+| M12-10 | 插件包/兼容/生命周期 | 本地目录/ZIP manifest、稳定 ID、API 兼容、文件 hash、启停/卸载、错误隔离 | NOT IMPLEMENTED |
+| M12-11 | 小精灵权限 | 包构建/manifest 收集 permissions sidecar；Launcher 复用逐次权限审阅 | NOT IMPLEMENTED |
+| M12-12 | Windows 桌面审阅 | Windows 10/11 普通权限、取消/批准、错误提示、DPI/多屏 | NOT RUN（统一延期 M14） |
+
+### M12-01 Windows CI 结果（2026-11-13）
+- Run 231（代码 HEAD e1940930e49e2821006f95a3cd8eb756035b9bfa）首次 Build 失败：新增测试文件漏写 using Xunit;，产生 Fact/FactAttribute CS0246；随后由提交 41474018a5dbf047f0782cb9f95046e1f890adf7 修复。
+- Run 232（HEAD 41474018a5dbf047f0782cb9f95046e1f890adf7）SUCCESS：Build 0 warnings / 0 errors、122/122 Core tests、API handbook check、自包含发布、小精灵/Worker smoke、ZIP/SHA256 和 artifact upload 全 PASS。
+- Run 233（HEAD f378a6007e2f8401f298e75dc95ed96126934a1d）SUCCESS：同样 122/122 tests、Build 0 warnings / 0 errors、API check、self-contained publish、package/Worker smoke、ZIP/SHA256 与 artifact upload 全 PASS。Artifact ID 14015360734，87,176,291 bytes，digest 892ea51f7c6646df498e59c9c60b7c05f6d90bdbc79cd944fa5eab4b6f591cfd。
+- Run 234（最终 M12-01 代码 HEAD 2a69776374abb9b472aa4db3b6bc5dd32c0f6a92）SUCCESS：Restore、Release Build 0 warnings / 0 errors、122/122 Core tests、API handbook check、self-contained win-x64 publish、实际包/Worker smoke、ZIP/SHA256 和 artifact upload 全 PASS。Artifact ID 14014463955，87,176,294 bytes，archive digest c17f159787d8129031e97e364e991bec9a6ea3a72b9b612567867acd1d93d770。
+- 本地环境没有 .NET SDK，本地 Restore/Build/Test 均 NOT RUN；自动化证据来自 GitHub Actions Windows runner。上述 CI 均不替代 M12 权限窗体的 Windows 10/11 实机验收。
+- 本轮未增加公开 Lua API；registry 保持 0.7 / 81 项，FUNCTION-REFERENCE 和 IDE API 提示无须生成新条目。未改 VERSION / AssemblyVersion / FileVersion，未创建 tag / Release；v0.1.0-preview.4 保持不变。

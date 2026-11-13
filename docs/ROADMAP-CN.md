@@ -22,7 +22,7 @@
 | M9 OCR 与文本识别 | DONE（实现与 Windows CI PASS；桌面验收延期至 M14 后，NOT RUN） | PaddleOcrNet 2.4.0 CPU 适配器、显式 ch/en/japan 模型管理、严格离线推理、行级结果/置信度/边界框、OCR/FindText/WaitText、暂停/停止与资源释放 |
 | M10 参数、配置与脚本自定义 UI | DONE（实现与 Windows 自动化验收完成；WinForms/桌面实测延期 M14） | 参数 sidecar schema v1、10 种类型、统一 validator、配置持久化/恢复、播放/调试前表单、参数设计器、JSON 导入导出、typed Worker IPC、递归只读 Lua Args、脚本目录相对路径解析 |
 | M11 小精灵打包器 | DONE（Windows CI run 229 PASS；WinForms/DPI/真实输入桌面验收延期 M14，NOT RUN） | 独立便携目录 + EXE 启动 ZIP、依赖/资源收集、M10 参数 UI、运行控制、manifest/SHA256、构建日志与离线函数参考 Markdown |
-| M12 内置扩展 API 与插件系统 | TODO | 文件、剪贴板、对话框、进程、HTTP/JSON，插件 manifest/权限/API 版本 |
+| M12 内置扩展 API 与插件系统 | IN_PROGRESS（M12-01 权限基座和播放/调试审阅/Worker 注入已通过 Windows CI；系统 API 和插件待实现） | 默认拒绝权限契约、逐次运行审阅、Worker grant 注入；文件/剪贴板/对话框/进程/HTTP/JSON 的主机双重授权和插件 manifest/加载仍待实现 |
 | M13 多实例与定时任务 | TODO | 独立运行实例、任务状态、定时、超时、失败策略与隔离 |
 | M14 1.0 稳定化与发布 | TODO | 自动与手工验收、依赖许可、离线帮助、性能/长时测试和正式稳定版发布 |
 
@@ -236,6 +236,25 @@ M7 实现/CI 已完成不代表 M7-01..M7-10 Windows 桌面验收通过；这些
 - [ ] PRD 2.14 所述离线函数参考 HTML 生成链尚未建立；当前包先包含 Markdown，HTML 任务保留到后续帮助系统完善。
 
 ## M12–M13 — 扩展 API、插件和自动运行
+
+
+### M12 当前进度（2026-11-13；仅权限基础阶段）
+
+- M12-01 已进入 main：Core 权限请求/批准/Grant 数据模型、schema v1 解析和范围校验；每脚本可选 sidecar 为脚本名后缀 .permissions.json，最大 256 KiB，声明不代表授权。
+- MainForm 普通播放与调试启动前均调用权限审阅；审批每次运行重新进行，所有选项默认不勾选，取消即不运行。缺少 sidecar 时使用空授权；损坏/未来 schema/重解析点 sidecar 会拒绝启动。
+- Worker 启动载荷携带本次 ScriptPermissionGrant，并注入 WorkerLuaApi。目前没有公开文件/剪贴板/进程/HTTP 扩展 API，因此 grant 尚未用于任何新增 OS 操作；主进程 PlaybackRunner.DispatchAsync 二次授权拦截尚未实现，不得提前开放这些 API。
+- Windows Actions run [234](https://github.com/xiaobei206/anjian/actions/runs/43377155430) 对代码 HEAD 2a69776374abb9b472aa4db3b6bc5dd32c0f6a92 PASS：0 warnings / 0 errors、122/122 Core tests、API handbook check、自包含 win-x64 publish、小精灵 EXE/Worker smoke、ZIP/SHA256、artifact upload。Artifact ID 14014463955，87,176,294 bytes，SHA-256 c17f159787d8129031e97e364e991bec9a6ea3a72b9b612567867acd1d93d770。
+- API registry 仍为 0.7 / 81 项；本轮没有新公开 API，函数手册/IDE 注册表不需改动。
+- 权限审阅窗体的实机交互、文件系统链接/竞态防护以及 M1–M13 其余桌面验收继续 NOT RUN，统一留到 M14。小精灵 Launcher 尚未读取/审阅权限 sidecar。
+
+### M12 后续实施顺序（必须按安全依赖推进）
+
+1. M12-02：先做文件/目录 API 与主进程 IPC 二次授权。Lua bridge 和 host dispatcher 对每个操作分别检查；规范化路径、目录边界、符号链接/reparse point 拒绝、写入原子性/大小限制、错误和 Stop 取消均要有测试。在二次校验未完成前，不注册可用文件 API。
+2. 再做剪贴板与消息/输入/确认对话框，明确文本长度、STA/主 UI 线程调度、取消语义，并由 host 再检查权限。
+3. 再做精确 EXE 启动/等待/查询与 HTTP(S)/JSON；设置超时、响应大小上限、Stop 取消、重定向重新授权和不继承敏感代理凭据。
+4. 建立本地插件目录/ZIP manifest、稳定 ID、版本和 API 兼容、文件清单/hash、权限与脚本声明取交集、启停/卸载及错误隔离；不加载任意 DLL，不在主 UI 执行插件 Lua。
+5. 完成以上 API 后再统一更新 registry/API version、中文函数手册、IDE 提示/命令面板和契约测试。小精灵包构建与 Launcher 也必须校验/审阅插件和权限清单。
+6. Windows CI 覆盖授权和撤销、越界/链接路径、取消、超时、重定向、插件兼容和损坏包拒绝；桌面交互仍只记录在 M14 集中验收。
 
 - 增加有边界的文件/目录、剪贴板、对话框、进程、HTTP(S)/JSON 等常用 API。
 - 插件 manifest、权限提示、版本兼容、启停/卸载、错误隔离和文档注册。

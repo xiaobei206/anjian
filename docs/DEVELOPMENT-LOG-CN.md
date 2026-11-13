@@ -674,3 +674,23 @@ M4 基础调试器与 M5 可视化录制/动作列表均已完成 Windows CI 验
 - SHA256 是完整性校验而非发布签名。离线手册 HTML 未实现，明确保留。
 - M11 WinForms/DPI/真实输入/暂停恢复桌面验收 NOT RUN，延期 M14；CI smoke 不等于用户机器实机验收。
 - 未修改 VERSION、AssemblyVersion、FileVersion；未创建 tag/Release；v0.1.0-preview.4 官方发布资产不变。
+
+
+## 2026-11-13 — M12-01 权限声明、逐次审阅与 Worker 注入基座
+
+### 实施内容（直接提交 main）
+- e1940930e49e2821006f95a3cd8eb756035b9bfa：新增 Core ScriptPermissionRequest / ScriptPermissionApproval / ScriptPermissionGrant / ScriptPermissionPolicy 和首批测试；新增 ADR-024，冻结声明不等于授权、逐次批准、默认拒绝、精确主机/方法及未来 IPC 双重检查边界。
+- 41474018a5dbf047f0782cb9f95046e1f890adf7：修复首轮 CI 发现的新测试文件缺少 using Xunit;。
+- f378a6007e2f8401f298e75dc95ed96126934a1d：新增 WinForms ScriptPermissionReviewForm 与 ScriptPermissionService；MainForm 普通播放和调试前逐次审阅 sidecar；缺文件使用空授权，损坏/超限/未知 schema/重解析点 sidecar 拒绝启动，取消审阅不创建 Worker；PlaybackRunner 将批准集合加入 worker-ready 载荷。
+- 2a69776374abb9b472aa4db3b6bc5dd32c0f6a92：将授权集合从 WorkerLaunchPayload 传给 WorkerProgram，并注入 WorkerLuaApi 的权限属性，作为后续扩展函数的统一读取入口。
+- 权限 sidecar 当前命名为脚本文件全名加 .permissions.json。授权每次运行重新选择，不保存永久同意；所有 checkbox 默认关闭。
+- Core 只做词法路径范围判断；尚未实现主进程 IPC 二次授权、文件 reparse point/TOCTOU 防护，也没有注册文件、剪贴板、对话框、进程或 HTTP API。小精灵 Launcher 尚未读取 sidecar。插件 manifest/加载/卸载也未实现。
+- API registry 未变更，仍 apiVersion 0.7 / 81 项；本轮无公开 Lua API，因此 FUNCTION-REFERENCE / IDE 补全不应添加未实现函数。
+
+### Windows CI 失败与修复
+- Run 231（HEAD e1940930...）因新测试文件漏了 using Xunit;，Build 出现 24 个 CS0246（Fact/FactAttribute 未找到），Test/后续步骤跳过。
+- 提交 41474018... 补上引用后 Run 232 SUCCESS：Restore/Build 通过，0 warnings / 0 errors，122/122 Core tests，API handbook check、自包含 win-x64 publish、真实 package/Worker smoke、ZIP/SHA256、artifact upload 全通过。artifact ID 14014483757，87,171,279 bytes，SHA-256 f5f1f49ba500b5f9cdd522658770919c6f8f287815de8903d1f5f7c19fe1c702。
+- Run 233（HEAD f378a600...）SUCCESS：Build 0 warnings / 0 errors、122/122 tests、API check、publish、package/Worker smoke、ZIP/SHA256、artifact upload 全 PASS。artifact ID 14015360734，87,176,291 bytes，SHA-256 892ea51f7c6646df498e59c9c60b7c05f6d90bdbc79cd944fa5eab4b6f591cfd。
+- Run 234（最终 M12-01 代码 HEAD 2a69776374abb9b472aa4db3b6bc5dd32c0f6a92）SUCCESS：Restore PASS；Release Build 0 warnings / 0 errors；Core tests 122/122 PASS；API handbook check PASS；self-contained win-x64 publish、真实包/Worker smoke、ZIP/SHA256 和 artifact upload PASS。artifact ID 14014463955，87,176,294 bytes，archive SHA-256 c17f159787d8129031e97e364e991bec9a6ea3a72b9b612567867acd1d93d770。
+- 本机没有 .NET SDK，本地 Restore/Build/Test NOT RUN；Windows Actions 为本轮构建/测试来源。WinForms 权限审阅真实交互和 M1–M13 桌面项目仍 NOT RUN，统一延期 M14。
+- 未修改 VERSION、AssemblyVersion、FileVersion；未创建 tag/Release；v0.1.0-preview.4 官方发布资产不变。

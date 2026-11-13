@@ -355,3 +355,19 @@ preview.4 当前采用低级鼠标/键盘 Hook，已纳入 Windows CI 编译与�
 - PackageId 基于规范化工程路径和产品名；EntryId 基于 PackageId 与入口工程相对路径。相同工程升级只变版本不换 ID；用户值存放到 %LOCALAPPDATA%\\Anjian2026\\Sprites\\<PackageIdHash>\\<EntryIdHash>.json，不写入发布目录。
 - 启动器用 Mutex 实现按包单实例，用 RegisterHotKey 注册可选启动热键；支持自动运行、循环、间隔、暂停/继续/停止与失败重试。Stop 仍强制终止 Worker 并释放输入；退出清理是不可关闭的安全项。
 - CI 增加真实 self-contained 发布包冒烟：运行重命名后的 apphost，经 Worker IPC 运行 package-local require 模块并注入 Args，检查完整执行结果；这不覆盖 WinForms UI/DPI/真实输入实机验收。
+
+
+## 17. M12 权限基础层（M12-01；后续系统 API 尚未开放）
+
+### 17.1 声明与授权数据流
+- 脚本可选同目录权限 sidecar：脚本文件全名加 .permissions.json，schemaVersion=1、最大 256 KiB。缺少 sidecar 表示无扩展能力请求；未知版本、损坏 JSON、超限和 sidecar 本身为 reparse point 时启动失败，不得当作“没有权限”静默运行。
+- Anjian.Core.Permissions.ScriptPermissionPolicy 将脚本相对路径按脚本目录规范化；权限字段包括文件读取/写入根、剪贴板读写布尔值、message/input/confirm 对话框类别、明确 EXE 路径、精确 DNS 主机和 HTTP 方法，以及独立的明文 HTTP 标志。
+- 请求清单不是授权。每次普通播放/调试前由 WinForms ScriptPermissionReviewForm 展示请求并逐项默认拒绝；用户确认后的选择由 CreateGrant 验证必须是请求集合的子集。取消审阅不启动 Worker，不保存永久同意。
+- PlaybackRunner 在 worker-ready 握手载荷中传入 Grant；WorkerProgram 将其注入 WorkerLuaApi。每轮完成后 Runner 清空引用，未提供授权的模式使用空 Grant。
+
+### 17.2 当前安全边界与未实现项
+- 当前已完成的是请求解析、批准子集校验、播放/调试前审阅以及 Worker 构造注入。**还没有新增文件、剪贴板、对话框、进程或 HTTP API**；WorkerLuaApi 目前只持有 Grant，未用它执行扩展操作。主进程 PlaybackRunner.DispatchAsync 的逐条 IPC 权限二次校验尚待 M12-02，完成之前不得注册这些 API。
+- Core 的文件根检查使用 Path.GetRelativePath 进行词法边界判断，不是符号链接或 TOCTOU 防护。未来 Windows 文件适配器必须拒绝路径链上的 reparse point，并在最终打开时避免检查与使用之间的竞态；不得将本 Core 策略描述为文件沙箱。
+- 权限 UI 当前只接入主程序普通播放/调试；M11 小精灵 SpriteLauncherForm 尚未加载权限 sidecar，也没有权限审阅流程。插件 ZIP/目录 manifest、来源政策、版本兼容、启停/卸载和隔离加载尚未实现。
+- 此权限机制不是恶意 Lua 的 OS 级沙箱。Lua 本身仍通过受限 Worker/公开 API 工作；只有在主机对每一项实际 OS 操作再次校验之后，才可启用相应扩展 API。
+- Windows Actions run [234](https://github.com/xiaobei206/anjian/actions/runs/43377155430) 对 M12-01 代码 HEAD 2a69776374abb9b472aa4db3b6bc5dd32c0f6a92 全 PASS；真实 WinForms 权限审阅体验 NOT RUN，仍属于 M14 桌面验收。
