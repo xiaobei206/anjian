@@ -832,3 +832,13 @@ M4 基础调试器与 M5 可视化录制/动作列表均已完成 Windows CI 验
 - 验证历史：早期 CI 曾分别发现 xUnit 集合断言风格问题、权限 schemaVersion 省略、被篡改包 listing 异常未隔离、NLua 未暴露 os 库时模块加载失败；均据日志修复。最终代码 HEAD 582db78d9bddbed820727dd1bf01b19847beb5f6 的 Windows Actions run [43433992383](https://github.com/xiaobei206/anjian/actions/runs/43433992383) 已 SUCCESS；171/171 Core tests、0 warnings/0 errors、API handbook check、self-contained win-x64 publish、真实启动发布包的插件 Worker 与 Sprite Worker smoke、ZIP/SHA256 和 artifact upload 全 PASS。Artifact ID 14042985442，87,263,152 bytes，archive SHA-256 ebe8ca9bc7c4f82723e86628da5755bd783d655a9c1a170c7112336919e95af1，有效至 2026-12-13；不是 GitHub Release。
 - 安全边界：manifest/hash 不是数字签名/发布者身份保证；独立 Worker 不等于 OS 沙箱。只导入可信插件。此实现不会加载任意 DLL、自动联网或把第三方函数动态加入公共 registry。
 - 本地容器无 .NET SDK，本地 Restore/Build/Test 为 NOT RUN；Windows CI 与本机 WinForms 实测分开记录。M14 的 Windows 10/11 权限窗口、管理 UI、DPI/多屏、Pause/Stop 与用户交互仍 NOT RUN。未改变 VERSION、AssemblyVersion、FileVersion，不创建 tag/Release；v0.1.0-preview.4 官方资产不变。
+
+
+### M12-11 小精灵包权限 sidecar 收集与逐次审阅（2026-11-13）
+
+- 规格先行提交 `93d213ba2b6f06cb11f14dd6ca48860e1fb91817`：新增 `docs/SPRITE-PERMISSIONS-CN.md`，并同步 ADR-031、架构说明。格式冻结为可选 `<entry.lua>.permissions.json`、逐入口精确绑定、schema v1 / 256 KiB、请求与 Grant 分离。
+- 功能提交 `708430c519bdbb02bfb620734213f0440689c690`：打包 sidecar 并纳入 files/hash 清单；新增 per-entry verifier；Launcher 复用既有权限审阅服务并只把本次审批 Grant 传给 PlaybackRunner；添加多入口、hash/缺失/错误 schema Core tests 和 self-contained Worker default-deny smoke。
+- 加固提交 `ff5dc1510f4f68fe23e4abf54e2c291f6df6229b`：封闭审阅前后重新读取 sidecar 的 hash/TOCTOU 缺口。Launcher 把 manifest 的预期 SHA-256 传给 service；service 对实际解析请求的有界 UTF-8 字节进行 SHA-256 校验；目录/悬空链接形式的 sidecar 也不能被静默忽略。
+- Windows Actions 最终 run [43436997492](https://github.com/xiaobei206/anjian/actions/runs/43436997492) SUCCESS：Restore PASS；Release Build 0 warnings / 0 errors；Core tests 173/173、0 skipped；API handbook check；self-contained win-x64 publish；published Sprite Worker smoke（sidecar 请求写入但空 Grant 拒绝）与 Plugin Worker smoke；ZIP/SHA256、artifact upload 全 PASS。Artifact ID `14044230189`，87,267,435 bytes，SHA-256 `8c4312eb072012db084917bd025d5640e105d623a4d7df819632bf7cf1e58fc0`；该 artifact 是临时 Actions 产物，不是 Release。
+- 未增加 Lua 公共 API；registry 保持 1.2 / 103，函数手册/IDE 数据无需改变。未修改 `VERSION` / AssemblyVersion / FileVersion，不创建 tag 或 Release，v0.1.0-preview.4 官方资产未变。
+- 本地容器无 .NET SDK，local Restore/Build/Test NOT RUN。WinForms 权限审阅、真实批准/拒绝、Windows 10/11 DPI/多屏交互仍 NOT RUN（M14）；CI smoke 不代表桌面验收通过。

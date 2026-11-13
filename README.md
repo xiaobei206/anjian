@@ -126,3 +126,11 @@ M12-09 受控 HTTP(S)/JSON API 已在 main 开发版实现：新增 HttpRequest(
 main 已包含本地 Lua 插件目录/ZIP 导入、Anjian.Plugin.json manifest 与 SHA-256 闭合文件校验、API 版本兼容、默认停用、启停/卸载、权限三方交集和独立 Worker 执行；主窗口入口为“插件管理”。插件格式、字段、大小上限和安全边界见 [docs/PLUGIN-MANIFEST-CN.md](docs/PLUGIN-MANIFEST-CN.md)。这不是云端市场，不会自动联网，也不加载包内 DLL/EXE。SHA-256 不是数字签名、Worker 不是 OS 沙箱，只使用可信插件。真实 WinForms/DPI/多屏与权限窗口仍待 M14 实机验收。
 
 - Windows Actions run [43433992383](https://github.com/xiaobei206/anjian/actions/runs/43433992383) 对代码 HEAD 582db78d9bddbed820727dd1bf01b19847beb5f6 全 PASS：Restore；Release Build 0 warnings / 0 errors；Core tests 171 passed / 0 failed / 0 skipped；API handbook check；self-contained win-x64 publish；published plugin Worker 与 Sprite Worker smoke；ZIP/SHA256 和 artifact upload 全 PASS。Artifact ID 14042985442，87,263,152 bytes，archive SHA-256 ebe8ca9bc7c4f82723e86628da5755bd783d655a9c1a170c7112336919e95af1，有效至 2026-12-13；这是 Actions 临时 artifact，不是 GitHub Release。
+
+
+### M12-11 小精灵权限 sidecar（main 开发版，未进入 v0.1.0-preview.4）
+
+小精灵打包器现在会按入口收集可选的 `<entry.lua>.permissions.json`，以 `SpritePackageEntry.PermissionManifestPath` 精确绑定入口，并把文件加入 manifest / SHA-256 闭合清单。每次启动所选入口前，Launcher 会复核绑定和哈希，复用现有权限审阅窗体逐项审阅本次请求。无 sidecar 即空 Grant；包内声明不是批准；hash/schema/路径异常会拒绝启动；主进程仍对每条 IPC 检查当前 Grant。详见 [sidecar 契约](docs/SPRITE-PERMISSIONS-CN.md) 和 [用户指南](docs/USER-GUIDE-CN.md)。
+
+- Windows Actions run [43436997492](https://github.com/xiaobei206/anjian/actions/runs/43436997492) 对 HEAD `ff5dc1510f4f68fe23e4abf54e2c291f6df6229b` 全 PASS：173/173 Core tests、0 warnings/0 errors、自包含 win-x64 发布、真实 Sprite/Plugin Worker smoke、ZIP/SHA256 与 artifact 上传；artifact ID `14044230189`，SHA-256 `8c4312eb072012db084917bd025d5640e105d623a4d7df819632bf7cf1e58fc0`。临时 CI artifact 不是 GitHub Release。
+- 不修改 v0.1.0-preview.4。真实 Windows 10/11 权限审阅窗体、DPI/多屏仍待 M14；CI PASS 不等于桌面实机验收。

@@ -489,3 +489,21 @@ M12-09 只实现有上限的显式 HTTP 缓冲请求；不代表大文件流式�
 
 - Windows Actions run [43433992383](https://github.com/xiaobei206/anjian/actions/runs/43433992383) 对代码 HEAD 582db78d9bddbed820727dd1bf01b19847beb5f6 全 PASS：Restore；Release Build 0 warnings / 0 errors；Core tests 171 passed / 0 failed / 0 skipped；API handbook check；self-contained win-x64 publish；published plugin Worker 与 Sprite Worker smoke；ZIP/SHA256 和 artifact upload 全 PASS。Artifact ID 14042985442，87,263,152 bytes，archive SHA-256 ebe8ca9bc7c4f82723e86628da5755bd783d655a9c1a170c7112336919e95af1，有效至 2026-12-13；这是 Actions 临时 artifact，不是 GitHub Release。
 真实 Windows 10/11 WinForms 权限审阅、管理 UI、DPI/多屏与用户交互仍 NOT RUN（M14）；CI smoke 仅覆盖发布包中真实启动的插件 Worker 与既有 Sprite Worker。
+
+
+## 23. M12-11 小精灵入口权限 sidecar 收集与逐次审阅
+
+| ID | 场景 | 自动化覆盖/期望 | Windows 桌面状态 |
+|---|---|---|---|
+| M12-11-01 | 多入口绑定与收集 | 每个入口只收集自身 `<entry.lua>.permissions.json`；写入 `PermissionManifestPath`，路径精确等于入口路径加后缀，不串用其他入口 | 自动化 PASS（Run 43436997492）；桌面实测 NOT RUN（M14） |
+| M12-11-02 | Manifest/完整性 | Sidecar 加入 files 闭合清单与 SHA256SUMS；验证大小、hash、schema v1、256 KiB 上限及 reparse point | 自动化 PASS（Run 43436997492）；桌面实测 NOT RUN（M14） |
+| M12-11-03 | 缺失/损坏/篡改 | 已绑定文件缺失、schema 无效、入口绑定错、大小/hash 不一致均拒绝；没有 sidecar 的入口保持空 Grant | 自动化 PASS（Run 43436997492）；桌面实测 NOT RUN（M14） |
+| M12-11-04 | 授权审阅与内容一致性 | Launcher 每次运行复用逐项审阅；同一份被审阅字节必须与 manifest SHA256 匹配；拒绝/取消不启动 Worker | Core/host 自动化 + 源码路径检查；实际 WinForms 同意/拒绝交互 NOT RUN（M14） |
+| M12-11-05 | 已发布 self-contained Sprite Worker smoke | 包内 sidecar 请求 fileWriteRoots，但 smoke 显式注入 ScriptPermissionGrant.Empty；WriteTextFile 被拒绝、无 marker 文件、模块和 Args 仍执行 | Windows Actions PASS（Run 43436997492）；非 GUI 实机验收 |
+| M12-11-06 | WinForms/DPI/多显示器 | 权限摘要、默认未勾选、批准后仅本次授权、拒绝/取消不启动、Stop 与布局表现 | NOT RUN（M14） |
+
+### M12-11 最终 Windows Actions 验证
+
+- Run [43436997492](https://github.com/xiaobei206/anjian/actions/runs/43436997492) SUCCESS，代码 HEAD `ff5dc1510f4f68fe23e4abf54e2c291f6df6229b`：Release Build 0 warnings / 0 errors；Core tests 173 passed / 0 failed / 0 skipped；API handbook check；self-contained win-x64 publish；published Sprite/Plugin Worker smoke；ZIP/SHA256 与 artifact upload 全 PASS。
+- Artifact ID `14044230189`，87,267,435 bytes，archive SHA-256 `8c4312eb072012db084917bd025d5640e105d623a4d7df819632bf7cf1e58fc0`，这是 Actions 临时 artifact，不是 GitHub Release。
+- 本地 Restore/Build/Test NOT RUN（无 .NET SDK）。真实 Windows 10/11 WinForms 权限窗口、批准/拒绝交互、DPI/多屏仍 NOT RUN，统一留 M14。
