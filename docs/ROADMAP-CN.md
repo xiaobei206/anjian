@@ -266,7 +266,7 @@ M7 实现/CI 已完成不代表 M7-01..M7-10 Windows 桌面验收通过；这些
 3. M12-09：DONE（Windows Actions run 43427860126 全 PASS：161/161 Core tests、0 warnings/0 errors、API handbook 103 项、自包含 win-x64/Sprite Worker smoke/ZIP/SHA256 上传全通过）；HttpRequest、精确主机/方法、HTTPS 默认、HTTP 单独审批、重定向逐跳授权、超时/Stop、请求/响应上限；真实网络桌面验收留 M14。
 4. M12-10：DONE（本地 manifest/目录 ZIP、安全校验、API 兼容、三方权限交集、版本隔离、管理窗口与独立 Worker；自动化结果见下方 M12-10 实施与验证记录；真实桌面验收 M14）。不加载任意 DLL，不在主 UI 执行插件 Lua。
 5. M12-11：DONE（Windows Actions run 43436997492 全 PASS：173/173 Core tests、0 warnings/0 errors、API handbook、自包含 win-x64 发布、Sprite/Plugin Worker smoke、ZIP/SHA256 与 artifact upload 全通过）。小精灵按入口收集并绑定 permissions sidecar，Launcher 按 manifest SHA-256 对正在审阅的字节做校验并复用逐次权限审阅；无 sidecar 时为空 Grant，声明本身不授权。真实 WinForms/权限/DPI/多屏实机验收仍留 M14。
-6. M12-12：代码与自动化测试已进入 main，最终验收以最新成功 Windows Actions run 为准。贡献 schema/ADR-032 冻结；纯 Lua helper 在独立 Worker 内按 hash 校验惰性执行，内存 registry extension view 同时服务 IDE 补全/签名、API 命令面板和本机动态参考生成。内置 registry 仍为 1.2 / 103；不加载 DLL、不增加 IPC/权限或修改 Grant。真实桌面实测留 M14。
+6. M12-12：DONE（Windows Actions [43441156420](https://github.com/xiaobei206/anjian/actions/runs/43441156420) PASS：177/177 tests、0 warnings/errors、API handbook、self-contained win-x64 publish、Sprite/Plugin Worker smoke、ZIP/SHA256/artifact upload 全通过）。贡献 schema/ADR-032 冻结；纯 Lua helper 在独立 Worker 内 hash-validated 惰性执行；内存 registry extension view 服务 IDE 补全/签名、API 命令面板和动态参考。内置 registry 仍 1.2 / 103，不加载 DLL、不增加 IPC/权限/Grant。M14 桌面实测仍 NOT RUN。
 7. 每批功能完成后同步 registry/API version、中文函数手册、IDE 提示和契约测试；Windows CI 不替代 M14 桌面验收。
 
 - 增加有边界的文件/目录、剪贴板、对话框、进程、HTTP(S)/JSON 等常用 API。

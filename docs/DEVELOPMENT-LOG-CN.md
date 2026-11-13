@@ -850,5 +850,5 @@ M4 基础调试器与 M5 可视化录制/动作列表均已完成 Windows CI 验
 - PluginPackageStore 只将 API 兼容、完整 files 清单与 SHA-256 校验且已启用的插件放入计划；启用前验证完整启用集，跨插件名称冲突拒绝且不写 catalog。普通脚本 Worker 启动时重新验证 catalog、manifest、文件清单和 hash；小精灵及插件入口 Worker 不继承普通脚本贡献计划。
 - 插件 helper 仅纯 Lua；模块惰性执行于脚本独立 Worker 内的受限环境，不提供宿主自动化 API，不增加 host IPC 或用户 Grant。参数/返回类型在调用时检查；插件异常传播到当前 Worker。
 - 新增 Core tests：registry/IDE completion、实际 NLua 调用、参数数量/类型、异常传播、宿主全局隔离、内置/插件名称冲突、启用原子性、未来/未知 schema 与模块 hash 篡改。未修改 VERSION/AssemblyVersion/FileVersion，不创建 tag/Release；preview.4 发布资产不变。
-- Windows Actions 曾发现 nullable 检查、xUnit2031 和 NLua 异常类型断言问题，均按日志修复；最终结果以最新成功 run 补记为准，不将失败 run 记录为通过。当前容器无 .NET SDK，local Restore/Build/Test NOT RUN；真实 Windows 10/11 插件管理/命令面板/DPI/多屏验收 NOT RUN（M14）。
+- Windows Actions 先后发现 nullable 检查、xUnit2031 与 NLua 实际抛出 LuaScriptException（不是 LuaException）的断言问题，均依据日志修复。最终 run [43441156420](https://github.com/xiaobei206/anjian/actions/runs/43441156420) 对代码 HEAD 6cb86e9111fa6ea792122ec07667c0e9ee0f3b94 SUCCESS：Restore、Release Build 0 warnings/0 errors、177/177 Core tests、API handbook 103 项、自包含 win-x64 发布、包内 Sprite/Plugin Worker smoke、ZIP/SHA256、artifact upload 全 PASS。临时 artifact ID 14044284665，87,281,040 bytes，SHA-256 29b125cbb56b21f8e52075713474c72591c8df9a38f5e8cd5383d8c3e26c5a0d（至 2026-12-13；非 Release）。当前容器无 .NET SDK，local Restore/Build/Test NOT RUN；真实 Windows 10/11 插件管理/命令面板/DPI/多屏验收 NOT RUN（M14）。
 

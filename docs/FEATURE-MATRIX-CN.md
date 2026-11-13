@@ -28,7 +28,7 @@ M1–M13 的 Windows 桌面实机验收统一延期至 M14 全部功能开发完
 | F04 | 代码编辑器 | 高亮、行号、补全、参数提示、诊断、查找替换、折叠、多标签 | 部分实现：M3 已实现语法高亮、行号、注册表驱动补全/签名提示、只编译语法诊断/错误行导航、查找替换与多标签；代码折叠和 Windows 桌面手工验收仍未完成 | M3 | 自动化测试覆盖注册表一致性/语法诊断；Windows 实机验证中文/日文、1MB 脚本、DPI、标签保存与错误导航 |
 | F05 | 断点调试 | 断点、单步、运行到光标、变量窗、监视、调用栈 | 部分实现：M4 main 基础版已加入文件/行号断点、真实 Lua Line hook 暂停、单步进入/越过/跳出、运行到光标、局部/可读全局变量快照及调用栈；断点暂为当前打开标签内存态，未实现命名 watch / 表展开；Windows 桌面手工验收未执行 | M4 | 自动测试覆盖断点/单步/嵌套调用/运行到光标/快照/Hook 清理；另需 Windows 桌面手工验收 |
 | F06 | API 命令面板 | 分类、搜索、插入、签名、返回值、中文帮助、示例 | 未实现 | M3 | 从注册表生成，展示内容与参考手册一致 |
-| F07 | API 注册与手册 | 单一 API 描述源，生成补全、提示、命令面板和中文函数/参数手册 | 注册表/运行时绑定/手册生成/契约测试已实现；M3 编辑器补全和签名提示消费同一注册表，Windows CI PASS；M12-12 已新增 API 命令面板，并与启用插件的内存 registry extension view 共用元数据；真实 Windows UI 验收 M14 NOT RUN | M2/M3 | 注册表和文档生成测试通过；当前实现函数无遗漏 |
+| F07 | API 注册与手册 | 单一 API 描述源，生成补全、提示、命令面板和中文函数/参数手册 | 内置 registry 驱动运行时 binding、IDE 补全/签名和静态手册；M12-12 启用插件贡献通过内存 extension view 进入 IDE 与 API 命令面板，并可生成本机动态参考；Windows Actions PASS，真实桌面 UI M14 NOT RUN | M2/M3/M12 | 内置手册 check 可重复；插件签名/说明来自同一合并元数据，停用/损坏插件不在后续视图 |
 | F08 | 键鼠前台控制 | 移动、点击、双击、Down/Up、滚轮、组合键、Unicode | 部分实现：基础输入已接入 | M1/M4 | 按键布局、取消、安全释放和权限错误测试通过 |
 | F09 | 输入录制 | 全局录制、暂停/续录、点击模式、事件过滤、异常告警 | 结构化原始事件与动作转换已接入；保留 Hook 的暂停/续录、click-only、注入过滤、Move 合并和溢出计数；Hook 实机可靠性仍未验收 | M1/M5 | Hook 稳定性、重复/漏录、注入过滤、队列压力需 Windows 实机通过 |
 | F10 | 可视化动作列表 | 动作编辑、分组、排序、参数/延时编辑、代码生成区块同步 | M5 实现已完成，Windows CI PASS（37/37 tests、Build 0 warning/0 error、API check、win-x64 publish/artifact upload 均 PASS）；Windows 桌面交互仍 NOT RUN | M5 | 修改动作后生成代码一致；块外代码保留；手改/删除区块必须预览并确认；sidecar round-trip 与不兼容 schema 不覆盖原文件 |
@@ -48,12 +48,12 @@ M1–M13 的 Windows 桌面实机验收统一延期至 M14 全部功能开发完
 | F24 | 小精灵打包器 | 独立运行包/EXE 入口、独立 UI、参数表单、图标、资源依赖 | DONE（M11 + M12-11 main；Windows Actions run 43436997492 的 self-contained 包/Worker smoke PASS；权限审阅 UI/DPI 实机验收仍留 M14） | M11/M12 | 干净 Windows 用户环境无需 IDE 即能运行生成包；每个入口权限请求不串用且逐次审阅 |
 | F25 | 打包完整性 | manifest、依赖检查、SHA256、版本/API 最低要求、配置迁移 | DONE（逐文件 SHA256、清单闭合校验、路径/资源/schema/OCR 验证、稳定 PackageId/EntryId；M12-11 侧车按入口绑定并纳入 manifest/hash，启动时复核；Windows Actions run 43436997492 全 PASS） | M11/M12 | 损坏/缺失资源与权限侧车篡改能被检测；manifest、SHA256 和授权审阅依据一致 |
 | F26 | 自定义用户界面 | 标签、文本/数字框、开关、选项、文件/目录、热键等参数控件 | DONE（M10 参数设计器/动态表单及 M11 小精灵复用同一 schema/validator；配置跨包版本稳定隔离；自动化 PASS；WinForms/DPI/交互验收 M14） | M10/M11 | UI 可配置、参数验证和用户运行状态完整 |
-| F27 | 插件扩展 | 本地插件包、manifest、API 版本、权限提示、启停/卸载 | M12-10 本地 manifest/目录 ZIP 校验、生命周期、管理窗口与独立 Worker 已实现；Windows CI run 43433992383 PASS（171/171 tests、发布包插件/Sprite Worker smoke 与 artifact upload 全绿）；真实桌面验收 M14 pending。M12-12 已实现 contributions schema v1、纯 Lua helper 注册、IDE 补全/签名、API 命令面板和动态参考生成器；真实桌面验收仍留 M14 | M12 | 安装与每次运行都校验闭合文件/hash；权限为脚本请求、插件声明、用户本次批准三方交集；停用版本不能运行，异常限定到插件 Worker 会话 |
+| F27 | 插件扩展 | 本地插件包、manifest、API 版本、权限提示、启停/卸载、第三方 Lua API/命令贡献 | M12-10/11 本地包生命周期、三方权限交集及入口 sidecar 已实现；M12-12 contributions schema v1、纯 Lua helper、内存 registry extension、IDE 补全/签名、命令面板和动态参考已实现；Windows Actions Run 43441156420 PASS；真实 UI/DPI/多屏 M14 NOT RUN | M12 | 安装/每次 Worker 启动校验闭合文件和 SHA-256；不加载 DLL、不增加 IPC/Grant；冲突启用拒绝且不写 catalog |
 | F28 | 文件/目录/剪贴板 | 受控文件操作、剪贴板、对话框与常用数据 API | PARTIAL：受控文件/目录 13 项与剪贴板/对话框 5 项 API 已实现；均使用本次 Grant 双层校验；Windows Actions run 43408020908 的 147/147 tests、Build、API handbook、自包含发布与 Sprite/Worker smoke 全 PASS；真实桌面交互待 M14 | M12 | 文件权限/链接/上限/取消契约测试；剪贴板读写、三类对话框、默认拒绝、伪造 IPC 与主线程/停止路径验证 |
 | F29 | 进程/应用控制 | 启动、等待、查询、明确权限的结束操作 | PARTIAL：StartProcess/WaitProcess/GetProcessInfo 已实现；Windows Actions run 43414530292 的 152/152 tests、0 warnings/errors、API handbook、win-x64 发布、Sprite/Worker smoke、ZIP/SHA 与 artifact 上传全 PASS；不提供任意进程终止/Shell，桌面验收 M14 | M12 | 精确路径默认拒绝；参数边界；超时/Stop/Pause；查询退出码；句柄不可跨会话或查询任意 PID |
 | F30 | 网络/JSON | 显式 HTTP(S)、超时、状态码、JSON、上传/下载 | PARTIAL：HttpRequest 已实现；Windows Actions run 43427860126 的 161/161 Core tests、0 warnings/0 errors、API handbook 与自包含包 smoke 全 PASS；精确主机/方法逐次授权、HTTPS 默认、HTTP 单独批准、逐跳重定向授权、超时/Stop、1 MiB 请求体与 4 MiB 响应体上限；大文件流式上传/下载尚未实现 | M12 | 默认不自动联网；未批准主机/方法/HTTP/重定向拒绝；超时/Stop/响应上限可靠；无网络时其余功能正常 |
 | F31 | 定时与多实例 | 定时运行、独立实例、任务状态、超时和失败策略 | 未实现 | M13 | 互相隔离，能分别停止、查看日志和处理输入状态 |
-| F32 | 扩展兼容性 | 稳定 API 版本、弃用策略、迁移说明、插件 API 约束 | 插件 manifest min/max API 版本兼容校验已实现；内置 API registry 保持 1.2 / 103 项，插件只扩展运行时内存视图，内置 registry 仍为 1.2 / 103；未知/未来 schema 与名称冲突 fail-closed | M12 | 插件超出 API 兼容区间拒绝安装/运行；公开 API 不静默改变语义，破坏性变更有迁移说明 |
+| F32 | 扩展兼容性 | 稳定 API 版本、弃用策略、迁移说明、插件 API 约束 | 插件 manifest min/max API 兼容已实现；贡献 schema v1；运行期 extension view 不改静态内置 registry（1.2 / 103）与静态手册；Windows Actions Run 43441156420 PASS | M12 | API 不兼容、未知/未来 schema、保留名/重复名拒绝；内置公开 API 语义不静默改变 |
 | F33 | 离线文档 | 用户手册、函数手册、打包/插件开发说明和离线 HTML | 部分实现：现有 Markdown 文档分散 | M2/M14 | 发布包内文档与发行版本匹配，可断网查阅 |
 | F34 | 发布/测试 | Windows 10/11、长时稳定性、DPI/多屏、依赖许可和 SHA256 | CI 流程已接入；实机验收未完成 | M1/M14 | 测试报告、版本、ZIP、SHA256 和 release 一致 |
 

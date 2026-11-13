@@ -79,4 +79,4 @@ manifest JSON 最大 256 KiB，UTF-8。
 
 ## 信任与安全边界
 
-SHA-256 用于检测包文件与 manifest 不一致，不是发布者数字签名，也不证明来源可信；可以同时改写 manifest 和内容的人仍能构造 hash 自洽的包。独立 Worker 与受限 Lua require 用于隔离插件 Lua state 和约束公开 API/文件加载入口，但不是完整操作系统沙箱，不能阻止同一用户权限下的全部恶意行为。只安装可信来源的插件；本阶段不加载 DLL/EXE/native module、不自动联网、不提供第三方动态 API 注册。真实 Windows 10/11 管理窗口、权限审阅、DPI、多屏和用户交互仍需 M14 实机验收。
+SHA-256 用于检测包文件与 manifest 不一致，不是发布者数字签名，也不证明来源可信；可以同时改写 manifest 和内容的人仍能构造 hash 自洽的包。独立 Worker 与受限 Lua require 用于隔离插件 Lua state 和约束公开 API/文件加载入口，但不是完整操作系统沙箱，不能阻止同一用户权限下的全部恶意行为。只安装可信来源的插件；M12-12 贡献只开放受限纯 Lua helper，不加载 DLL/EXE/native module，不自动联网，不开放宿主自动化 API/IPC，也不扩大 Grant。真实 Windows 10/11 管理窗口、命令面板、权限审阅、DPI、多屏和用户交互仍需 M14 实机验收。
