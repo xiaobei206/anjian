@@ -205,7 +205,8 @@ internal sealed class WindowsImageService(WindowsWindowManager windows)
     {
         ArgumentNullException.ThrowIfNull(request);
         return ImageSearchEngine.FindImage(Get(request.ImageId), Get(request.TemplateId),
-            request.Similarity, request.Tolerance, request.Left, request.Top, request.Width, request.Height, request.Step, cancellationToken);
+            request.Similarity, request.Tolerance, request.Left, request.Top, request.Width, request.Height, request.Step,
+            request.Grayscale, request.Scale, cancellationToken);
     }
 
     public IReadOnlyList<ImageMatchPoint> FindImages(ImageTemplateSearchRequest request, CancellationToken cancellationToken = default)
@@ -213,7 +214,7 @@ internal sealed class WindowsImageService(WindowsWindowManager windows)
         ArgumentNullException.ThrowIfNull(request);
         return ImageSearchEngine.FindImages(Get(request.ImageId), Get(request.TemplateId),
             request.Similarity, request.Tolerance, request.MaxResults, request.Left, request.Top,
-            request.Width, request.Height, request.Step, cancellationToken);
+            request.Width, request.Height, request.Step, request.Grayscale, request.Scale, cancellationToken);
     }
 
     private string Add(PixelImage image)

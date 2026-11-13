@@ -70,31 +70,33 @@ public sealed partial class WorkerLuaApi
         ImageInteger("image-count-colors", ColorRequest(imageId, color, tolerance, left, top, width, height, step));
 
     public LuaTable? FindImage(string imageId, string templateId, double similarity, double tolerance,
-        double left, double top, double width, double height, double step) =>
+        double left, double top, double width, double height, double step, bool grayscale, double scale) =>
         RequestTable("image-find-image", TemplateRequest(imageId, templateId, similarity, tolerance,
-            1, left, top, width, height, step));
+            1, left, top, width, height, step, grayscale, scale));
 
     public LuaTable FindImages(string imageId, string templateId, double similarity, double tolerance,
-        double maxResults, double left, double top, double width, double height, double step) =>
+        double maxResults, double left, double top, double width, double height, double step, bool grayscale, double scale) =>
         RequestTable("image-find-images", TemplateRequest(imageId, templateId, similarity, tolerance,
             Integer(maxResults, 1, ImageSearchEngine.MaximumResults, "maxResults"),
-            left, top, width, height, step))
+            left, top, width, height, step, grayscale, scale))
         ?? throw new InvalidDataException("FindImages 没有返回结果表。");
 
     public LuaTable? WaitImage(string templateId, double similarity, double tolerance,
-        double timeoutMilliseconds, double intervalMilliseconds) =>
-        RequestTable("image-wait-image", WaitImageRequest(templateId, similarity, tolerance, timeoutMilliseconds, intervalMilliseconds));
+        double timeoutMilliseconds, double intervalMilliseconds, bool grayscale, double scale, double stableCount) =>
+        RequestTable("image-wait-image", WaitImageRequest(templateId, similarity, tolerance,
+            timeoutMilliseconds, intervalMilliseconds, grayscale, scale, stableCount));
 
     public bool WaitImageGone(string templateId, double similarity, double tolerance,
-        double timeoutMilliseconds, double intervalMilliseconds) =>
+        double timeoutMilliseconds, double intervalMilliseconds, bool grayscale, double scale, double stableCount) =>
         ImageBoolean("image-wait-image-gone",
-            WaitImageRequest(templateId, similarity, tolerance, timeoutMilliseconds, intervalMilliseconds));
+            WaitImageRequest(templateId, similarity, tolerance, timeoutMilliseconds,
+                intervalMilliseconds, grayscale, scale, stableCount));
 
-    public LuaTable? WaitColor(double color, double tolerance, double timeoutMilliseconds, double intervalMilliseconds) =>
-        RequestTable("image-wait-color", WaitColorRequest(color, tolerance, timeoutMilliseconds, intervalMilliseconds));
+    public LuaTable? WaitColor(double color, double tolerance, double timeoutMilliseconds, double intervalMilliseconds, double stableCount) =>
+        RequestTable("image-wait-color", WaitColorRequest(color, tolerance, timeoutMilliseconds, intervalMilliseconds, stableCount));
 
-    public bool WaitColorGone(double color, double tolerance, double timeoutMilliseconds, double intervalMilliseconds) =>
-        ImageBoolean("image-wait-color-gone", WaitColorRequest(color, tolerance, timeoutMilliseconds, intervalMilliseconds));
+    public bool WaitColorGone(double color, double tolerance, double timeoutMilliseconds, double intervalMilliseconds, double stableCount) =>
+        ImageBoolean("image-wait-color-gone", WaitColorRequest(color, tolerance, timeoutMilliseconds, intervalMilliseconds, stableCount));
 
     private ImageColorSearchRequest ColorRequest(
         string imageId, double color, double tolerance, double left, double top, double width, double height, double step) =>
@@ -105,31 +107,35 @@ public sealed partial class WorkerLuaApi
 
     private ImageTemplateSearchRequest TemplateRequest(
         string imageId, string templateId, double similarity, double tolerance, int maxResults,
-        double left, double top, double width, double height, double step)
+        double left, double top, double width, double height, double step, bool grayscale, double scale)
     {
         if (!double.IsFinite(similarity) || similarity is < 0 or > 1)
             throw new ArgumentOutOfRangeException(nameof(similarity), "相似度阈值必须在 0 到 1 之间。");
+        ValidateTemplateScale(scale);
         return new ImageTemplateSearchRequest(RequiredId(imageId), RequiredId(templateId), similarity,
             Integer(tolerance, 0, 255, "颜色容差"), maxResults, RegionValue(left, "区域左边"),
             RegionValue(top, "区域上边"), RegionDimension(width, "区域宽度"),
-            RegionDimension(height, "区域高度"), Integer(step, 1, 64, "step"));
+            RegionDimension(height, "区域高度"), Integer(step, 1, 64, "step"), grayscale, scale);
     }
 
     private ImageWaitImageRequest WaitImageRequest(string templateId, double similarity, double tolerance,
-        double timeoutMilliseconds, double intervalMilliseconds)
+        double timeoutMilliseconds, double intervalMilliseconds, bool grayscale, double scale, double stableCount)
     {
         if (!double.IsFinite(similarity) || similarity is < 0 or > 1)
             throw new ArgumentOutOfRangeException(nameof(similarity), "相似度阈值必须在 0 到 1 之间。");
+        ValidateTemplateScale(scale);
         return new ImageWaitImageRequest(RequiredId(templateId), similarity,
             Integer(tolerance, 0, 255, "颜色容差"), Integer(timeoutMilliseconds, 0, 600000, "超时时间"),
-            Integer(intervalMilliseconds, 10, 5000, "轮询间隔"));
+            Integer(intervalMilliseconds, 10, 5000, "轮询间隔"), grayscale, scale,
+            Integer(stableCount, 1, 20, "连续确认次数"));
     }
 
     private ImageWaitColorRequest WaitColorRequest(double color, double tolerance,
-        double timeoutMilliseconds, double intervalMilliseconds) =>
+        double timeoutMilliseconds, double intervalMilliseconds, double stableCount) =>
         new(RgbColor(color), Integer(tolerance, 0, 255, "颜色容差"),
             Integer(timeoutMilliseconds, 0, 600000, "超时时间"),
-            Integer(intervalMilliseconds, 10, 5000, "轮询间隔"));
+            Integer(intervalMilliseconds, 10, 5000, "轮询间隔"),
+            Integer(stableCount, 1, 20, "连续确认次数"));
 
     private bool ImageBoolean(string type, object payload) => RequestBoolean(type, payload);
 
@@ -149,6 +155,12 @@ public sealed partial class WorkerLuaApi
 
     private static int RegionValue(double value, string label) => Integer(value, 0, 32767, label);
     private static int RegionDimension(double value, string label) => Integer(value, 0, 32768, label);
+
+    private static void ValidateTemplateScale(double scale)
+    {
+        if (!double.IsFinite(scale) || scale < ImageSearchEngine.MinimumTemplateScale || scale > ImageSearchEngine.MaximumTemplateScale)
+            throw new ArgumentOutOfRangeException(nameof(scale), $"模板 scale 必须在 {ImageSearchEngine.MinimumTemplateScale} 到 {ImageSearchEngine.MaximumTemplateScale} 之间。");
+    }
 
     private static double Finite(double value, string label) =>
         double.IsFinite(value) ? value : throw new ArgumentOutOfRangeException(label, "坐标必须是有限数。");

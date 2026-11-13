@@ -14,11 +14,12 @@ public sealed record ImageColorSearchRequest(
 public sealed record ImageMultiColorSearchRequest(
     string ImageId, uint Color, string Pattern, int Tolerance, int Left, int Top, int Width, int Height, int Step);
 public sealed record ImageTemplateSearchRequest(
-    string ImageId, string TemplateId, double Similarity, int Tolerance,
-    int MaxResults, int Left, int Top, int Width, int Height, int Step);
+    string ImageId, string TemplateId, double Similarity, int Tolerance, int MaxResults,
+    int Left, int Top, int Width, int Height, int Step, bool Grayscale, double Scale);
 public sealed record ImageWaitImageRequest(
-    string TemplateId, double Similarity, int Tolerance, int TimeoutMilliseconds, int IntervalMilliseconds);
+    string TemplateId, double Similarity, int Tolerance, int TimeoutMilliseconds, int IntervalMilliseconds,
+    bool Grayscale, double Scale, int StableCount);
 public sealed record ImageWaitColorRequest(
-    uint Color, int Tolerance, int TimeoutMilliseconds, int IntervalMilliseconds);
+    uint Color, int Tolerance, int TimeoutMilliseconds, int IntervalMilliseconds, int StableCount);
 public sealed record ImageSizeInfo(
     int Width, int Height, bool HasScreenCoordinates, int ScreenOriginX, int ScreenOriginY);
