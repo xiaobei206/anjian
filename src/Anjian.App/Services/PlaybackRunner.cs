@@ -378,26 +378,12 @@ internal sealed class PlaybackRunner : IDisposable
 
     private static void ValidateWorkerMessage(IpcMessage message, WorkerHandshake expected)
     {
-        if (!string.Equals(message.InstanceId, expected.InstanceId, StringComparison.Ordinal) ||
-            !string.Equals(message.WorkerAttemptId, expected.WorkerAttemptId, StringComparison.Ordinal) ||
-            !FixedNonceEquals(message.SessionNonce, expected.SessionNonce))
+        if (!WorkerSessionIdentityPolicy.Matches(
+            expected.InstanceId, expected.WorkerAttemptId, expected.SessionNonce,
+            message.InstanceId, message.WorkerAttemptId, message.SessionNonce))
             throw new InvalidDataException("拒绝不属于当前 Worker pipe/session 的 IPC 消息。");
     }
 
-    private static bool FixedNonceEquals(string? actual, string expected)
-    {
-        if (actual is null || actual.Length != expected.Length)
-            return false;
-        try
-        {
-            return CryptographicOperations.FixedTimeEquals(
-                Convert.FromHexString(actual), Convert.FromHexString(expected));
-        }
-        catch (FormatException)
-        {
-            return false;
-        }
-    }
 
     private async Task<string?> DispatchAsync(
         IpcMessage message,
