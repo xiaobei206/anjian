@@ -24,7 +24,7 @@ public sealed class RunInstanceListQueryTests
     public void FilterOrdersNewestFirstAndRetainsAllLiveInstancesPlusRecentCompletedHistory()
     {
         var now = DateTimeOffset.UtcNow;
-        var oldCompleted = Descriptor(@"C:\scripts\old.lua", now, RunInstanceState.Cleaned, RunInstanceOutcome.Succeeded);
+        var oldCompleted = Descriptor(@"C:\scripts\old.lua", now.AddMinutes(-5), RunInstanceState.Cleaned, RunInstanceOutcome.Succeeded);
         var running = Descriptor(@"C:\scripts\active.lua", now.AddMinutes(-4), RunInstanceState.Running);
         var queued = Descriptor(@"C:\scripts\queued.lua", now.AddMinutes(-3), RunInstanceState.Queued);
         var newestCompleted = Descriptor(@"C:\scripts\new.lua", now.AddMinutes(-1), RunInstanceState.Cleaned, RunInstanceOutcome.Failed);
