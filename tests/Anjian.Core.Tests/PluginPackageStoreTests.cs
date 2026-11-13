@@ -145,6 +145,12 @@ public sealed class PluginPackageStoreTests : IDisposable
         WriteRawManifest(manifestlessVersion, topLevel);
         Assert.Throws<InvalidDataException>(() => PluginPackageValidator.Inspect(manifestlessVersion, "1.2"));
 
+        var entrylessPackage = CreatePackage(Path.Combine(_temporaryRoot, "missing-entry"));
+        var entryless = JsonNode.Parse(File.ReadAllText(Path.Combine(entrylessPackage, PluginPackageValidator.ManifestFileName)))!.AsObject();
+        entryless.Remove("entry");
+        WriteRawManifest(entrylessPackage, entryless);
+        Assert.Throws<InvalidDataException>(() => PluginPackageValidator.Inspect(entrylessPackage, "1.2"));
+
         var permissionlessVersion = CreatePackage(Path.Combine(_temporaryRoot, "missing-permission-schema"));
         var nested = JsonNode.Parse(File.ReadAllText(Path.Combine(permissionlessVersion, PluginPackageValidator.ManifestFileName)))!.AsObject();
         nested["permissions"]!.AsObject().Remove("schemaVersion");

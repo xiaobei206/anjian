@@ -17,8 +17,8 @@ public sealed class PluginManifest
     public string Author { get; set; } = "";
     public string MinApiVersion { get; set; } = "";
     public string? MaxApiVersion { get; set; }
-    public string Entry { get; set; } = "entry.lua";
-    public string? ModulesRoot { get; set; } = "Modules";
+    public string Entry { get; set; } = "";
+    public string? ModulesRoot { get; set; }
     public PluginPermissionManifest Permissions { get; set; } = new();
     public List<PluginPackageFile> Files { get; set; } = [];
 }
@@ -117,6 +117,7 @@ public static class PluginPackageValidator
             var manifestJson = new UTF8Encoding(false, true).GetString(manifestBytes);
             using var document = JsonDocument.Parse(manifestJson, new JsonDocumentOptions { MaxDepth = 32 });
             RequireSchemaVersion(document.RootElement, "插件 manifest");
+            _ = GetRequiredPropertyValue(document.RootElement, "entry", "插件 entry");
             var permissionElement = GetRequiredProperty(document.RootElement, "permissions", "插件 permissions");
             RequireSchemaVersion(permissionElement, "插件 permissions");
             manifest = JsonSerializer.Deserialize<PluginManifest>(manifestJson, JsonOptions)
@@ -360,13 +361,21 @@ public static class PluginPackageValidator
 
     private static JsonElement GetRequiredProperty(JsonElement element, string name, string label)
     {
+        var value = GetRequiredPropertyValue(element, name, label);
+        if (value.ValueKind != JsonValueKind.Object)
+            throw new InvalidDataException(label + " 必须是 JSON 对象。");
+        return value;
+    }
+
+    private static JsonElement GetRequiredPropertyValue(JsonElement element, string name, string label)
+    {
         if (element.ValueKind != JsonValueKind.Object)
             throw new InvalidDataException(label + " 缺失或类型错误。");
         var matches = element.EnumerateObject()
             .Where(property => property.Name.Equals(name, StringComparison.OrdinalIgnoreCase))
             .ToArray();
-        if (matches.Length != 1 || matches[0].Value.ValueKind != JsonValueKind.Object)
-            throw new InvalidDataException(label + " 必须且只能是一个 JSON 对象。");
+        if (matches.Length != 1)
+            throw new InvalidDataException(label + " 必须且只能声明一次。");
         return matches[0].Value;
     }
 
