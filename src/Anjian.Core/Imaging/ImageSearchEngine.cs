@@ -13,6 +13,8 @@ public static class ImageSearchEngine
 {
     public const int MaximumPatternProbes = 256;
     public const int MaximumResults = 1000;
+    public const double MinimumTemplateScale = 0.25;
+    public const double MaximumTemplateScale = 4.0;
     private const long MaximumPixelComparisons = 50_000_000;
 
     public static bool CompareColor(PixelImage image, int x, int y, uint expected, int tolerance = 0)
@@ -358,7 +360,7 @@ public static class ImageSearchEngine
 
     private static void ValidateScale(double scale)
     {
-        if (!double.IsFinite(scale) || scale is < 0.25 or > 4.0)
-            throw new ArgumentOutOfRangeException(nameof(scale), "模板 scale 必须在 0.25 到 4 之间。");
+        if (!double.IsFinite(scale) || scale < MinimumTemplateScale || scale > MaximumTemplateScale)
+            throw new ArgumentOutOfRangeException(nameof(scale), $"模板 scale 必须在 {MinimumTemplateScale} 到 {MaximumTemplateScale} 之间。");
     }
 }

@@ -4142,8 +4142,8 @@
       "name": "FindImage",
       "title": "模板找图",
       "category": "imaging",
-      "signature": "FindImage(imageId, templateId, similarity?, tolerance?, left?, top?, width?, height?, step?)",
-      "description": "在源图像区域查找模板首个命中；透明模板像素作为通配点。similarity 为 0–1 的匹配比例，未命中返回 nil。单次调用最多执行 5000 万次模板像素比较，防止长时间无界循环。",
+      "signature": "FindImage(imageId, templateId, similarity?, tolerance?, left?, top?, width?, height?, step?, grayscale?, scale?)",
+      "description": "在源图像区域查找模板首个命中；透明模板像素作为通配点。similarity 为 0–1 的匹配比例，未命中返回 nil。单次调用最多执行 5000 万次模板像素比较，防止长时间无界循环。 支持灰度比较和 0.25–4 倍最近邻缩放，默认仍是原尺寸 RGB。",
       "parameters": [
         {
           "name": "imageId",
@@ -4224,6 +4224,22 @@
           "minimum": 1,
           "maximum": 64,
           "unit": "像素"
+        },
+        {
+          "name": "grayscale",
+          "type": "boolean",
+          "required": false,
+          "defaultValue": false,
+          "description": "是否按亮度灰度进行模板匹配。"
+        },
+        {
+          "name": "scale",
+          "type": "number",
+          "required": false,
+          "defaultValue": 1,
+          "description": "模板缩放比例；1 为原尺寸，采用最近邻采样。",
+          "minimum": 0.25,
+          "maximum": 4
         }
       ],
       "returns": {
@@ -4233,9 +4249,9 @@
       "errors": [
         "模板全透明、资源失效、区域越界或达到像素比较预算时产生错误。"
       ],
-      "example": "local hit = FindImage(screen, template, 0.95, 4)",
+      "example": "local hit = FindImage(screen, template, 0.95, 4, 0, 0, 0, 0, 1, true, 1.5)",
       "runtime": {
-        "definition": "function(imageId, templateId, similarity, tolerance, left, top, width, height, step) return __AnjianBridge_FindImage(imageId, templateId, (similarity == nil and 0.95 or similarity), (tolerance == nil and 0 or tolerance), (left == nil and 0 or left), (top == nil and 0 or top), (width == nil and 0 or width), (height == nil and 0 or height), (step == nil and 1 or step)) end",
+        "definition": "function(imageId, templateId, similarity, tolerance, left, top, width, height, step, grayscale, scale) if grayscale == nil then grayscale = false end; return __AnjianBridge_FindImage(imageId, templateId, (similarity == nil and 0.95 or similarity), (tolerance == nil and 0 or tolerance), (left == nil and 0 or left), (top == nil and 0 or top), (width == nil and 0 or width), (height == nil and 0 or height), (step == nil and 1 or step), (grayscale == nil and false or grayscale), (scale == nil and 1 or scale)) end",
         "bindings": [
           {
             "name": "__FindImage",
@@ -4260,8 +4276,8 @@
       "name": "FindImages",
       "title": "查找多个模板位置",
       "category": "imaging",
-      "signature": "FindImages(imageId, templateId, similarity?, tolerance?, maxResults?, left?, top?, width?, height?, step?)",
-      "description": "返回按从上到下、从左到右排序且互不重叠的命中数组。maxResults 为 1–1000；未命中返回空数组。",
+      "signature": "FindImages(imageId, templateId, similarity?, tolerance?, maxResults?, left?, top?, width?, height?, step?, grayscale?, scale?)",
+      "description": "返回按从上到下、从左到右排序且互不重叠的命中数组。maxResults 为 1–1000；未命中返回空数组。 支持灰度比较和 0.25–4 倍最近邻缩放，默认仍是原尺寸 RGB。",
       "parameters": [
         {
           "name": "imageId",
@@ -4351,6 +4367,22 @@
           "minimum": 1,
           "maximum": 64,
           "unit": "像素"
+        },
+        {
+          "name": "grayscale",
+          "type": "boolean",
+          "required": false,
+          "defaultValue": false,
+          "description": "是否按亮度灰度进行模板匹配。"
+        },
+        {
+          "name": "scale",
+          "type": "number",
+          "required": false,
+          "defaultValue": 1,
+          "description": "模板缩放比例；1 为原尺寸，采用最近邻采样。",
+          "minimum": 0.25,
+          "maximum": 4
         }
       ],
       "returns": {
@@ -4360,9 +4392,9 @@
       "errors": [
         "模板全透明、资源失效、区域越界或达到像素比较预算时产生错误。"
       ],
-      "example": "local hits = FindImages(screen, template, 0.95, 0, 20)",
+      "example": "local hits = FindImages(screen, template, 0.95, 0, 20, 0, 0, 0, 0, 1, true, 1)",
       "runtime": {
-        "definition": "function(imageId, templateId, similarity, tolerance, maxResults, left, top, width, height, step) return __AnjianBridge_FindImages(imageId, templateId, (similarity == nil and 0.95 or similarity), (tolerance == nil and 0 or tolerance), (maxResults == nil and 100 or maxResults), (left == nil and 0 or left), (top == nil and 0 or top), (width == nil and 0 or width), (height == nil and 0 or height), (step == nil and 1 or step)) end",
+        "definition": "function(imageId, templateId, similarity, tolerance, maxResults, left, top, width, height, step, grayscale, scale) if grayscale == nil then grayscale = false end; return __AnjianBridge_FindImages(imageId, templateId, (similarity == nil and 0.95 or similarity), (tolerance == nil and 0 or tolerance), (maxResults == nil and 100 or maxResults), (left == nil and 0 or left), (top == nil and 0 or top), (width == nil and 0 or width), (height == nil and 0 or height), (step == nil and 1 or step), (grayscale == nil and false or grayscale), (scale == nil and 1 or scale)) end",
         "bindings": [
           {
             "name": "__FindImages",
@@ -4387,8 +4419,8 @@
       "name": "WaitImage",
       "title": "等待模板出现",
       "category": "imaging",
-      "signature": "WaitImage(templateId, similarity?, tolerance?, timeoutMs?, intervalMs?)",
-      "description": "循环截取当前虚拟桌面并搜索模板；首次命中返回位置表，超时返回 nil。Stop 取消轮询，Pause 会暂停后续轮询。",
+      "signature": "WaitImage(templateId, similarity?, tolerance?, timeoutMs?, intervalMs?, grayscale?, scale?, stableCount?)",
+      "description": "循环截取当前虚拟桌面并搜索模板；首次命中返回位置表，超时返回 nil。Stop 取消轮询，Pause 会暂停后续轮询。 可指定灰度/缩放，并要求连续多帧命中以降低单帧误判。",
       "parameters": [
         {
           "name": "templateId",
@@ -4433,6 +4465,32 @@
           "minimum": 10,
           "maximum": 5000,
           "unit": "毫秒"
+        },
+        {
+          "name": "grayscale",
+          "type": "boolean",
+          "required": false,
+          "defaultValue": false,
+          "description": "是否按亮度灰度进行模板匹配。"
+        },
+        {
+          "name": "scale",
+          "type": "number",
+          "required": false,
+          "defaultValue": 1,
+          "description": "模板缩放比例；1 为原尺寸，采用最近邻采样。",
+          "minimum": 0.25,
+          "maximum": 4
+        },
+        {
+          "name": "stableCount",
+          "type": "integer",
+          "required": false,
+          "defaultValue": 1,
+          "description": "需连续满足条件的截图次数，用于抑制单帧误判。",
+          "minimum": 1,
+          "maximum": 20,
+          "unit": "次"
         }
       ],
       "returns": {
@@ -4442,9 +4500,9 @@
       "errors": [
         "模板失效、截图失败、图像过大或搜索达到像素比较预算时产生错误。"
       ],
-      "example": "local hit = WaitImage(template, 0.95, 0, 5000, 100)",
+      "example": "local hit = WaitImage(template, 0.95, 0, 5000, 100, false, 1, 2)",
       "runtime": {
-        "definition": "function(templateId, similarity, tolerance, timeoutMs, intervalMs) return __AnjianBridge_WaitImage(templateId, (similarity == nil and 0.95 or similarity), (tolerance == nil and 0 or tolerance), (timeoutMs == nil and 5000 or timeoutMs), (intervalMs == nil and 100 or intervalMs)) end",
+        "definition": "function(templateId, similarity, tolerance, timeoutMs, intervalMs, grayscale, scale, stableCount) if grayscale == nil then grayscale = false end; return __AnjianBridge_WaitImage(templateId, (similarity == nil and 0.95 or similarity), (tolerance == nil and 0 or tolerance), (timeoutMs == nil and 5000 or timeoutMs), (intervalMs == nil and 100 or intervalMs), (grayscale == nil and false or grayscale), (scale == nil and 1 or scale), (stableCount == nil and 1 or stableCount)) end",
         "bindings": [
           {
             "name": "__WaitImage",
@@ -4471,8 +4529,8 @@
       "name": "WaitImageGone",
       "title": "等待模板消失",
       "category": "imaging",
-      "signature": "WaitImageGone(templateId, similarity?, tolerance?, timeoutMs?, intervalMs?)",
-      "description": "持续截取虚拟桌面；模板消失返回 true，超时时模板仍存在返回 false。Stop 取消轮询。",
+      "signature": "WaitImageGone(templateId, similarity?, tolerance?, timeoutMs?, intervalMs?, grayscale?, scale?, stableCount?)",
+      "description": "持续截取虚拟桌面；模板消失返回 true，超时时模板仍存在返回 false。Stop 取消轮询。 可指定灰度/缩放，并要求连续多帧未命中以降低单帧误判。",
       "parameters": [
         {
           "name": "templateId",
@@ -4517,6 +4575,32 @@
           "minimum": 10,
           "maximum": 5000,
           "unit": "毫秒"
+        },
+        {
+          "name": "grayscale",
+          "type": "boolean",
+          "required": false,
+          "defaultValue": false,
+          "description": "是否按亮度灰度进行模板匹配。"
+        },
+        {
+          "name": "scale",
+          "type": "number",
+          "required": false,
+          "defaultValue": 1,
+          "description": "模板缩放比例；1 为原尺寸，采用最近邻采样。",
+          "minimum": 0.25,
+          "maximum": 4
+        },
+        {
+          "name": "stableCount",
+          "type": "integer",
+          "required": false,
+          "defaultValue": 1,
+          "description": "需连续满足条件的截图次数，用于抑制单帧误判。",
+          "minimum": 1,
+          "maximum": 20,
+          "unit": "次"
         }
       ],
       "returns": {
@@ -4526,9 +4610,9 @@
       "errors": [
         "模板失效、截图失败、图像过大或搜索达到像素比较预算时产生错误。"
       ],
-      "example": "if WaitImageGone(template, 0.95, 0, 5000, 100) then Log(\"目标已消失\") end",
+      "example": "if WaitImageGone(template, 0.95, 0, 5000, 100, false, 1, 2) then Log(\"目标已稳定消失\") end",
       "runtime": {
-        "definition": "function(templateId, similarity, tolerance, timeoutMs, intervalMs) return __AnjianBridge_WaitImageGone(templateId, (similarity == nil and 0.95 or similarity), (tolerance == nil and 0 or tolerance), (timeoutMs == nil and 5000 or timeoutMs), (intervalMs == nil and 100 or intervalMs)) end",
+        "definition": "function(templateId, similarity, tolerance, timeoutMs, intervalMs, grayscale, scale, stableCount) if grayscale == nil then grayscale = false end; return __AnjianBridge_WaitImageGone(templateId, (similarity == nil and 0.95 or similarity), (tolerance == nil and 0 or tolerance), (timeoutMs == nil and 5000 or timeoutMs), (intervalMs == nil and 100 or intervalMs), (grayscale == nil and false or grayscale), (scale == nil and 1 or scale), (stableCount == nil and 1 or stableCount)) end",
         "bindings": [
           {
             "name": "__WaitImageGone",
@@ -4555,8 +4639,8 @@
       "name": "WaitColor",
       "title": "等待屏幕颜色出现",
       "category": "imaging",
-      "signature": "WaitColor(color, tolerance?, timeoutMs?, intervalMs?)",
-      "description": "持续截取虚拟桌面；首次找到指定 RGB 颜色返回命中位置，超时返回 nil。",
+      "signature": "WaitColor(color, tolerance?, timeoutMs?, intervalMs?, stableCount?)",
+      "description": "持续截取虚拟桌面；首次找到指定 RGB 颜色返回命中位置，超时返回 nil。 可指定连续命中次数以降低单帧误判。",
       "parameters": [
         {
           "name": "color",
@@ -4594,6 +4678,16 @@
           "minimum": 10,
           "maximum": 5000,
           "unit": "毫秒"
+        },
+        {
+          "name": "stableCount",
+          "type": "integer",
+          "required": false,
+          "defaultValue": 1,
+          "description": "需连续满足条件的截图次数，用于抑制单帧误判。",
+          "minimum": 1,
+          "maximum": 20,
+          "unit": "次"
         }
       ],
       "returns": {
@@ -4603,9 +4697,9 @@
       "errors": [
         "截图失败、图像过大或参数无效时产生错误。"
       ],
-      "example": "local hit = WaitColor(0x00FF00, 8, 3000, 100)",
+      "example": "local hit = WaitColor(0x00FF00, 8, 3000, 100, 2)",
       "runtime": {
-        "definition": "function(color, tolerance, timeoutMs, intervalMs) return __AnjianBridge_WaitColor(color, (tolerance == nil and 0 or tolerance), (timeoutMs == nil and 5000 or timeoutMs), (intervalMs == nil and 100 or intervalMs)) end",
+        "definition": "function(color, tolerance, timeoutMs, intervalMs, stableCount) return __AnjianBridge_WaitColor(color, (tolerance == nil and 0 or tolerance), (timeoutMs == nil and 5000 or timeoutMs), (intervalMs == nil and 100 or intervalMs), (stableCount == nil and 1 or stableCount)) end",
         "bindings": [
           {
             "name": "__WaitColor",
@@ -4632,8 +4726,8 @@
       "name": "WaitColorGone",
       "title": "等待屏幕颜色消失",
       "category": "imaging",
-      "signature": "WaitColorGone(color, tolerance?, timeoutMs?, intervalMs?)",
-      "description": "持续截取虚拟桌面；指定颜色不再出现返回 true，超时仍存在返回 false。",
+      "signature": "WaitColorGone(color, tolerance?, timeoutMs?, intervalMs?, stableCount?)",
+      "description": "持续截取虚拟桌面；指定颜色不再出现返回 true，超时仍存在返回 false。 可指定连续未命中次数以降低单帧误判。",
       "parameters": [
         {
           "name": "color",
@@ -4671,6 +4765,16 @@
           "minimum": 10,
           "maximum": 5000,
           "unit": "毫秒"
+        },
+        {
+          "name": "stableCount",
+          "type": "integer",
+          "required": false,
+          "defaultValue": 1,
+          "description": "需连续满足条件的截图次数，用于抑制单帧误判。",
+          "minimum": 1,
+          "maximum": 20,
+          "unit": "次"
         }
       ],
       "returns": {
@@ -4680,9 +4784,9 @@
       "errors": [
         "截图失败、图像过大或参数无效时产生错误。"
       ],
-      "example": "if WaitColorGone(0x00FF00, 8, 3000, 100) then Log(\"颜色已消失\") end",
+      "example": "if WaitColorGone(0x00FF00, 8, 3000, 100, 2) then Log(\"颜色已稳定消失\") end",
       "runtime": {
-        "definition": "function(color, tolerance, timeoutMs, intervalMs) return __AnjianBridge_WaitColorGone(color, (tolerance == nil and 0 or tolerance), (timeoutMs == nil and 5000 or timeoutMs), (intervalMs == nil and 100 or intervalMs)) end",
+        "definition": "function(color, tolerance, timeoutMs, intervalMs, stableCount) return __AnjianBridge_WaitColorGone(color, (tolerance == nil and 0 or tolerance), (timeoutMs == nil and 5000 or timeoutMs), (intervalMs == nil and 100 or intervalMs), (stableCount == nil and 1 or stableCount)) end",
         "bindings": [
           {
             "name": "__WaitColorGone",

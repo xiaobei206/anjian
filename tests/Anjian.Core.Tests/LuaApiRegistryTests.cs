@@ -166,12 +166,17 @@ public void ImagingApiDefaultsAndValidationAreRegistered()
  Assert.Equal(74,r.Apis.Count);
  var find=r.Apis.Single(a=>a.Name=="FindImage");
  Assert.Equal(0.95,find.Parameters.Single(p=>p.Name=="similarity").DefaultValue?.GetDouble());
+ Assert.False(find.Parameters.Single(p=>p.Name=="grayscale").DefaultValue?.GetBoolean());
+ Assert.Equal(1.0,find.Parameters.Single(p=>p.Name=="scale").DefaultValue?.GetDouble());
+ Assert.Equal(1, r.Apis.Single(a=>a.Name=="WaitColor").Parameters.Single(p=>p.Name=="stableCount").DefaultValue?.GetInt32());
  using var lua=new Lua(openLibs:true);
  LuaApiRuntime.Register(lua,new WorkerLuaApi(new Recorder()));
  Assert.Equal("function",lua.DoString("return type(FindColor)")[0]?.ToString());
  Assert.Equal("function",lua.DoString("return type(WaitImage)")[0]?.ToString());
- var result=lua.DoString("local a=pcall(CompareColor, 'image', 0, 0, 0xFF0000, 256); local b=pcall(FindImage, 'image', 'template', 1.2, 0, 0, 0, 0, 0, 0, 1); return a,b");
+ var result=lua.DoString("local a=pcall(CompareColor, 'image', 0, 0, 0xFF0000, 256); local b=pcall(FindImage, 'image', 'template', 1.2, 0, 0, 0, 0, 0, 0, 1); local c=pcall(FindImage, 'image', 'template', 1, 0, 0, 0, 0, 1, false, 4.1); local d=pcall(WaitColor, 0xFF0000, 0, 0, 100, 21); return a,b,c,d");
  Assert.False(Convert.ToBoolean(result[0]));
  Assert.False(Convert.ToBoolean(result[1]));
+ Assert.False(Convert.ToBoolean(result[2]));
+ Assert.False(Convert.ToBoolean(result[3]));
 }
 }

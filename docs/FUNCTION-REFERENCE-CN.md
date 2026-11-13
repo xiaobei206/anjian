@@ -1482,11 +1482,11 @@ local hit = FindMultiColor(screen, 0x112233, "1,0,FF0000;0,1,00FF00", 2)
 local count = CountColors(screen, 0x00FF00, 0, 0, 0, 640, 480)
 ```
 
-#### `FindImage(imageId, templateId, similarity?, tolerance?, left?, top?, width?, height?, step?)` — 模板找图
+#### `FindImage(imageId, templateId, similarity?, tolerance?, left?, top?, width?, height?, step?, grayscale?, scale?)` — 模板找图
 
 - **稳定 ID：** `anjian.imaging.findImage`
 - **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
-- **说明：** 在源图像区域查找模板首个命中；透明模板像素作为通配点。similarity 为 0–1 的匹配比例，未命中返回 nil。单次调用最多执行 5000 万次模板像素比较，防止长时间无界循环。
+- **说明：** 在源图像区域查找模板首个命中；透明模板像素作为通配点。similarity 为 0–1 的匹配比例，未命中返回 nil。单次调用最多执行 5000 万次模板像素比较，防止长时间无界循环。 支持灰度比较和 0.25–4 倍最近邻缩放，默认仍是原尺寸 RGB。
 
 | 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
 |---|---|---|---|---|---|
@@ -1499,6 +1499,8 @@ local count = CountColors(screen, 0x00FF00, 0, 0, 0, 640, 480)
 | `width` | `integer` | 否 | `0` | 0–32768 像素 | 区域宽度；0 表示到图像右边界。 |
 | `height` | `integer` | 否 | `0` | 0–32768 像素 | 区域高度；0 表示到图像下边界。 |
 | `step` | `integer` | 否 | `1` | 1–64 像素 | 候选采样步长。 |
+| `grayscale` | `boolean` | 否 | `false` | — | 是否按亮度灰度进行模板匹配。 |
+| `scale` | `number` | 否 | `1` | 0.25–4 | 模板缩放比例；1 为原尺寸，采用最近邻采样。 |
 
 **返回值：** `table\|nil` — 命中位置/相似度与可用的 screenX/screenY；未命中返回 nil。
 **错误：** 模板全透明、资源失效、区域越界或达到像素比较预算时产生错误。
@@ -1507,14 +1509,14 @@ local count = CountColors(screen, 0x00FF00, 0, 0, 0, 640, 480)
 
 **示例：**
 ```lua
-local hit = FindImage(screen, template, 0.95, 4)
+local hit = FindImage(screen, template, 0.95, 4, 0, 0, 0, 0, 1, true, 1.5)
 ```
 
-#### `FindImages(imageId, templateId, similarity?, tolerance?, maxResults?, left?, top?, width?, height?, step?)` — 查找多个模板位置
+#### `FindImages(imageId, templateId, similarity?, tolerance?, maxResults?, left?, top?, width?, height?, step?, grayscale?, scale?)` — 查找多个模板位置
 
 - **稳定 ID：** `anjian.imaging.findImages`
 - **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
-- **说明：** 返回按从上到下、从左到右排序且互不重叠的命中数组。maxResults 为 1–1000；未命中返回空数组。
+- **说明：** 返回按从上到下、从左到右排序且互不重叠的命中数组。maxResults 为 1–1000；未命中返回空数组。 支持灰度比较和 0.25–4 倍最近邻缩放，默认仍是原尺寸 RGB。
 
 | 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
 |---|---|---|---|---|---|
@@ -1528,6 +1530,8 @@ local hit = FindImage(screen, template, 0.95, 4)
 | `width` | `integer` | 否 | `0` | 0–32768 像素 | 区域宽度；0 表示到图像右边界。 |
 | `height` | `integer` | 否 | `0` | 0–32768 像素 | 区域高度；0 表示到图像下边界。 |
 | `step` | `integer` | 否 | `1` | 1–64 像素 | 候选采样步长。 |
+| `grayscale` | `boolean` | 否 | `false` | — | 是否按亮度灰度进行模板匹配。 |
+| `scale` | `number` | 否 | `1` | 0.25–4 | 模板缩放比例；1 为原尺寸，采用最近邻采样。 |
 
 **返回值：** `table` — Lua 数组形式的命中列表；没有匹配时为空表。
 **错误：** 模板全透明、资源失效、区域越界或达到像素比较预算时产生错误。
@@ -1536,14 +1540,14 @@ local hit = FindImage(screen, template, 0.95, 4)
 
 **示例：**
 ```lua
-local hits = FindImages(screen, template, 0.95, 0, 20)
+local hits = FindImages(screen, template, 0.95, 0, 20, 0, 0, 0, 0, 1, true, 1)
 ```
 
-#### `WaitImage(templateId, similarity?, tolerance?, timeoutMs?, intervalMs?)` — 等待模板出现
+#### `WaitImage(templateId, similarity?, tolerance?, timeoutMs?, intervalMs?, grayscale?, scale?, stableCount?)` — 等待模板出现
 
 - **稳定 ID：** `anjian.imaging.waitImage`
 - **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
-- **说明：** 循环截取当前虚拟桌面并搜索模板；首次命中返回位置表，超时返回 nil。Stop 取消轮询，Pause 会暂停后续轮询。
+- **说明：** 循环截取当前虚拟桌面并搜索模板；首次命中返回位置表，超时返回 nil。Stop 取消轮询，Pause 会暂停后续轮询。 可指定灰度/缩放，并要求连续多帧命中以降低单帧误判。
 
 | 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
 |---|---|---|---|---|---|
@@ -1552,6 +1556,9 @@ local hits = FindImages(screen, template, 0.95, 0, 20)
 | `tolerance` | `integer` | 否 | `0` | 0–255 | RGB 每个通道允许的最大绝对差。 |
 | `timeoutMs` | `integer` | 否 | `5000` | 0–600000 毫秒 | 最大等待时长。 |
 | `intervalMs` | `integer` | 否 | `100` | 10–5000 毫秒 | 两次检测间隔。 |
+| `grayscale` | `boolean` | 否 | `false` | — | 是否按亮度灰度进行模板匹配。 |
+| `scale` | `number` | 否 | `1` | 0.25–4 | 模板缩放比例；1 为原尺寸，采用最近邻采样。 |
+| `stableCount` | `integer` | 否 | `1` | 1–20 次 | 需连续满足条件的截图次数，用于抑制单帧误判。 |
 
 **返回值：** `table\|nil` — 首次命中位置或超时 nil。
 **错误：** 模板失效、截图失败、图像过大或搜索达到像素比较预算时产生错误。
@@ -1560,14 +1567,14 @@ local hits = FindImages(screen, template, 0.95, 0, 20)
 
 **示例：**
 ```lua
-local hit = WaitImage(template, 0.95, 0, 5000, 100)
+local hit = WaitImage(template, 0.95, 0, 5000, 100, false, 1, 2)
 ```
 
-#### `WaitImageGone(templateId, similarity?, tolerance?, timeoutMs?, intervalMs?)` — 等待模板消失
+#### `WaitImageGone(templateId, similarity?, tolerance?, timeoutMs?, intervalMs?, grayscale?, scale?, stableCount?)` — 等待模板消失
 
 - **稳定 ID：** `anjian.imaging.waitImageGone`
 - **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
-- **说明：** 持续截取虚拟桌面；模板消失返回 true，超时时模板仍存在返回 false。Stop 取消轮询。
+- **说明：** 持续截取虚拟桌面；模板消失返回 true，超时时模板仍存在返回 false。Stop 取消轮询。 可指定灰度/缩放，并要求连续多帧未命中以降低单帧误判。
 
 | 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
 |---|---|---|---|---|---|
@@ -1576,6 +1583,9 @@ local hit = WaitImage(template, 0.95, 0, 5000, 100)
 | `tolerance` | `integer` | 否 | `0` | 0–255 | RGB 每个通道允许的最大绝对差。 |
 | `timeoutMs` | `integer` | 否 | `5000` | 0–600000 毫秒 | 最大等待时长。 |
 | `intervalMs` | `integer` | 否 | `100` | 10–5000 毫秒 | 两次检测间隔。 |
+| `grayscale` | `boolean` | 否 | `false` | — | 是否按亮度灰度进行模板匹配。 |
+| `scale` | `number` | 否 | `1` | 0.25–4 | 模板缩放比例；1 为原尺寸，采用最近邻采样。 |
+| `stableCount` | `integer` | 否 | `1` | 1–20 次 | 需连续满足条件的截图次数，用于抑制单帧误判。 |
 
 **返回值：** `boolean` — 模板消失返回 true；超时仍存在返回 false。
 **错误：** 模板失效、截图失败、图像过大或搜索达到像素比较预算时产生错误。
@@ -1584,14 +1594,14 @@ local hit = WaitImage(template, 0.95, 0, 5000, 100)
 
 **示例：**
 ```lua
-if WaitImageGone(template, 0.95, 0, 5000, 100) then Log("目标已消失") end
+if WaitImageGone(template, 0.95, 0, 5000, 100, false, 1, 2) then Log("目标已稳定消失") end
 ```
 
-#### `WaitColor(color, tolerance?, timeoutMs?, intervalMs?)` — 等待屏幕颜色出现
+#### `WaitColor(color, tolerance?, timeoutMs?, intervalMs?, stableCount?)` — 等待屏幕颜色出现
 
 - **稳定 ID：** `anjian.imaging.waitColor`
 - **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
-- **说明：** 持续截取虚拟桌面；首次找到指定 RGB 颜色返回命中位置，超时返回 nil。
+- **说明：** 持续截取虚拟桌面；首次找到指定 RGB 颜色返回命中位置，超时返回 nil。 可指定连续命中次数以降低单帧误判。
 
 | 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
 |---|---|---|---|---|---|
@@ -1599,6 +1609,7 @@ if WaitImageGone(template, 0.95, 0, 5000, 100) then Log("目标已消失") end
 | `tolerance` | `integer` | 否 | `0` | 0–255 | RGB 每个通道允许的最大绝对差。 |
 | `timeoutMs` | `integer` | 否 | `5000` | 0–600000 毫秒 | 最大等待时长。 |
 | `intervalMs` | `integer` | 否 | `100` | 10–5000 毫秒 | 两次检测之间的间隔。 |
+| `stableCount` | `integer` | 否 | `1` | 1–20 次 | 需连续满足条件的截图次数，用于抑制单帧误判。 |
 
 **返回值：** `table\|nil` — 首次命中位置或超时 nil。
 **错误：** 截图失败、图像过大或参数无效时产生错误。
@@ -1607,14 +1618,14 @@ if WaitImageGone(template, 0.95, 0, 5000, 100) then Log("目标已消失") end
 
 **示例：**
 ```lua
-local hit = WaitColor(0x00FF00, 8, 3000, 100)
+local hit = WaitColor(0x00FF00, 8, 3000, 100, 2)
 ```
 
-#### `WaitColorGone(color, tolerance?, timeoutMs?, intervalMs?)` — 等待屏幕颜色消失
+#### `WaitColorGone(color, tolerance?, timeoutMs?, intervalMs?, stableCount?)` — 等待屏幕颜色消失
 
 - **稳定 ID：** `anjian.imaging.waitColorGone`
 - **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
-- **说明：** 持续截取虚拟桌面；指定颜色不再出现返回 true，超时仍存在返回 false。
+- **说明：** 持续截取虚拟桌面；指定颜色不再出现返回 true，超时仍存在返回 false。 可指定连续未命中次数以降低单帧误判。
 
 | 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
 |---|---|---|---|---|---|
@@ -1622,6 +1633,7 @@ local hit = WaitColor(0x00FF00, 8, 3000, 100)
 | `tolerance` | `integer` | 否 | `0` | 0–255 | RGB 每个通道允许的最大绝对差。 |
 | `timeoutMs` | `integer` | 否 | `5000` | 0–600000 毫秒 | 最大等待时长。 |
 | `intervalMs` | `integer` | 否 | `100` | 10–5000 毫秒 | 两次检测之间的间隔。 |
+| `stableCount` | `integer` | 否 | `1` | 1–20 次 | 需连续满足条件的截图次数，用于抑制单帧误判。 |
 
 **返回值：** `boolean` — 颜色消失返回 true；超时仍存在返回 false。
 **错误：** 截图失败、图像过大或参数无效时产生错误。
@@ -1630,7 +1642,7 @@ local hit = WaitColor(0x00FF00, 8, 3000, 100)
 
 **示例：**
 ```lua
-if WaitColorGone(0x00FF00, 8, 3000, 100) then Log("颜色已消失") end
+if WaitColorGone(0x00FF00, 8, 3000, 100, 2) then Log("颜色已稳定消失") end
 ```
 
 <!-- END GENERATED API REFERENCE -->

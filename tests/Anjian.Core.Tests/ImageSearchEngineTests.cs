@@ -89,6 +89,33 @@ public sealed class ImageSearchEngineTests
     }
 
     [Fact]
+    public void TemplateMatchingSupportsGrayscaleAndNearestNeighborScale()
+    {
+        var source = new PixelImage(4, 2,
+        [
+            Rgb(0xFF0000), Rgb(0xFF0000), Rgb(0x00FF00), Rgb(0x00FF00),
+            Rgb(0xFF0000), Rgb(0xFF0000), Rgb(0x00FF00), Rgb(0x00FF00)
+        ]);
+        var template = new PixelImage(2, 1, [Rgb(0xFF0000), Rgb(0x00FF00)]);
+
+        var unscaled = ImageSearchEngine.FindImage(source, template, 1.0);
+        var scaled = ImageSearchEngine.FindImage(source, template, 1.0, scale: 2.0);
+        Assert.NotNull(unscaled);
+        Assert.NotNull(scaled);
+        Assert.Equal(1, unscaled.X);
+        Assert.Equal(0, scaled.X);
+
+        var red = new PixelImage(1, 1, [Rgb(0xFF0000)]);
+        var equivalentGray = new PixelImage(1, 1, [Rgb(0x4C4C4C)]);
+        Assert.Null(ImageSearchEngine.FindImage(red, equivalentGray, 1.0));
+        var grayscale = ImageSearchEngine.FindImage(red, equivalentGray, 1.0, grayscale: true);
+        Assert.NotNull(grayscale);
+        Assert.Equal(1.0, grayscale.Similarity);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => ImageSearchEngine.FindImage(source, template, scale: 4.1));
+    }
+
+    [Fact]
     public void LongImageSearchOperationsObserveCancellation()
     {
         var image = new PixelImage(2, 2, [Rgb(1), Rgb(2), Rgb(3), Rgb(4)]);
