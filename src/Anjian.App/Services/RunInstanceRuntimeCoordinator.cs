@@ -360,7 +360,18 @@ internal sealed class RunInstanceRuntimeCoordinator : IDisposable
             entry.Started = true;
         }
 
-        if (_shuttingDown)
+        var execution = entry.Runner.RunAsync(
+            entry.ScriptPath,
+            entry.Options,
+            entry.DebugOptions,
+            entry.Parameters,
+            entry.SpriteRuntimeOptions,
+            entry.Permissions,
+            entry.PluginRuntimeOptions);
+        bool shutdownRequested;
+        lock (_sync)
+            shutdownRequested = _shuttingDown;
+        if (shutdownRequested)
         {
             var stop = _model.RequestStop(entry.InstanceId);
             StateChanged?.Invoke(stop.Snapshot);
@@ -370,14 +381,7 @@ internal sealed class RunInstanceRuntimeCoordinator : IDisposable
         Exception? failure = null;
         try
         {
-            await entry.Runner.RunAsync(
-                entry.ScriptPath,
-                entry.Options,
-                entry.DebugOptions,
-                entry.Parameters,
-                entry.SpriteRuntimeOptions,
-                entry.Permissions,
-                entry.PluginRuntimeOptions).ConfigureAwait(false);
+            await execution.ConfigureAwait(false);
         }
         catch (Exception ex)
         {
