@@ -247,7 +247,9 @@ internal sealed class ScheduledTaskEditorForm : Form
         _dateTime.Width = 220;
         _dateTime.Value = original?.OnceAtUtc is { } due
             ? TimeZoneInfo.ConvertTime(due, TimeZoneInfo.FindSystemTimeZoneById(_timeZone.Text)).DateTime
-            : DateTime.Today.Add(original?.LocalTime.ToTimeSpan() ?? TimeSpan.FromMinutes(5));
+            : original is null
+                ? DateTime.Now.AddMinutes(5)
+                : DateTime.Today.Add(original.LocalTime.ToTimeSpan());
 
         ConfigureNumber(_delaySeconds, 1, 2_592_000, (decimal)(original?.DelayFromCreation.TotalSeconds ?? 60));
         ConfigureNumber(_misfireGrace, 0, 43_200, (decimal)(original?.MisfireGracePeriod.TotalMinutes ?? 1440));
