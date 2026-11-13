@@ -35,8 +35,8 @@ public sealed class PluginApiContributionTests : IDisposable
         using var lua = new Lua(openLibs: true);
         PluginApiContributionRuntime.Register(lua, plans, "1.2");
         Assert.Equal(5d, Convert.ToDouble(lua.DoString("return PluginAdd(2, 3)")[0]));
-        Assert.Throws<NLua.Exceptions.LuaException>(() => lua.DoString("return PluginAdd('2', 3)"));
-        Assert.Throws<NLua.Exceptions.LuaException>(() => lua.DoString("return PluginAdd(1)"));
+        Assert.Throws<NLua.Exceptions.LuaScriptException>(() => lua.DoString("return PluginAdd('2', 3)"));
+        Assert.Throws<NLua.Exceptions.LuaScriptException>(() => lua.DoString("return PluginAdd(1)"));
 
         _store.Disable(installed.PluginId, installed.Version);
         Assert.Empty(_store.GetEnabledApiContributionPlans());
@@ -51,7 +51,7 @@ public sealed class PluginApiContributionTests : IDisposable
         using var lua = new Lua(openLibs: true);
         PluginApiContributionRuntime.Register(lua, plans, "1.2");
         Assert.Null(lua.DoString("return PluginHostGlobal()")[0]);
-        Assert.Throws<NLua.Exceptions.LuaException>(() => lua.DoString("return PluginAlwaysFails()"));
+        Assert.Throws<NLua.Exceptions.LuaScriptException>(() => lua.DoString("return PluginAlwaysFails()"));
     }
 
     [Fact]
