@@ -94,3 +94,9 @@ F31 从 M13-01 的“契约/状态模型部分实现”更新为 M13-02“运行
 - F31 的多实例运行时部分已完成：Windows Actions [43461688129](https://github.com/xiaobei206/anjian/actions/runs/43461688129) 对代码 HEAD d6854f872a36263f6e3658eb9cf2b7e9f252c947 SUCCESS，202/202 Core tests、0 warnings/errors、自包含 win-x64 发布、Sprite/Plugin/MultiInstance Worker smoke 3/3、ZIP/SHA256 与 artifact upload 全 PASS。
 - 发布包 smoke 覆盖真实 Worker 并行、单实例 Stop 隔离及 Worker crash 隔离；InputArbiter 的公平 FIFO/故障锁定仍由 Core 测试验证，真实 SendInput/KeyUp 则留 M14。
 - F31 仍为 PARTIAL：M13-03 已实现延迟/指定时刻/每日/每周触发、时区/DST/misfire、重叠、持久化游标、实例超时与 Stop/Continue/Retry；M13-04 仍负责完整实例列表/筛选/按实例日志/恢复 UI。Windows 10/11 桌面验收 NOT RUN（M14）。
+
+## M13-03 最终自动化状态（2026-11-14）
+
+- F22/F31 的 M13-03 代码部分已实现并通过 Windows Actions：HEAD 69febaab37857fbe9186157a4725d52c193ce539，run [43470648199](https://github.com/xiaobei206/anjian/actions/runs/43470648199)，Core 218/218、Release Build 0 warnings/errors、API handbook 103/103、自包含包和 Worker smoke 全 PASS。
+- 功能包括指定时刻/延迟/每日/每周调度、本地 timezone/DST/misfire、重启 cursor、重叠策略、运行超时、Stop/Continue/Retry 和失败限制。F31 整体仍为 PARTIAL，因为 M13-04 完整实例列表/筛选/按实例日志/恢复 UI 尚未实现。
+- CI 不等于 Windows 10/11 桌面验收；M14 实际键鼠、权限窗口、WinForms、DPI/多屏与托盘/退出仍 NOT RUN。

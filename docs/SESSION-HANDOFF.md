@@ -919,3 +919,52 @@ M13-03 的核心是确定性的调度与超时/失败策略；完成后唯一下
 - 此最终记录覆盖之前提到 run 43460841956 package smoke pending/failed 的临时状态。其失败揭露 worker crash during Delay IPC 时 host 没有及时取消 dispatch；当前实现已并行监视 Worker exit 与 pipe connect、handshake 和 IPC dispatch，最终 run 全部通过。
 - 当前 main HEAD 可能因本 handoff/文档更新提交改变；代码验收基线仍是上列 ${codeHead}。文档提交触发的新 Actions run 需核对，不能把本次代码 HEAD 的结果伪称为文档 HEAD 的结果。
 - 本地容器无 .NET SDK，local Restore/Build/Test NOT RUN。M14 Windows 10/11 实际键鼠、KeyUp、WinForms、DPI/多屏、托盘退出与长时稳定性仍 NOT RUN。
+
+---
+
+# 最新交接状态覆盖：M13-03 单次/延迟/定时/周期调度、运行超时与失败策略已完成（2026-11-14）
+
+本节优先于本文以前所有 M13-03 待实现状态。M13-03 的 Core/App 实现和 Windows 自动化验收已通过，未代表 M13 整个阶段结束；完整实例列表/筛选/按实例日志与恢复 UI 是下一会话唯一任务 M13-04。当前 main HEAD（本段生成前核对）为 69febaab37857fbe9186157a4725d52c193ce539。本文本次为文档收尾提交，提交后必须再核对 main 最新 HEAD 和相应 Actions 状态，不能把代码 HEAD 的 CI 证据误称为文档 HEAD 的 CI。
+
+## M13-03 已交付范围与冻结语义
+
+- Core 新增 ScheduledTaskDefinition / ScheduledTaskEngine / ScheduledTaskCalculator / ScheduledTaskPolicy / RunInstanceTimeoutTracker。支持指定本地时区的一次性日期时间、从创建时刻起算的一次性延迟、每日和每周本地时间；立即运行仍走普通 Start。Windows TimeZone ID 必须有效，时区转换不能静默回退。
+- DST 不存在的本地时刻向前移动到首个有效分钟；DST 重复的本地时刻选较大 UTC offset（较早 UTC instant），同一日不在第二次重复小时再触发。
+- Misfire：调度 tick 每秒一次，2 分钟以内视为正常触发；超出为 misfire。Skip 丢弃并推进；RunOnce 只在配置 grace 内补跑最近一次，多次错过不无限追赶。
+- 任务与 cursor 以 schemaVersion=1 原子持久化到 %LOCALAPPDATA%\Anjian2026\scheduled-tasks.json，替换前备份 .bak。cursor 在交给执行层前先写盘，采用 at-most-once（重启不重放已处理 occurrence），不宣称 exactly-once；持久化到实际 admission 之间断电可能丢一次触发。
+- occurrence key = taskId + scheduled UTC ticks；每次 attempt 的 startRequestId 由 taskId + occurrence key + attempt 编号稳定哈希。Retry 一律创建新的逻辑实例/Worker attempt，重新收集参数、重新逐次审阅 Grant；不会把新 attempt 误作同一 Start 的幂等重发。
+- overlap：Skip 忽略；QueueOne 最多保留一个 pending，后续合并；Parallel 可多开，但仍经 M13-02 的 4 active + 16 FIFO admission。全局容量暂满时暂存一个触发，之后再尝试。禁用/删除清掉未 admission 的 pending，阻止还未开始的 retry；已 admission 的运行实例继续按启动快照运行。编辑只影响未来触发；in-flight occurrence 使用旧快照。
+- 每实例运行超时支持 Core 1 秒至 7 天，当前 UI 以分钟设置（0 表示手动播放关闭超时）；只从 Worker 首次 worker-ready / Running 开始计时，校验/权限审阅/Starting/FIFO 排队不计入；Paused 仍计入墙钟。Stop 和 timeout 在 coordinator 同一锁内提交，先成功的状态转换决定 outcome；超时复用 Runner.Stop、Worker graceful/force 终止和 owner-only held-input cleanup。
+- 失败策略：Stop（失败后禁用任务）、Continue（等待下一计划）、有限 Retry（1–10 次、基础延迟、指数退避封顶 1 小时）；连续失败达到限制后禁用。参数/权限用户取消不算脚本失败；清理或 InputArbiter fault 会停止自动 retry/禁用任务，需人工核验键鼠状态。
+- MainForm 工具栏可持久化手动运行超时；“定时任务”窗口提供任务增删改、启停、timezone、weekday、misfire/overlap、timeout、failure/retry 设置。隐藏主窗口到托盘时调度继续，明确退出先停止新触发再调用 StopAll。
+- M13-03 不增加 Lua API；内置 registry 保持 1.2 / 103。未修改 VERSION / AssemblyVersion / FileVersion；未创建 tag/Release，已发布 v0.1.0-preview.4 不变。
+
+## M13-03 最终 Windows Actions 证据（2026-11-14）
+
+- 最终代码 HEAD 69febaab37857fbe9186157a4725d52c193ce539 的 Windows Actions run [43470648199](https://github.com/xiaobei206/anjian/actions/runs/43470648199) SUCCESS。
+- Restore PASS；Release Build PASS（0 warnings / 0 errors）；Core tests 218/218 PASS；API 文档生成区检查 PASS（103 个公开函数）；self-contained win-x64 publish PASS；published package smoke 3/3 PASS（Plugin Worker、MultiInstance 两 Worker 并发并独立 Stop、Sprite Worker）；ZIP/SHA256 与 artifact upload PASS。
+- Artifact ID 14061576124，名称 Anjian2026-preview-win-x64，87,351,703 bytes；uploaded ZIP SHA-256 1f917e68c0ac35291884d8e747e680814b3cca3884aa6669f76951eb6a4e8a85。这是临时 Actions artifact，不是正式 Release。
+- 调试收敛历史：首个 M13-03 代码 HEAD 9705065f4978c2fcb3afe32261215fa6ee5c551c 的 run 43470218387 因四处 CS0411 泛型选项推断失败（WinForms AddChoices）而 Build FAIL；已在 2c4b7e6 显式指定枚举泛型并修复 pending/capacity 管理，69febaab 再修正新建延迟/本地时刻任务的默认日期。中间 HEAD 2c4b7e6c402fc416d9950ebc052fd6917139dc33 的 run 43470500913 亦完整 SUCCESS；最新验证仍以 69febaab / 43470648199 为准。
+- 本地容器未安装 .NET SDK，local Restore/Build/Test NOT RUN；Windows Actions 使用 Windows Server 2025 runner，不代表 Windows 10/11 桌面实测。Win10/11 实际键鼠输入/KeyUp、WinForms 权限弹窗、DPI/多屏、托盘退出、长时间稳定性仍 NOT RUN（M14）。
+
+## 下一会话唯一任务：M13-04 — 完整运行实例列表、日志筛选与恢复 UI
+
+只做 M13-04；不提前进入 M14，不修改版本、不创建 Release。开始前核对 main 最新 HEAD，并读取 AGENTS、README、handoff、PRD §2.10、FEATURE-MATRIX F22/F31、ROADMAP、ADR-033/034、Architecture §19、Acceptance M13-02/M13-03，以及当前 RunInstanceRuntimeCoordinator、RunInstanceCoordinator、MainForm 的实例事件/日志和输入仲裁恢复入口。
+
+### 范围与验收条件
+
+1. 增加完整运行实例视图：显示活动、排队、暂停、终止/清理中的实例与最近完成结果；至少可按脚本名/路径、状态筛选，并可选中具体 instanceId。显示创建时间、状态、Outcome、循环进度、worker attempt/退出码、清理结果及 timeout/termination 诊断；不得将两个同脚本实例合并。
+2. 将 Pause/Resume/Stop 控制绑定到选中 instanceId，而不是依赖隐式“最新实例”。确保排队实例可取消，已清理实例不可操作，Stop/timeout 的最终 outcome 不被 UI 覆盖。保留现有 toolbar 快捷控制兼容性，但状态来源以 coordinator 为准。
+3. 提供按 instanceId 浏览日志的视图/筛选；日志应带 UTC 时间、级别/事件码、instanceId、workerAttemptId（若存在）、循环序号。不得暴露权限 sidecar 正文、敏感参数或 HTTP header/body。支持复制/导出安全日志，但不要扩展为新的诊断取证采集。
+4. 提供可观测恢复入口：Worker crash、Forced termination、input cleanup failed、InputArbiter fault、权限拒绝/参数取消等需区分。只有 InputArbiter 故障允许明确“已人工核验键鼠状态”后恢复；CleanupStatus=Failed 不得假装已恢复。禁用/删除任务与正在运行实例保持 M13-03 已冻结语义。
+5. 运行实例状态/日志刷新不阻塞 WinForms UI；高频事件需限流/批量刷新，关闭窗口隐藏到托盘仍继续运行；明确退出先停止 scheduler，再 StopAll，最后释放 UI/协调器。
+6. 自动化覆盖：实例列表排序/筛选/选择；同脚本多实例分离；队列取消；Pause/Resume/Stop 选择正确 instanceId；各 Outcome/CleanupStatus 展示；日志过滤与敏感字段剔除；worker crash/forced/cleanup failure 提示；InputArbiter 手工恢复路径；StopAll/调度并发回归。Windows package smoke 至少验证 UI 所依赖的 coordinator event stream 及日志隔离。不得以 CI 替代 M14 桌面手测。
+7. 同步 ROADMAP、FEATURE-MATRIX、ARCHITECTURE、ACCEPTANCE、USER-GUIDE、DEVELOPMENT-LOG、handoff。M14 Win10/11 实际输入、权限、DPI/多屏、托盘退出和长时稳定性继续 NOT RUN。
+
+M13-04 完成后再进入 M14 的集中 Win10/11 桌面实机验收。
+
+---
+
+## 文档提交后复核规则
+
+本节记录的是代码 HEAD 69febaab37857fbe9186157a4725d52c193ce539 的 Windows Actions；本次文档收尾会产生新的 main HEAD。下一轮开始和本轮收尾时都必须核对真实 main HEAD。任何由纯文档提交触发的新 CI run，也要记录它的 HEAD 与结果；不能把本节代码 HEAD 的结果误写成后续文档 HEAD 的结果。

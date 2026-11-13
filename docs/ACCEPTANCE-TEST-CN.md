@@ -593,5 +593,15 @@ M12-09 只实现有上限的显式 HTTP 缓冲请求；不代表大文件流式�
 | M13-03-12 | 配置持久化和损坏保护 | schemaVersion 校验、原子替换、.bak 备份、未知 schema/损坏文件不静默覆盖 | NOT RUN（M14） |
 | M13-03-13 | 关闭/托盘服务生命周期 | 隐藏到托盘时调度继续；明确退出先停止 scheduler 投递再 StopAll；需 Windows UI 手测 | NOT RUN（M14） |
 
-- M13-03 新增 ScheduledTaskSchedulerTests（TimeProvider deterministic tests）；最终 Windows Actions 成功结果将在本节追加准确 HEAD/run/测试总数。
+- M13-03 新增 ScheduledTaskSchedulerTests（TimeProvider deterministic tests）。最终代码 HEAD 69febaab37857fbe9186157a4725d52c193ce539 对应 Windows Actions [43470648199](https://github.com/xiaobei206/anjian/actions/runs/43470648199) SUCCESS：Restore PASS；Release Build 0 warnings / 0 errors；Core tests 218/218；API 文档生成区检查 103/103；self-contained win-x64 publish PASS；Sprite/Plugin/MultiInstance Worker package smoke 3/3；ZIP/SHA256 与 artifact upload PASS。
 - M13-03 不增加 Lua API，registry 仍为 1.2 / 103；不修改 VERSION / AssemblyVersion / FileVersion；不创建 tag/Release。CI PASS 不等于 Windows 10/11 桌面实机验收。
+
+
+### M13-03 最终 Windows 自动化验证（2026-11-14）
+
+- 代码 HEAD 69febaab37857fbe9186157a4725d52c193ce539；Actions run [43470648199](https://github.com/xiaobei206/anjian/actions/runs/43470648199) SUCCESS。218/218 Core tests、0 build warnings/errors、API registry/handbook 103 项、自包含 win-x64 publish、Sprite/Plugin/MultiInstance package smoke 3/3、ZIP/SHA256 与 artifact upload 全 PASS。
+- 三项发布包 smoke 的实际项：Plugin Worker 独立运行；MultiInstance 两个 Worker 并发存活并可独立停止；Sprite Worker 在发布包内运行。
+- Actions artifact ID 14061576124，87,351,703 bytes，archive SHA-256 1f917e68c0ac35291884d8e747e680814b3cca3884aa6669f76951eb6a4e8a85。临时 Actions artifact，不是 Release。
+- 初次代码 HEAD 9705065f4978c2fcb3afe32261215fa6ee5c551c 的 run 43470218387 编译失败（四处 CS0411，UI 泛型枚举选项类型推断）；已在 2c4b7e6 修正，最新 UI 默认触发时间在 69febaab 修正。另有完整通过的中间 run 43470500913，最终证据仍以本节最新 HEAD/run 为准。
+- local Restore/Build/Test NOT RUN（本地无 .NET SDK）；Win10/11 实际键鼠、权限审阅、WinForms/DPI/多屏、托盘退出、2 小时稳定性仍 NOT RUN（M14）。CI 不等同于桌面实机验收。
+- M13-03 不改 Lua API（registry 1.2/103）、版本或 Release；preview.4 不变。

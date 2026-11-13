@@ -526,4 +526,4 @@ end
 
 禁用或删除只取消尚未启动的计划触发和 retry，不会强制终止已经进入运行协调器的实例；编辑仅影响未来计划，已投递 occurrence 使用启动快照。关闭主窗口只隐藏到托盘，调度继续；从托盘明确退出才会停止调度并按 StopAll 流程结束实例。
 
-本节功能只存在于 main 开发版，不包含在已发布 v0.1.0-preview.4。M13-03 的自动化测试与 Windows Actions 结果按验收文档记录；Windows 10/11 的 WinForms、权限提示、DPI、多屏和实际键鼠操作仍需 M14 桌面实测。
+本节功能只存在于 main 开发版，不包含在已发布 v0.1.0-preview.4。M13-03 的 Windows Actions run [43470648199](https://github.com/xiaobei206/anjian/actions/runs/43470648199) 已通过（218/218 Core tests、API 文档 103/103、win-x64 self-contained 发布及 Worker smoke 3/3）；Windows 10/11 的 WinForms、权限提示、DPI、多屏和实际键鼠操作仍需 M14 桌面实测。

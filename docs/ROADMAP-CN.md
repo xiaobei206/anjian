@@ -23,7 +23,7 @@
 | M10 参数、配置与脚本自定义 UI | DONE（实现与 Windows 自动化验收完成；WinForms/桌面实测延期 M14） | 参数 sidecar schema v1、10 种类型、统一 validator、配置持久化/恢复、播放/调试前表单、参数设计器、JSON 导入导出、typed Worker IPC、递归只读 Lua Args、脚本目录相对路径解析 |
 | M11 小精灵打包器 | DONE（Windows CI run 229 PASS；WinForms/DPI/真实输入桌面验收延期 M14，NOT RUN） | 独立便携目录 + EXE 启动 ZIP、依赖/资源收集、M10 参数 UI、运行控制、manifest/SHA256、构建日志与离线函数参考 Markdown |
 | M12 内置扩展 API 与插件系统 | DONE（M12-01..M12-12 实现与 Windows CI 自动化完成；WinForms/权限/DPI/多屏桌面验收延期 M14） | 文件/剪贴板/对话框/进程/HTTP(S)/JSON 双层授权；本地插件 manifest/hash/三方 Grant 交集、入口 sidecar 与受限 Lua contribution；内置 API registry 1.2 / 103 |
-| M13 多实例与定时任务 | IN_PROGRESS（M13-01/02/03 实现完成；M13-04 下一步） | M13-03 已实现一次性/延迟/每日/每周调度、本地时区/DST/misfire、持久化游标、重叠策略、每实例超时与 Stop/Continue/Retry；Windows CI 与最终代码 HEAD 验证待本轮执行；完整实例列表/筛选/日志/恢复 UI 留 M13-04 |
+| M13 多实例与定时任务 | IN_PROGRESS（M13-01/02/03 DONE；M13-04 下一步） | M13-03 在代码 HEAD 69febaab 已通过 Windows Actions 43470648199：218/218 Core tests、0 warnings/errors、API 103/103、自包含发布、Worker smoke 3/3、ZIP/SHA 上传 PASS；完整实例列表/筛选/日志/恢复 UI 留 M13-04 |
 | M14 1.0 稳定化与发布 | TODO | 自动与手工验收、依赖许可、离线帮助、性能/长时测试和正式稳定版发布 |
 
 ## 统一 Windows 桌面实机验收策略（用户决定，2026-11-13）
@@ -429,7 +429,7 @@ M13-01 不是新 release；不得以设计文件代替实现测试证据，也�
 - 本地容器没有 .NET SDK，local Restore/Build/Test NOT RUN。Windows 10/11 实际键鼠输入、WinForms、DPI/多屏、托盘/退出与长时稳定性仍 NOT RUN（M14）。
 
 
-## M13-03 — 单次/延迟/定时/周期触发、运行超时与失败策略（代码实现完成；Windows CI 待验）
+## M13-03 — 单次/延迟/定时/周期触发、运行超时与失败策略（DONE：Windows Actions PASS）
 
 - Core 新增 ScheduledTaskDefinition、ScheduledTaskEngine、ScheduledTaskCalculator、ScheduledTaskPolicy 与 RunInstanceTimeoutTracker；调度使用可注入 TimeProvider，日历推进不依赖 Thread.Sleep。
 - 触发类型：创建时间起算的一次性延迟、UTC 存储/指定 Windows 时区本地时刻的一次性任务、每日和每周本地时刻。每个任务保存时区 ID；DST 不存在时间向前顺延到首个有效分钟，DST 歧义时间选择产生较早 UTC instant 的 offset。
@@ -442,3 +442,10 @@ M13-01 不是新 release；不得以设计文件代替实现测试证据，也�
 - MainForm 新增“定时任务”入口、任务列表/编辑、启停/删除和可持久化手动运行超时。任务触发时在 UI 线程收集参数并逐次弹出权限审阅；Close-to-tray 不停止调度，明确退出先停止调度投递，再执行 M13-02 StopAll。
 - 自动化计划包含 DST/时区/misfire/重复投递/重叠/队列取消/禁用恢复/超时 Pause 语义/Stop-timeout race/retry/backoff/应用重启 cursor 等 deterministic tests。真实 WinForms、Windows 10/11 权限提示、DPI/多屏、真实键鼠和长期运行仍 NOT RUN（M14）。
 - 本轮不增加 Lua API，不改变 registry 1.2 / 103，不修改 VERSION/AssemblyVersion/FileVersion，不创建 tag/Release。
+
+
+### M13-03 最终 Windows Actions 证据（2026-11-14）
+
+- 最终代码 HEAD 69febaab37857fbe9186157a4725d52c193ce539，Windows Actions [43470648199](https://github.com/xiaobei206/anjian/actions/runs/43470648199) SUCCESS：Restore；Release Build 0 warnings / 0 errors；Core 218/218；API 文档 103 个公开函数一致；self-contained win-x64 publish；Sprite/Plugin/MultiInstance smoke 3/3；ZIP/SHA256 与 artifact upload 全部 PASS。
+- Artifact ID 14061576124，87,351,703 bytes，uploaded archive SHA-256 1f917e68c0ac35291884d8e747e680814b3cca3884aa6669f76951eb6a4e8a85；仅临时 Actions artifact，非正式 Release。
+- M13-03 功能及 CI 验收完成后，唯一下一任务为 M13-04。Windows 10/11 WinForms、权限弹窗、真实键鼠、DPI/多屏、托盘/退出、长时稳定性仍全部留 M14 NOT RUN。

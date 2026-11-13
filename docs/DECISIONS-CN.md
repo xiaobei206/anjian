@@ -309,7 +309,7 @@
 
 ## ADR-034：定时任务的时间、重复投递与恢复语义（M13-03）
 
-- 状态：ACCEPTED（M13-03 Core/App 实现；Windows Actions 待最终验证）。
+- 状态：ACCEPTED（M13-03 Core/App 实现；Windows Actions run 43470648199 对最终代码 HEAD 69febaab SUCCESS；Win10/11 桌面实测留 M14）。
 - 任务触发统一以 UTC instant 持久化；每日/每周只保存本地 TimeZoneId、TimeOnly 和 weekday 集合。时区解析必须成功，禁止静默回退到系统本地时区。
 - DST gap（本地时间不存在）向前移动到首个有效本地分钟；DST overlap（本地时间出现两次）固定选择较大 UTC offset，即较早的 UTC instant，同一日不在第二个重复小时再次触发。
 - Scheduler 以 1 秒轮询；超过 2 分钟正常容差视为 misfire。Skip 丢弃；RunOnce 只在 MisfireGracePeriod 内补最近一次。一次 sleep/restart 跨过多个周期也只处理最近一次，不追赶执行全部历史周期。
@@ -319,3 +319,9 @@
 - occurrence key = taskId + scheduled UTC ticks；attempt 的 startRequestId 使用 taskId + occurrence key + attempt number 稳定哈希。重试一律创建新的逻辑实例和 Worker attempt，并再次审阅脚本权限。
 - RuntimeTimeout 允许 1 秒至 7 天，从每个 RunInstance 第一次 WorkerReady/Running 起算；审阅、Starting 和 FIFO queue 不计入；Pause 不暂停计时。Stop 与 timeout 由 coordinator 同步锁内的第一个成功状态转换胜出，二者均复用相同 Worker/输入清理链。
 - Failure Stop 在一次失败后禁用任务；Continue 保留下一计划；Retry 限次并使用 capped exponential backoff；连续失败上限触发禁用。用户取消参数/拒绝权限不当作脚本运行失败；清理失败不再继续自动任务。
+
+
+### ADR-034 M13-03 验收记录（2026-11-14）
+
+- Windows Actions [43470648199](https://github.com/xiaobei206/anjian/actions/runs/43470648199) 对最终代码 HEAD 69febaab37857fbe9186157a4725d52c193ce539 SUCCESS：218/218 Core tests、Release Build 0 warnings / 0 errors、API 文档一致 103/103、自包含 win-x64 发布、package smoke 3/3、ZIP/SHA256 与 artifact upload 全通过。
+- 该结果验证 Core 自动化与发布包子进程 smoke，不代表 Windows 10/11 桌面上的 WinForms、权限弹窗、实际键鼠、DPI/多屏或托盘行为已验收；全部仍为 M14 NOT RUN。

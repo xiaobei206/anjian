@@ -494,7 +494,7 @@ M13-01 先冻结契约；新增 Core 类型只负责身份、状态转换和并�
 - MultiInstance 发布包 smoke 先确认两个 Worker PID 不同且同时存活，停止其中一个后另一个保持运行；再杀掉另一个 Worker，第三个 Worker 保持运行并完成，验证进程级故障隔离。
 - Worker crash while host dispatching IPC 现在由 Worker exit monitor 及时取消宿主 dispatch；connect、ready handshake、执行 IPC 三段均监视对应 Worker 进程退出。真实 SendInput/KeyUp 和 WinForms 桌面交互仍 NOT RUN（M14）。
 
-### 19.7 M13-03 定时调度与运行超时
+### 19.7 M13-03 定时调度与运行超时（Windows Actions 验证通过）
 
 - ScheduledTaskDefinition 封存任务 ID、脚本路径、触发类型、本地时区 ID、weekday/TimeOnly、misfire/overlap/failure policy 和可选 RuntimeTimeout。任务数据与 cursor 使用 schemaVersion=1 持久化到用户 LocalAppData；不把任务计划写入 Lua API registry。
 - ScheduledTaskEngine 是无 UI、可注入 TimeProvider 的确定性计算层。ScheduledTaskCalculator 负责本地时刻到 UTC 的解析、DST gap/overlap 规则、每日/每周下一次 occurrence 与 misfire 的最近一次收敛。持久化 cursor 的 LastHandledOccurrenceUtc / NextOccurrenceUtc / Exhausted 是重启去重来源。
@@ -504,3 +504,10 @@ M13-01 先冻结契约；新增 Core 类型只负责身份、状态转换和并�
 - 手动播放 timeout 分钟项持久化在 settings.json；定时任务可独立配置 1 秒至 7 天 timeout。timeout 通过 RunInstanceCoordinator.RequestTimeout，随即 PlaybackRunner.Stop()，沿用 worker grace、force terminate 和 owner-only held-input cleanup。
 - 停止策略：参数表单取消或权限拒绝属于用户取消，不计入失败；脚本 Failed/TimedOut 进入指定 failure policy；InputArbiter/Cleanup fault 禁止自动重试并禁用任务，需人工核验输入状态。
 - MainForm 隐藏到托盘不停止 Scheduler；明确退出先取消调度投递，再 StopAll 所有运行实例，最后释放 service/coordinator。完整运行实例列表/筛选/日志浏览仍留 M13-04；真实桌面验收留 M14。
+
+
+### 19.8 M13-03 最终验证记录
+
+- 最终代码 HEAD 69febaab37857fbe9186157a4725d52c193ce539 的 Windows Actions [43470648199](https://github.com/xiaobei206/anjian/actions/runs/43470648199) SUCCESS：Restore、Release Build 0 warnings / 0 errors、218/218 Core tests、API handbook 103/103、自包含 win-x64 publish、Sprite/Plugin/MultiInstance smoke 3/3、ZIP/SHA256 和 artifact upload。
+- Artifact ID 14061576124，87,351,703 bytes，archive SHA-256 1f917e68c0ac35291884d8e747e680814b3cca3884aa6669f76951eb6a4e8a85；临时 Actions artifact，不是正式 Release。
+- Local .NET SDK 不存在，因此本地 Restore/Build/Test NOT RUN。Windows 10/11 桌面实机仍归 M14。

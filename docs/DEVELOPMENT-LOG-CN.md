@@ -908,3 +908,12 @@ M4 基础调试器与 M5 可视化录制/动作列表均已完成 Windows CI 验
 - 新增 ScheduledTaskSchedulerTests（TimeProvider deterministic tests），覆盖时区/DST/misfire、延迟/一次性触发、游标重启、重叠/失败 policy、超时与 Stop-timeout race、禁用期间跳过和编辑一次性任务重置。
 - 本地容器无 .NET SDK，Restore/Build/Test NOT RUN；需以 Windows Actions 最终 HEAD 结果覆盖此临时状态。
 - Windows 10/11 WinForms 权限提示、真实键鼠、DPI/多屏、托盘/退出和长时稳定性均 NOT RUN（M14）。
+
+
+### M13-03 最终 Windows Actions 验收记录（2026-11-14）
+
+- 最终代码 HEAD：69febaab37857fbe9186157a4725d52c193ce539；Windows Actions run [43470648199](https://github.com/xiaobei206/anjian/actions/runs/43470648199) SUCCESS。Restore PASS；Release Build PASS（0 warnings / 0 errors）；Core tests 218/218 PASS；API 文档生成区一致（103 个当前公开函数）；self-contained win-x64 publish PASS；发布包 smoke 3/3 PASS（Plugin Worker、MultiInstance 两 Worker 并发/独立停止、Sprite Worker）；ZIP/SHA256 与 artifact upload PASS。
+- 上传 artifact：ID 14061576124，名称 Anjian2026-preview-win-x64，87,351,703 bytes；uploaded artifact ZIP SHA-256：1f917e68c0ac35291884d8e747e680814b3cca3884aa6669f76951eb6a4e8a85。该文件是临时 GitHub Actions artifact，不是 GitHub Release；本批没有创建 Release 或 tag。
+- 调试收敛：首个 M13-03 代码提交 9705065f 的 run [43470218387](https://github.com/xiaobei206/anjian/actions/runs/43470218387) Restore PASS、Core/Test assembly build pass，但 WinForms Release Build 暴露四处 CS0411（泛型 AddChoices 的目标类型 new 无法推断）。随后提交 2c4b7e6 显式传入四种枚举泛型并修正调度容量/pending 处理，提交 69febaab 修正新建任务的默认日期/时间；最终 run 43470648199 对最新代码全 PASS。中间 run [43470500913](https://github.com/xiaobei206/anjian/actions/runs/43470500913) 对 2c4b7e6 也已完整 SUCCESS。
+- 本地容器未安装 .NET SDK，因此本地 Restore/Build/Test 仍为 NOT RUN；Windows Actions 是本轮可复现构建/测试依据。该 CI 在 Windows Server 2025 上运行，不是 Windows 10/11 桌面验收。
+- 未新增 Lua API，registry 仍 1.2 / 103；未改 VERSION / AssemblyVersion / FileVersion；未创建 tag/Release，已发布 v0.1.0-preview.4 不变。Win10/11 实际键鼠、权限弹窗、WinForms/DPI/多屏、托盘退出和长时间稳定性保持 NOT RUN（M14）。
