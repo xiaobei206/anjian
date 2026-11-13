@@ -5,7 +5,7 @@
 - 每个 Lua 入口的可选权限请求文件名固定为 `<entry.lua>.permissions.json`，即源路径 `entryScriptPath + ".permissions.json"`；例如 `main.lua.permissions.json`。
 - 打包器只收集所选入口的精确 sidecar，不扫描/合并同目录其他脚本的权限，也不因复制 sidecar 扩大授权。
 - `SpritePackageEntry` 使用可空的 `permissionManifestPath` 字段。字段非空时，包内路径必须精确等于该 entry 的 `scriptPath + ".permissions.json"`（按包内正斜线相对路径比较）；不同入口不能交叉引用同一 sidecar。
-- Sidecar 内容文件必须进入 `Anjian.Sprite.json` 的 `files` 闭合清单，记录实际大小与 SHA-256，并由 `SHA256SUMS.txt` 覆盖。缺失 sidecar、哈希不匹配、路径不匹配、reparse point/符号链接或无效 JSON/schema 均使包校验失败。
+- 若 manifest 已将 sidecar 绑定到某入口，则该文件必须进入 `Anjian.Sprite.json` 的 `files` 闭合清单，记录实际大小与 SHA-256，并由 `SHA256SUMS.txt` 覆盖；已声明绑定的文件缺失、哈希不匹配、路径不匹配、reparse point/符号链接或无效 JSON/schema 均使包校验失败。未声明 sidecar 的入口按下一条规则合法地使用空 Grant。
 - 若 `permissionManifestPath` 为空，包内不得悄悄存在该入口的规范 sidecar 路径。入口没有 sidecar 是合法情形，但它不会继承其他入口的权限。
 
 ## 2. 内容契约
