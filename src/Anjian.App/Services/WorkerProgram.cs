@@ -6,6 +6,7 @@ using Anjian.Core.Api;
 using Anjian.Core.Editor;
 using Anjian.Core.Parameters;
 using Anjian.Core.Plugins;
+using Anjian.Core.Runtime;
 using KeraLua;
 using NLua;
 
