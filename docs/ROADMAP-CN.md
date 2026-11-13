@@ -23,7 +23,7 @@
 | M10 参数、配置与脚本自定义 UI | DONE（实现与 Windows 自动化验收完成；WinForms/桌面实测延期 M14） | 参数 sidecar schema v1、10 种类型、统一 validator、配置持久化/恢复、播放/调试前表单、参数设计器、JSON 导入导出、typed Worker IPC、递归只读 Lua Args、脚本目录相对路径解析 |
 | M11 小精灵打包器 | DONE（Windows CI run 229 PASS；WinForms/DPI/真实输入桌面验收延期 M14，NOT RUN） | 独立便携目录 + EXE 启动 ZIP、依赖/资源收集、M10 参数 UI、运行控制、manifest/SHA256、构建日志与离线函数参考 Markdown |
 | M12 内置扩展 API 与插件系统 | DONE（M12-01..M12-12 实现与 Windows CI 自动化完成；WinForms/权限/DPI/多屏桌面验收延期 M14） | 文件/剪贴板/对话框/进程/HTTP(S)/JSON 双层授权；本地插件 manifest/hash/三方 Grant 交集、入口 sidecar 与受限 Lua contribution；内置 API registry 1.2 / 103 |
-| M13 多实例与定时任务 | IN_PROGRESS（M13-01 契约/状态转换模型 DONE；M13-02 下一步实现协调器与输入仲裁） | 稳定 instanceId、状态机、4 active + 16 queue、Worker/权限/输入隔离契约已冻结；运行时多实例与定时尚未实现 |
+| M13 多实例与定时任务 | IN_PROGRESS（M13-01 契约 DONE；M13-02 运行时协调器/Worker/IPC/InputArbiter 实现 DONE；M13-03 下一步） | 4 active + 16 FIFO queue、独立 Worker/脚本快照/Grant/会话、单实例 Stop/Pause、全局输入公平仲裁与故障恢复已实现；定时/周期触发和完整实例管理 UI 尚未实现 |
 | M14 1.0 稳定化与发布 | TODO | 自动与手工验收、依赖许可、离线帮助、性能/长时测试和正式稳定版发布 |
 
 ## 统一 Windows 桌面实机验收策略（用户决定，2026-11-13）
@@ -409,3 +409,13 @@ M13-01 不是新 release；不得以设计文件代替实现测试证据，也�
 - Lua Worker、pipe/session、Grant、参数、计时、Pause/CTS、ProcessSession handles、HTTP/Window/Image/Plugin/debug context 和输入 held-state 都是实例私有。Grant 每实例重新审阅；host 每 IPC 以 owner instance 权威 Grant 复核。
 - SendInput/SetCursorPos 是全局桌面资源。M13-02 必须用主进程 FIFO InputArbiter 串行；Down 到 Up 的租约归原 owner，暂停保留；Stop/timeout/crash 先释放本实例 owned-held，再交接。清理失败时锁定后续输入。
 - Core 状态模型 10 项新增测试已完成。最新代码 HEAD `46bf87dc3324b3befba2369870bc45c4fa28c031` 的 Windows Actions run [43449173287](https://github.com/xiaobei206/anjian/actions/runs/43449173287) SUCCESS：187/187 Core tests、Build 0 warnings / 0 errors、API handbook、自包含 win-x64 publish、published Worker smoke、ZIP/SHA256 与 artifact upload 全 PASS（artifact `14050195325`）。M13-02 的并发 Worker/InputArbiter 集成仍未实现；上述是 Core/CI 验证，不是 Windows 10/11 桌面验收。
+
+
+## M13-02 — 独立运行实例协调器、Worker/IPC 身份与全局输入仲裁（实现已完成）
+
+- Core RunInstanceCoordinator 与 App RunInstanceRuntimeCoordinator 已接入 MainForm：同脚本不同 Start 生成不同实例；同一 startRequestId 幂等且不能被重用于不同脚本；最多 4 个活动 Worker、16 个 FIFO 排队项，队满明确拒绝；队列取消不占槽，Cleaned 后晋升最早队列项。
+- 每实例独立 PlaybackRunner、Worker/Lua state、CancellationTokenSource/Pause gate、ScriptProcessSession、HTTP/Window/Image/debug 状态、参数快照、权限 Grant 快照及普通脚本源码快照。每次 Start 仍独立走原权限审阅；不按脚本路径共享 Grant。
+- 每个 Worker attempt 有随机 workerAttemptId/nonce，IPC 消息与响应逐条核验；宿主在 named pipe 建立后读取 OS client PID，必须匹配本实例刚启动的 Worker PID。Worker 不接收或覆盖宿主 Grant；进程句柄只存在所属 ScriptProcessSession。
+- 主进程 FIFO InputArbiter 串行化 SendInput/SetCursorPos；Down 租约由 owner 持有至 Up，原子 Click/KeyPress/TypeText 不交错；Stop/Worker exit 仅清理本实例 held 输入。释放失败锁定新输入并提供人工检查/恢复入口。
+- MainForm 已连接 Start/Pause/Stop-selected 与明确退出 StopAll；关闭主窗体隐藏到托盘仍继续运行。完整实例列表、切换/筛选与独立日志浏览留 M13-04。M13-03 的定时器、用户配置运行超时和重试尚未实现。
+- M14 的 Windows 10/11 实际键鼠、WinForms、DPI、多显示器、托盘/退出与长时稳定性仍 NOT RUN；不得以发布包 smoke 代替桌面验收。

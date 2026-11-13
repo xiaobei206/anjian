@@ -275,19 +275,28 @@
 
 ## ADR-033：多实例运行实例身份、生命周期与资源隔离契约
 
-- 状态：ACCEPTED（M13-01 规格与 Core 状态转换契约已进入 main；协调器、并发 Worker 与 UI 尚待 M13-02/M13-04 实现；真实桌面验收留 M14）。
+- 状态：ACCEPTED（M13-01 规格及 M13-02 Core/App 运行时协调、Worker/IPC 身份和全局输入仲裁已实现并经 Windows CI；完整实例 UI 留 M13-04；真实桌面验收留 M14）。
 - 身份分层：
   - `instanceId` 是一次用户明确启动意图的稳定身份，使用小写 32 位 GUID-N；Core 类型为 `RunInstanceId`。从创建到清理完成保持不变。
   - `startRequestId` 是 UI/调用方的幂等请求标识。同一 Start 手势的重复派发或网络/消息重试必须返回同一实例，不得二次启动；用户再次明确点击 Start 则创建新请求和新实例。不能仅按脚本路径去重。
   - `workerAttemptId` 标识一个具体 Worker 尝试。单个逻辑实例的每轮播放仍保持同一个 `instanceId`，每次新建 Worker 使用新的 attempt ID、随机命名管道和会话 nonce。
 - 生命周期模型由 `Anjian.Core.Runtime.RunInstanceLifecycle` 机器可读维护。状态为 Created、Validating、Queued、Starting、Running、Paused、StopRequested、TimeoutRequested、Cancelling、ForceTerminating、CleaningUp、Cleaned；结果单独记录为 None/Succeeded/Failed/Cancelled/TimedOut；终止模式及清理结果也单独记录。Cleaned 是唯一终态。这样清理失败不会覆盖脚本本身的 Succeeded/Failed/Cancelled/TimedOut 结果。
 - 合法转换图和不变量以 Core 的 `AllowedTransitions`、`CanTransition`、`Transition` 为唯一契约。StopRequested 首次锁定 Cancelled，TimeoutRequested 首次锁定 TimedOut；首个终止原因不可被后来的 Stop/timeout/Worker 退出覆盖。开始 CleaningUp 前必须确定结果；只有清理处于 InProgress 才能进入 Cleaned，并报告清理 Succeeded/Failed。非法边、跳过清理或覆盖结果均拒绝。`Transition` 是不可变快照上的纯转换校验，不是并发协调器；M13-02 必须按实例串行提交状态/终止原因（事件循环或锁/CAS），确保 Stop 与 timeout 的 winner 唯一。正常自然完成保持 TerminationMode=None；仅经 Cancelling 才是 Graceful，仅经 ForceTerminating 才是 Forced。
-- 启动与并发边界：每个逻辑实例独立校验、独立审阅权限后才进入 FIFO 队列。最多 4 个占用 Worker 槽位的实例（Starting/Running/Paused/正在终止或清理的实例均占槽）；最多另排队 16 个；超限立即返回明确容量错误，不建立无界后台 Task。排队中可取消；槽位只有在实例进入 Cleaned、完成输入和句柄清理后才释放。契约常量冻结 Worker 启动连接 watchdog 为 30 秒、Stop 宽限期为 2 秒，届满仍未退出才强制终止；M13-01 只定义数值，不实际启动 watchdog/计时器，执行机制属于 M13-02。数值由 `RunInstanceLimits` 提供。
+- 启动与并发边界：每个逻辑实例独立校验、独立审阅权限后才进入 FIFO 队列。最多 4 个占用 Worker 槽位的实例（Starting/Running/Paused/正在终止或清理的实例均占槽）；最多另排队 16 个；超限立即返回明确容量错误，不建立无界后台 Task。排队中可取消；槽位只有在实例进入 Cleaned、完成输入和句柄清理后才释放。契约常量冻结 Worker 启动连接 watchdog 为 30 秒、Stop 宽限期为 2 秒，届满仍未退出才强制终止；M13-02 已实际执行连接/握手 watchdog、宽限和强制杀进程树。启动 watchdog 记为 TimedOut；用户可配置运行超时属于 M13-03。数值由 `RunInstanceLimits` 提供。
 - 同脚本多实例允许：不同 Start 意图各自创建实例，可同时排队/运行；一次 Start 的重试必须幂等。每个实例捕获独立且不可变的启动快照：规范化脚本路径/内容版本、类型化参数、播放选项、权限 Request 与本次 Grant、插件贡献计划、循环计数、日志上下文及创建时间。一个实例的参数修改不得改变已经启动的其他实例。
 - 实例私有资源不得共享：Lua state/Worker/管道会话、Worker attempt、ExecutionGate/Pause 信号、CancellationTokenSource、运行/超时计时器、ScriptProcessSession 随机进程句柄字典、HTTP session、窗口引用、图像缓存、插件计划快照、调试命令等待源、键鼠按下资源与清理责任。Worker 退出、Stop、timeout 或异常只影响所属实例；兄弟实例继续运行。Worker/管道的每个请求必须由宿主绑定到创建它的实例，包含 instanceId + workerAttemptId + nonce 并与服务端 pipe/session 对照；不信任 Worker 自报身份或 Grant。任何未知/不匹配 IPC fail-closed。
 - 权限不跨实例共享：每个实例启动时重新读取其脚本/小精灵入口的 sidecar，绑定规范化脚本路径、请求内容 hash、instanceId，并逐次展示本次审批；缺失 sidecar 得到 Empty Grant，取消/拒绝不启动。Grant 不持久化、不缓存给同路径其他实例，也不能由 Worker 在 IPC 中提交或升级。插件模式继续采用脚本请求 ∩ 插件 manifest ceiling ∩ 用户本次批准；host 每条 IPC 以实例端持有的权威不可变 Grant 再检查。随机进程句柄仅存在该实例的 ScriptProcessSession 中；其他实例即使猜中字符串也查不到。
-- 前台键鼠输入是整个 Windows 桌面共享资源，不可能依靠每个 Worker 的 Lua state 隔离。M13-02 必须实现主进程单一全局 InputArbiter：FIFO、单写者。Move/Wheel/Click/KeyPress/TypeText 等完整原子事件持有一次租约，禁止不同实例的 SendInput 序列交错；显式 KeyDown/MouseDown 的租约持续到对应 Up 全部释放。持有者暂停时仍保留租约，其他实例的输入请求等待且可取消；持有者的 Up、Stop/timeout 清理可绕过暂停门。所属实例的全部 held keys/buttons 发出 Up 并确认清理后才归还租约。若释放失败，标记全局输入仲裁器故障并阻止后续输入租约，直至恢复；不能让另一实例误释放别人的按键或在未知按键状态下继续注入。纯 UIA 语义操作不占 SendInput 租约，仍按各自 Worker 和 HWND 引用校验。
+- 前台键鼠输入是整个 Windows 桌面共享资源，不可能依靠每个 Worker 的 Lua state 隔离。M13-02 已实现主进程单一全局 InputArbiter：FIFO、单写者。Move/Wheel/Click/KeyPress/TypeText 等完整原子事件持有一次租约，禁止不同实例的 SendInput 序列交错；显式 KeyDown/MouseDown 的租约持续到对应 Up 全部释放。持有者暂停时仍保留租约，其他实例的输入请求等待且可取消；持有者的 Up、Stop/timeout 清理可绕过暂停门。所属实例的全部 held keys/buttons 发出 Up 并确认清理后才归还租约。若释放失败，标记全局输入仲裁器故障并阻止后续输入租约，直至恢复；不能让另一实例误释放别人的按键或在未知按键状态下继续注入。纯 UIA 语义操作不占 SendInput 租约，仍按各自 Worker 和 HWND 引用校验。
 - 计时语义：启动/验证/用户权限审阅及 FIFO 排队时间不计入运行超时；Worker 从 Starting 到 Running 有独立 30 秒启动 watchdog。用户配置的实例运行超时从第一次进入 Running 起算，Running 与 Paused 均计入墙钟时长（避免长期暂停永久占用实例/输入资源），循环间隔计入；超时与 Stop 竞争时以先成功提交的状态转换为准。具体可配置值/范围与 M13-03 定时语义一并确定。
 - 进程/应用生命周期：关闭主窗口但仅隐藏到托盘不停止实例；用户明确退出应用时先拒绝新 Start，再对所有实例并发请求停止，等待各 Worker 最多 2 秒后强制终止剩余 Worker，随后逐实例完成输入释放、会话句柄/窗口/图像/管道清理。当前 StartProcess 启动的外部应用不因脚本 Stop 默认被杀；仅清除该实例对进程的查询句柄。Worker 意外退出视为 Failed（除非更早的 Stop/timeout 已锁定结果），触发本实例清理，不取消兄弟实例。宿主崩溃/断电下无法保证用户态 SendInput 的 Up 一定发出，必须记录为 OS 进程异常退出边界，不宣称完整防护。
 - 可观测性：每条日志/状态事件带 instanceId、workerAttemptId（若存在）、脚本路径、循环序号、UTC 时间、级别、事件码和消息；UI 聚合时仍可按 instanceId 筛选。日志不写敏感参数值、权限 sidecar 正文、HTTP header/body。清理结果、强制终止、Worker exit code、输入仲裁器故障必须单独记录。
-- M13-01 只冻结设计和状态转换规则，不把该模型误报为已经支持多实例。M13-02 实现协调器/Worker 与输入仲裁；M13-03 实现定时与用户配置的超时/失败策略；M13-04 完成 UI 可观察性与回归。Windows 10/11 并发输入、停止释放、DPI、多屏和退出路径仍需 M14 实机验收。
+- M13-01 只冻结设计和状态转换规则；M13-02 已将协调器/Worker/IPC 与输入仲裁实现。M13-03 实现定时与用户配置的超时/失败策略；M13-04 完成实例列表、日志筛选、恢复 UI 与回归。Windows 10/11 并发输入、停止释放、DPI、多屏和退出路径仍需 M14 实机验收。
+
+
+### ADR-033 的 M13-02 实现补记（2026-11-14）
+
+- Core RunInstanceCoordinator + App RunInstanceRuntimeCoordinator 实际执行 4 active / 16 FIFO queue；相同 Start request ID 幂等，重用到不同脚本路径拒绝；同脚本不同 Start 得到独立 instanceId。队列项可取消，Cleaned 后最早队列项晋升。
+- 实例启动快照包含复制的 PlaybackOptions、JsonElement 参数、只读权限 Grant、plugin runtime options 与普通脚本源码；每实例独立 PlaybackRunner、ProcessSession/HTTP session/窗口/图像/调试状态/Worker。
+- Worker pipe 经 current-user ACL、OS 客户端 PID、instanceId/attemptId/nonce 三重绑定；Worker 无权上传/覆盖 Grant，host 每条受保护 IPC 仍按实例端权威 Grant 检查。
+- 全局 InputArbiter 已实现公平 FIFO 租约、owner re-entry 用于 Up/清理、等待取消、故障锁定与人工恢复；自动化测试覆盖租约交接、故障拒绝与恢复。
+- MainForm 提供基本 selected instance 控制和 StopAll 退出；完整实例列表/筛选/日志视图留 M13-04。定时触发、运行超时用户配置和失败重试留 M13-03。

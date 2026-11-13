@@ -545,3 +545,24 @@ M12-09 只实现有上限的显式 HTTP 缓冲请求；不代表大文件流式�
 - Core 新增 10 个状态机/ID/不变量测试；完整 Core suite 在提交 7112e1d 对应 Windows Actions run [43448241211](https://github.com/xiaobei206/anjian/actions/runs/43448241211) 为 187/187 PASS，Build 0 warnings / 0 errors、API handbook、self-contained win-x64 publish、Sprite/Worker smoke、ZIP/SHA256 和 artifact upload 全 PASS。
 - CI 收敛过程如实保留：run [43448652175](https://github.com/xiaobei206/anjian/actions/runs/43448652175) 的测试期望未同步新状态边（186 pass / 1 fail）；run [43448660886](https://github.com/xiaobei206/anjian/actions/runs/43448660886) 暴露既有 `ScriptProcessTests` 使用 `ping -n 3` 的进程存活时序竞争（186 pass / 1 fail）。已修复为 `ping -n 12`，并修正正常完成的 TerminationMode 断言。最终代码 HEAD `46bf87dc3324b3befba2369870bc45c4fa28c031` 对应 Windows Actions run [43449173287](https://github.com/xiaobei206/anjian/actions/runs/43449173287) SUCCESS：187/187 Core tests、0 warnings / 0 errors、API handbook、self-contained win-x64 publish、published Sprite/Worker smoke、ZIP/SHA256 与 artifact upload 全 PASS。Artifact ID `14050195325`，87,285,016 bytes，uploaded artifact archive SHA-256 `4112f445fe3c4135880fdf9a016f6de6ecaab085b6fd53ab581274f0ced41017`，有效至 2026-12-13；这是临时 Actions artifact，不是 GitHub Release。
 - 当前容器无 .NET SDK，local Restore/Build/Test NOT RUN。没有 M13-02 coordinator、worker concurrency、IPC owner-binding 或 InputArbiter；真实 Windows 10/11 并发、权限 UI、输入释放、DPI/多屏和应用退出仍 NOT RUN（M14）。
+
+
+## 25. M13-02 独立运行实例、Worker/IPC 身份与全局输入仲裁
+
+| ID | 场景 | 自动化覆盖/结果 | Windows 桌面状态 |
+|---|---|---|---|
+| M13-02-01 | 同脚本独立 Start / 同请求幂等 / 错用 request ID | RunInstanceCoordinatorTests 覆盖同脚本不同实例、相同 requestId 重试返回同实例、相同 requestId 不可换脚本 | NOT RUN（M14） |
+| M13-02-02 | 4 active + 16 FIFO / 队满拒绝 / 取消队列 / Cleaned 后晋升 | Core coordinator tests 覆盖限额、FIFO 晋升、排队取消不占 Worker slot 和容量错误 | NOT RUN（M14） |
+| M13-02-03 | 单实例状态、Grant、参数、脚本源码和运行资源隔离 | App 每 Start 创建独立 PlaybackRunner；复制参数/Grant/options/plugin options；普通脚本按启动时源码快照执行；每 runner 独立 Process/HTTP/Window/Image/debug context | NOT RUN（M14） |
+| M13-02-04 | 跨实例 process handle 不能查询 | Windows-only ScriptProcessTests 使用第二个 ScriptProcessSession 查询第一个 session 的 handle，必须拒绝 | NOT RUN（M14） |
+| M13-02-05 | IPC 伪造、过期 attempt、跨实例/nonce 不匹配 | WorkerSessionIdentityPolicyTests 覆盖 instanceId/attemptId/nonce 格式与伪造；实际 host 逐条验证消息/响应，并核验 named-pipe client PID 等于所启动 Worker PID | NOT RUN（M14） |
+| M13-02-06 | 全局输入 FIFO、原子持有、Up 重入、取消与故障恢复 | InputArbiterTests 覆盖 FIFO、公平性、owner re-entry、排队取消、fault 锁定和人工确认恢复；SendInput 实机验收另留 M14 | NOT RUN（M14） |
+| M13-02-07 | 两个真实 Worker 并行、单独 Stop、Worker crash 不影响兄弟实例 | 发布包 MultiInstanceRuntimeSmokeTests 启动独立 Worker，验证同时存活、Stop 一个仍存活、杀掉一个后另一个继续运行 | NOT RUN（M14） |
+| M13-02-08 | Worker startup watchdog 与状态结果 | Coordinator test 验证 Starting → TimedOut → Cancelling → Cleaned，后续 Failed 不覆盖 TimedOut；Windows 包 smoke 对正常 Worker 启动路径执行 | NOT RUN（M14） |
+| M13-02-09 | 明确退出 StopAll 与实例 UI 管理 | MainForm 已接入拒绝新 Start、StopAll 和等待各实例清理；完整列表/筛选/独立日志浏览留 M13-04，StopAll WinForms 实机路径留 M14 | NOT RUN（M14） |
+
+### M13-02 自动化与边界记录
+
+- M13-02 不增加 Lua 公共 API，registry 保持 1.2 / 103；不改 VERSION / AssemblyVersion / FileVersion；不创建 tag 或 GitHub Release，已发布 v0.1.0-preview.4 资产不变。
+- Windows CI 最终结果以本节最后更新时当前 main 代码 HEAD 对应的最新 Actions run 为准。M13-02 的可机读契约包括 RunInstanceCoordinator、RunInstanceRuntimeCoordinator、WorkerSessionIdentityPolicy 与 InputArbiter；core tests、OS Worker/PID smoke 和 package tests 不能代替 Windows 10/11 桌面验收。
+- 本地容器未安装 .NET SDK，local Restore/Build/Test 为 NOT RUN。Windows 10/11 的实际 SendInput/Up 清理、WinForms UI、DPI、多屏、托盘/退出及长时稳定性仍 NOT RUN（M14）。

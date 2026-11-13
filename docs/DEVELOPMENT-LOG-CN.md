@@ -867,3 +867,18 @@ M4 基础调试器与 M5 可视化录制/动作列表均已完成 Windows CI 验
 - 当前容器无 .NET SDK，local Restore/Build/Test NOT RUN。M13-01 没有执行 UI/多实例运行器集成测试；Windows 10/11 多实例、输入竞争/清理、权限审批、DPI/多屏和应用退出实测仍 NOT RUN（M14），不得将 Core 状态测试或 CI 通过写成桌面 PASS。
 - 下一步只进入 M13-02：实现独立运行协调器/Worker session/IPC 身份与全局 InputArbiter；不要顺手实现定时/周期触发（M13-03）。
 
+
+
+## 2026-11-14 — M13-02 独立运行实例协调器、Worker/IPC 身份与全局输入仲裁
+
+- 开始时核对 main HEAD 622ccfaa0aa36ca7ca616bb349a02e1c39f22c0c，读取 AGENTS/README/handoff/PRD §2.10/FEATURE-MATRIX/ROADMAP/ADR-033/Architecture §19/Acceptance M13-01 与 PlaybackRunner/Worker/IPC/Input/权限/主窗体生命周期。
+- 新增 Core RunInstanceCoordinator 与 App RunInstanceRuntimeCoordinator。支持稳定 instanceId、startRequestId 幂等、同一 request ID 不可跨脚本路径复用、同脚本不同 Start 独立实例、最多 4 active + 16 FIFO queue、排队取消、完成晋升、selected instance Pause/Resume/Stop 和 StopAll。
+- 每实例独立 PlaybackRunner/Worker/Lua state、pipe/session/attempt、CTS/Pause gate、ProcessSession、HTTP/Window/Image/debug 资源。实例启动时复制参数、PlaybackOptions、Grant 和 plugin runtime options；普通脚本将启动时源码放进 Worker launch payload，避免后续编辑改变已启动快照。权限审阅仍由每次 Start 的主窗体执行，Grant 不按脚本路径共享。
+- Worker IPC 绑定随机 instanceId/workerAttemptId/256-bit nonce，Worker handshake/launch/response 与 host message 都经 WorkerSessionIdentityPolicy 校验；host 通过 GetNamedPipeClientProcessId 将 pipe 客户端 PID 与本次 Process.Start 的 PID 固定比对。Worker 不持有更改 Grant 的通道，host 对每条权限 IPC 仍重新检查 runner 所属 Grant。
+- 全局 InputArbiter 为 FIFO 单写者；Click/KeyPress/TypeText/Move/Wheel 通过 lease 序列化，显式 Down 保留 owner lease 至 Up，owner re-entry 保证暂停/Stop 后仍可 Up。owner cleanup 失败会锁定后续输入并拒绝新 lease；MainForm 提供人工确认/恢复，不会自动假装已释放物理按键。
+- MainForm 允许同脚本多次 Start，基础 Pause/Resume/Stop 作用于 selected instance；关闭主窗体仍隐藏到托盘，明确退出则拒绝新 Start、取消所有实例、等待清理。完整实例列表/筛选/按实例日志浏览属于 M13-04。
+- Core tests 覆盖 coordinator FIFO/idempotency/queue cancellation/independent state、InputArbiter fairness/re-entry/cancel/fault-recovery、IPC instance/attempt/nonce spoof rejection、startup watchdog TimedOut outcome；Windows-only ProcessSession test 追加跨 session handle 拒绝。Self-contained package smoke 验证多 Worker 同时存活、Stop 单个 Worker 后兄弟仍运行，并增加 Worker crash isolation。
+- 调试修复记录：早期 Build 曾因 WorkerProgram 缺少 Core.Runtime using 失败，后续补正；早期 coordinator test 漏掉 WorkerReady 状态前置；Plugin smoke 揭露 Worker 关闭 pipe 后 host StreamWriter.Dispose flush 的竞态，已对正常 peer close 容错；输入 FIFO cancellation registration 曾出现可能死锁，已改为锁外 dispose/完成。每次修正均重新触发 Windows Actions。
+- 既有基线 Windows Actions run [43454882820](https://github.com/xiaobei206/anjian/actions/runs/43454882820) 对代码 HEAD efc47875ba72ef2b20b248243b942ca6022f82a6 SUCCESS：Release Build 0 warnings / 0 errors、199/199 Core tests、API handbook 103 函数、自包含 win-x64 publish、Sprite/Plugin/双 Worker smoke、ZIP/SHA256 与 artifact upload 全 PASS；临时 artifact ID 14053877302，87,316,704 bytes，上传 archive SHA-256 39ef686826e82e4efab339c137bf13e7f735c93e6079526ccd1c076fbe8cba39。
+- 随后增加 IPC identity spoof/cross-session handle/startup-timeout/crash smoke 覆盖；代码 HEAD f1ad298e2ab2b02ef1b155d6c1428c872c7ed63b 的 Windows Actions run [43460841956](https://github.com/xiaobei206/anjian/actions/runs/43460841956) 在开发日志本次提交时仍执行中，最终 Build/Test/package smoke 结果必须以后续补记为准。
+- 未增加 Lua API；registry 保持 1.2 / 103；未修改 VERSION/AssemblyVersion/FileVersion；未创建 tag/Release。当前本地容器没有 .NET SDK，local Restore/Build/Test NOT RUN。Windows 10/11 实际并发键鼠、WinForms、DPI/多屏、托盘退出和长时间运行仍 NOT RUN（M14）。

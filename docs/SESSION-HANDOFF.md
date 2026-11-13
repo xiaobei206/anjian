@@ -870,3 +870,41 @@ M12-10 已完成本地插件包/manifest/生命周期与独立 Worker 基础；�
 7. 同步 ROADMAP、FEATURE-MATRIX、ARCHITECTURE、DECISIONS（仅若实现中需补决策）、ACCEPTANCE、DEVELOPMENT-LOG、handoff。真实 Windows 10/11 并发输入、权限 UI、DPI/多屏仍留 M14；不得用 CI 替代桌面实测。不改版本、不创建 Release。
 
 M13-02 的重点是隔离协调器与全局输入仲裁。M13-03 才增加单次/延迟/定时/周期触发、运行超时用户配置和失败重试策略。
+
+---
+
+# 最新交接状态覆盖：M13-02 多实例协调器、Worker/IPC 身份与输入仲裁已完成（2026-11-14）
+
+本节优先于本文历史中任何 M13-02 待实现声明。代码任务 M13-02 已进入 main；不代表 M13 阶段完成。最新代码 HEAD（本节创建时）为 f1ad298e2ab2b02ef1b155d6c1428c872c7ed63b；该 HEAD 的 Windows Actions run [43460841956](https://github.com/xiaobei206/anjian/actions/runs/43460841956) 在本节创建时仍在执行，不能提前写成 PASS。随后文档提交触发的 Actions 应再核验，并以最终完成记录覆盖本段 CI 状态。
+
+## M13-02 已交付范围
+
+- Core RunInstanceCoordinator + App RunInstanceRuntimeCoordinator；4 active + 16 FIFO queue；请求 ID 幂等且不能跨脚本路径复用；同脚本不同 Start 独立实例；队列取消、Cleaned 后 FIFO promotion。
+- 独立 PlaybackRunner/Worker/Lua state、pipe/session/attempt、CTS/Pause gate、ProcessSession、HTTP/Window/Image/debug resources；复制 options/parameters/Grant/plugin runtime options；普通脚本按启动时源码快照执行。
+- 每个 Worker attempt 使用 instanceId/workerAttemptId/256-bit nonce；消息与响应逐条校验；host 另外通过 Windows named-pipe API 验证连接客户端 PID 等于该实例自己的 Worker PID。Worker 不得提供或覆盖 Grant；host 保留每实例权威 Grant 并逐条 IPC 校验。
+- 全局 FIFO InputArbiter 串行 SendInput/SetCursorPos；Down 租约属于 owner 并保持至 Up；原子 Click/KeyPress/TypeText 不交错；Stop/Worker exit 仅清理所属实例的 held input；清理失败后锁定后续输入并要求人工检查/确认恢复。
+- MainForm 已接入多 Start、selected instance Pause/Resume/Stop 和 StopAll 退出；关闭主窗体隐藏到托盘继续运行。完整实例列表、切换/筛选及按实例日志浏览留 M13-04。
+- 启动 watchdog 为 30 秒，超时锁定 TimedOut，不被后续 Failed 覆盖；Stop 给予 2 秒宽限，超时强制终止 Worker 树。
+
+## M13-02 验证边界与未完成事项
+
+- Core 自动化覆盖：4+16 容量/FIFO、Start 幂等、排队取消/晋升、实例间状态隔离、输入仲裁 FIFO/owner re-entry/取消/故障锁定/人工恢复、Worker identity 伪造与跨实例 nonce 拒绝、startup TimedOut 结果不被覆盖；Windows-only ProcessSession test 断言另一个 session 不能查询前一实例的 handle。
+- Published Windows x64 smoke：真实 Worker 并行、Stop 一个 Worker 而兄弟继续运行；扩展 smoke 验证 Worker crash 只影响所属实例。以本节后续 CI 补记确认最终运行结果。
+- 真实 Windows 10/11 键鼠物理输入、KeyUp 实测、WinForms/DPI、多屏、托盘/退出 UI、2 小时稳定性全部 NOT RUN（M14）。CI 不代替实机验收。
+- 不包含 M13-03 的单次/延迟/定时/周期触发、用户运行超时参数、失败重试/连续失败限制；也不包含 M13-04 的完整实例列表/筛选、日志浏览与恢复中心。
+
+## 下一会话唯一任务：M13-03 — 单次/延迟/定时/周期触发、运行超时与失败策略
+
+只做 M13-03，不提前做 M13-04 的完整实例管理 UI，也不执行 M14 桌面验收。开始时核对 main 最新 HEAD，并读取 AGENTS.md、README、本 handoff、PRD §2.10、FEATURE-MATRIX F22/F31、ROADMAP、ADR-033、Architecture §19 和 Acceptance M13-02。
+
+### 范围与验收条件
+
+1. 冻结任务/trigger 模型与 ADR：区分立即 Start、一次性延迟、指定本地时刻、每日/每周或 cron-like 周期；必须明确定义时区 ID、DST 不存在/歧义时刻处理、错过触发（misfire）、应用休眠/重启后的处理、同一触发重复投递的 idempotency key。
+2. 规定重叠策略：同一 schedule 的上一次仍运行时，Skip / Queue one / Parallel（受 4+16 全局容量限制）如何选择；schedule 禁用/删除、编辑与已排队实例之间的关系必须确定。任何触发都复用 M13-02 admission coordinator，不得直接 new Worker 或绕过 Grant 审阅。
+3. 实现每实例用户可配置的运行超时：只从首次 Running 开始计时；启动/权限审阅/队列不计入；Running 与 Paused 均计入墙钟时间；Stop 与 timeout 的胜者由状态机先提交者确定。超时后复用 owner-only cancel/cleanup/InputArbiter，不得只更新 UI。
+4. 定义失败策略：Stop、Continue、有限 Retry（次数、延迟/backoff、连续失败上限）；重试必须是新 Worker attempt，但保留 schedule/run lineage 与每次 Grant 审阅边界，不得把旧 instanceId 当成重复的新 Start。
+5. 添加可注入 TimeProvider / deterministic scheduler tests，覆盖时区/DST/misfire/重复触发/重叠/排队取消/超时暂停语义/stop-timeout race/retry limits/应用重启恢复。不得依靠真实 Thread.Sleep 等待日历时间。
+6. 同步 ADR、Architecture、ROADMAP、FEATURE-MATRIX、ACCEPTANCE、USER-GUIDE、DEVELOPMENT-LOG 与 handoff；执行 Windows Actions Restore/Release Build/Core tests/API handbook/self-contained package smoke。当前无新 Lua API 时不得改 registry/API version。
+7. 不改 VERSION、不创建 tag/Release。M14 Windows 10/11 实机验收仍保持 NOT RUN。
+
+M13-03 的核心是确定性的调度与超时/失败策略；完成后唯一下一任务才是 M13-04 的实例列表、日志筛选和恢复 UI。
