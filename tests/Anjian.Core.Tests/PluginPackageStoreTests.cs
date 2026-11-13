@@ -117,6 +117,13 @@ public sealed class PluginPackageStoreTests : IDisposable
         WriteManifest(unsafePermissionPackage, unsafePermissionManifest);
         Assert.Throws<InvalidDataException>(() => PluginPackageValidator.Inspect(unsafePermissionPackage, "1.2"));
 
+        var absolutePermissionPackage = CreatePackage(Path.Combine(_temporaryRoot, "absolute-process-permission"));
+        var absolutePermissionManifest = ReadManifest(absolutePermissionPackage);
+        absolutePermissionManifest.Permissions.ProcessExecutables.Add(
+            Path.GetFullPath(Path.Combine(_temporaryRoot, "trusted-tool.exe")));
+        WriteManifest(absolutePermissionPackage, absolutePermissionManifest);
+        Assert.Single(PluginPackageValidator.Inspect(absolutePermissionPackage, "1.2").ManifestPermissions.ProcessExecutables);
+
         var nativePath = Path.Combine(source, "helper.dll");
         File.WriteAllText(nativePath, "not a native library");
         var manifest = ReadManifest(source);

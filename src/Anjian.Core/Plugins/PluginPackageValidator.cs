@@ -435,9 +435,18 @@ public static class PluginPackageValidator
         }
         foreach (var executable in permissions.ProcessExecutables)
         {
+            if (string.IsNullOrWhiteSpace(executable) || executable.Any(char.IsControl))
+                throw new InvalidDataException("processExecutables 不能包含空值或控制字符。");
             if (Path.IsPathRooted(executable))
-                throw new InvalidDataException("processExecutables 必须是相对插件包根目录的路径。");
-            _ = NormalizeRelativePath(executable);
+            {
+                if (!Path.IsPathFullyQualified(executable))
+                    throw new InvalidDataException("processExecutables 的绝对路径必须完全限定。");
+                _ = Path.GetFullPath(executable);
+            }
+            else
+            {
+                _ = NormalizeRelativePath(executable);
+            }
         }
         if (permissions.Dialogs.Any(string.IsNullOrWhiteSpace) ||
             permissions.ProcessExecutables.Any(string.IsNullOrWhiteSpace) ||

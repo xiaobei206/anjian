@@ -47,7 +47,7 @@ manifest JSON 最大 256 KiB，UTF-8。
 - minApiVersion / maxApiVersion 使用 major.minor；运行时当前 API 版本来自唯一注册表 src/Anjian.Core/Api/lua-api-registry.json（当前为 1.2）。必须满足 min 不高于当前版本，且 max（若提供）不低于当前版本。
 - entry 必须指向包内已列入 files 的 Lua 文件。主入口和模块都只在独立 Worker 的 Lua 5.4 state 中运行，绝不在主 UI 中执行。
 - modulesRoot 为包内可选的模块目录，目录下仅可 require manifest 已登记、hash 已匹配的 Lua 文件；模块名采用点分名映射到相对路径。未登记或运行前被篡改的模块拒绝加载。
-- permissions 使用现有脚本权限 schema v1 的相同字段和含义。文件根目录/EXE 相对路径以包根目录解析；HTTP 主机/方法仍遵守现有精确白名单政策。它只是插件的上限声明，不是授权。
+- permissions 使用现有脚本权限 schema v1 的相同字段和含义。文件读写根目录与相对 processExecutables 路径以包根目录解析；processExecutables 也可列出精确、完全限定的绝对路径。相对路径拒绝点段/越界，绝对路径仍需脚本 sidecar 请求并经用户逐次批准；不支持通配符。HTTP 主机/方法仍遵守现有精确白名单政策。它只是插件的上限声明，不是授权。
 - files 需覆盖每个内容文件，路径大小写不敏感去重、使用相对正斜线分隔、不能含盘符/UNC、冒号、空段、点段、父目录段、控制字符或根外路径。每项为 64 位十六进制 SHA-256 字符串。manifest 本身不包含在此列表。
 
 ## 文件边界与资源上限
