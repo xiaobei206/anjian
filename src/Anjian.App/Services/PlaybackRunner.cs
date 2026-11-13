@@ -72,6 +72,7 @@ internal sealed class PlaybackRunner : IDisposable
     public event Action? WorkerForceTerminating;
     public bool LastCleanupSucceeded { get; private set; } = true;
     public bool IsWorkerAlive => _worker is { HasExited: false };
+    public int? WorkerProcessId => _worker is { HasExited: false } process ? process.Id : null;
     public RunInstanceId InstanceId => _instanceId;
     public bool IsRunning => _runCts is not null;
     public bool IsPaused => _gate.IsPaused;
