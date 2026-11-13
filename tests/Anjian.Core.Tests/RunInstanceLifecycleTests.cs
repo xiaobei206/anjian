@@ -43,6 +43,7 @@ public sealed class RunInstanceLifecycleTests
             (RunInstanceState.Queued, RunInstanceState.StopRequested),
             (RunInstanceState.Starting, RunInstanceState.Running),
             (RunInstanceState.Starting, RunInstanceState.StopRequested),
+            (RunInstanceState.Starting, RunInstanceState.TimeoutRequested),
             (RunInstanceState.Starting, RunInstanceState.ForceTerminating),
             (RunInstanceState.Starting, RunInstanceState.CleaningUp),
             (RunInstanceState.Running, RunInstanceState.Paused),
@@ -207,6 +208,7 @@ public sealed class RunInstanceLifecycleTests
     {
         Assert.Equal(4, RunInstanceLimits.MaximumActiveInstances);
         Assert.Equal(16, RunInstanceLimits.MaximumQueuedInstances);
+        Assert.Equal(30_000, RunInstanceLimits.WorkerStartupTimeoutMilliseconds);
         Assert.Equal(2_000, RunInstanceLimits.WorkerCancellationGracePeriodMilliseconds);
     }
 }
