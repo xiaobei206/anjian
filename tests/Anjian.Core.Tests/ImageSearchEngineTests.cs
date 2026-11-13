@@ -89,6 +89,23 @@ public sealed class ImageSearchEngineTests
     }
 
     [Fact]
+    public void ConsecutiveConditionTrackerRequiresStableObservationsAndResets()
+    {
+        var tracker = new ConsecutiveConditionTracker(3);
+        Assert.False(tracker.Observe(true));
+        Assert.False(tracker.Observe(true));
+        Assert.False(tracker.Observe(false));
+        Assert.Equal(0, tracker.ConsecutiveCount);
+        Assert.False(tracker.Observe(true));
+        Assert.False(tracker.Observe(true));
+        Assert.True(tracker.Observe(true));
+        Assert.True(tracker.Observe(true));
+        Assert.Equal(3, tracker.ConsecutiveCount);
+        Assert.Throws<ArgumentOutOfRangeException>(() => new ConsecutiveConditionTracker(0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new ConsecutiveConditionTracker(21));
+    }
+
+    [Fact]
     public void TemplateMatchingSupportsGrayscaleAndNearestNeighborScale()
     {
         var source = new PixelImage(4, 2,

@@ -358,7 +358,7 @@ internal sealed class PlaybackRunner : IDisposable
     {
         var template = _images.Get(request.TemplateId);
         var timer = Stopwatch.StartNew();
-        var consecutiveMatches = 0;
+        var stableTracker = new ConsecutiveConditionTracker(request.StableCount);
         while (true)
         {
             token.ThrowIfCancellationRequested();
@@ -368,11 +368,10 @@ internal sealed class PlaybackRunner : IDisposable
                 scale: request.Scale, cancellationToken: token);
             if (match is not null)
             {
-                consecutiveMatches++;
-                if (consecutiveMatches >= request.StableCount)
+                if (stableTracker.Observe(true))
                     return match;
             }
-            else consecutiveMatches = 0;
+            else stableTracker.Observe(false);
 
             var remaining = request.TimeoutMilliseconds - (int)Math.Min(int.MaxValue, timer.ElapsedMilliseconds);
             if (remaining <= 0)
@@ -386,7 +385,7 @@ internal sealed class PlaybackRunner : IDisposable
     {
         var template = _images.Get(request.TemplateId);
         var timer = Stopwatch.StartNew();
-        var consecutiveMisses = 0;
+        var stableTracker = new ConsecutiveConditionTracker(request.StableCount);
         while (true)
         {
             token.ThrowIfCancellationRequested();
@@ -396,11 +395,10 @@ internal sealed class PlaybackRunner : IDisposable
                 scale: request.Scale, cancellationToken: token);
             if (match is null)
             {
-                consecutiveMisses++;
-                if (consecutiveMisses >= request.StableCount)
+                if (stableTracker.Observe(true))
                     return true;
             }
-            else consecutiveMisses = 0;
+            else stableTracker.Observe(false);
 
             var remaining = request.TimeoutMilliseconds - (int)Math.Min(int.MaxValue, timer.ElapsedMilliseconds);
             if (remaining <= 0)
