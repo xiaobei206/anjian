@@ -1,5 +1,7 @@
 using System.Text.Json;
+using Anjian.Core;
 using Anjian.Core.Editor;
+using Anjian.Core.Imaging;
 using Anjian.Core.Parameters;
 using Anjian.Core.Permissions;
 using Anjian.Core.Plugins;
@@ -121,7 +123,17 @@ internal sealed class RunInstanceRuntimeCoordinator : IDisposable
         RunInstanceState.Cancelling or RunInstanceState.ForceTerminating or RunInstanceState.CleaningUp;
 
     public bool SelectedIsPaused => SelectedSnapshot()?.State == RunInstanceState.Paused;
+    public bool SelectedCanPause => SelectedSnapshot()?.State is RunInstanceState.Running or RunInstanceState.Paused;
     public bool SelectedIsDebugging => SelectedRunner?.IsDebugging == true;
+    public bool HasDebuggingInstances
+    {
+        get
+        {
+            lock (_sync)
+                return _entries.Values.Any(entry => entry.Runner.IsDebugging &&
+                    !RunInstanceLifecycle.IsTerminal(_model.GetSnapshot(entry.InstanceId)));
+        }
+    }
     public bool VisualDebugEnabled
     {
         get => SelectedRunner?.VisualDebugEnabled == true;
@@ -461,6 +473,17 @@ internal sealed class RunInstanceRuntimeCoordinator : IDisposable
 
     private void SelectLatestRunnableLocked()
     {
+        var debugging = _entries.Values
+            .Where(entry => entry.Runner.IsDebugging &&
+                !RunInstanceLifecycle.IsTerminal(_model.GetSnapshot(entry.InstanceId)))
+            .OrderByDescending(entry => entry.Started)
+            .FirstOrDefault();
+        if (debugging is not null)
+        {
+            _selected = debugging.InstanceId;
+            return;
+        }
+
         if (_selected is not null && _entries.ContainsKey(_selected))
         {
             var selected = _model.GetSnapshot(_selected);
