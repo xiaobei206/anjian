@@ -284,3 +284,24 @@ M7 使用 Windows 自带 UI Automation Control View / Pattern，不宣称任意�
 M8 核心阶段 Windows Actions run [43353801969](https://github.com/xiaobei206/anjian/actions/runs/43353801969) 通过 73/73 tests。M8-CLOSE 实现代码基线的 Windows Actions run [43357876777](https://github.com/xiaobei206/anjian/actions/runs/43357876777) SUCCESS；随后文档同步 main HEAD `c2b30c1d9aabd876cd848d6203376060f294c34e` 的 run [43358188770](https://github.com/xiaobei206/anjian/actions/runs/43358188770) 也 SUCCESS：Windows Server 2025 runner，Release Build 0 warnings / 0 errors，85 passed / 0 failed / 0 skipped；API handbook generation --check 确认 78 个公开函数；self-contained win-x64 publish、ZIP/SHA256 package、artifact upload 全 PASS（最新 artifact ID 14006903094，76,460,671 bytes；[下载](https://github.com/xiaobei206/anjian/actions/runs/43358188770/artifacts/14006903094)）。新增自动化覆盖 RGB/hex 差值、颜色块连通分量、PNG manifest/path/hash 和静态 LoadImage 依赖扫描。**M8-01..M8-18 的 GDI、WinForms UI、点击穿透、显示亲和、多显示器和真实桌面行为仍全部 NOT RUN**，必须由 Windows 10/11 用户桌面实测。
 
 **本会话执行记录（2026-11-13）：** 本轮在 Debian 13 x86_64 环境中无 Windows 桌面访问、无 .NET SDK，未执行任何 M8 桌面场景。M8-01..M8-18 全部继续为 NOT RUN。Windows Actions run 43358188770 的 85/85 Core tests、Build 与 win-x64 publish PASS 仅是自动化/构建证据，不替代本表要求的 Windows 10/11 桌面验收。
+
+
+## Windows 桌面实机验收统一策略（用户决定，2026-11-13）
+
+M1–M13 的桌面实测不再作为进入下一开发阶段的前置条件，统一在 M14 所有功能开发完成后集中执行。各场景在开发阶段仍保持 NOT RUN；CI、代码审查和 Core 单元测试不能将这些场景标成 PASS。M14 正式发布前必须完成本文件所有桌面验收行，记录 Windows 版本/build、DPI、显示器拓扑、步骤、结果与日志。
+
+## 15. M9 OCR 与文本识别（main 开发版，实机验收延期至 M14 后）
+
+下列场景目前均为 **NOT RUN**。自动化 API 测试使用假 OCR 服务，只验证契约，不代表真实识别模型的精度、运行时和 Windows 桌面通过。
+
+| ID | 场景 | 操作 | 通过标准 | 当前状态 |
+|---|---|---|---|---|
+| M9-01 | 模型管理与完整性 | 在“OCR 模型”管理器分别选择 ch/en/japan，下载或补齐模型；检查 cache 文件及上游校验结果 | 下载仅由用户明确触发；所有需要的模型文件存在且 SHA-256 校验通过；缓存路径位于 LocalAppData；取消/失败状态准确 | NOT RUN（桌面） |
+| M9-02 | 严格离线推理 | 安装所需模型后断开网络运行 OCR/FindText/WaitText；再移走其中一个模型文件重复运行 | 已安装模型时识别不请求网络；缺失模型明确报错并提示打开模型管理器；运行时不静默下载 | NOT RUN（桌面） |
+| M9-03 | 语言与文字方向 | 对简体中文、英语、日语样本分别 OCR，覆盖横排、多行、混合数字/标点及空白图 | 语言选择与模型一致；文本阅读顺序合理；空白图返回空结果；不支持语言明确报错 | NOT RUN（桌面） |
+| M9-04 | 行文本与置信度 | 对不同字体、大小、缩放、抗锯齿文本运行 OCR，改变 minConfidence | 返回全文与逐行 text/confidence；阈值只过滤低置信度行；置信度在 0–1；空结果不伪造命中 | NOT RUN（桌面） |
+| M9-05 | 矩形/多边形与屏幕坐标 | 对窗口内截图、区域截图和副屏左/上方的多显示器截图识别；核对 polygon/矩形和 screenX/Y | 局部坐标以图像零基像素为基准；screen 坐标只在截图有 screen origin 时返回；负坐标和边界映射正确 | NOT RUN（桌面） |
+| M9-06 | FindText 匹配 | 对大小写、中文子串、整行、重复匹配和置信度阈值调用 contains/exact | contains/exact 语义符合说明；按阅读顺序返回第一个匹配行；未命中返回 nil | NOT RUN（桌面） |
+| M9-07 | WaitText 超时/暂停/停止 | 分别在文字立即出现、延迟出现、始终不出现时调用；中途 F11 暂停、F12 停止 | 命中返回行；timeout 返回 nil；暂停在检查点生效；Stop 能终止独立 Worker；临时截图/整轮资源最终释放；UI 持续响应 | NOT RUN（桌面） |
+| M9-08 | 大图/损坏输入与稳定性 | 输入超过 16 MP 图片、超过 64 MiB PNG 编码、损坏 PNG、空图；连续识别 100 次 | 超限在分配/推理前明确拒绝；损坏图片报错可诊断；不会使主 UI 崩溃；模型 session 与资源可正常释放 | NOT RUN（桌面） |
+

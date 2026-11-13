@@ -198,3 +198,71 @@ ReleaseImage(screen)
 - 图像资源 UI 从主窗口工具栏“图像资源”打开：导入 PNG 后可列表、预览、重命名、校验 schema/路径/尺寸/文件大小/SHA-256，并复制相对路径到剪贴板。清单写入脚本旁的 .images.json，图片放在 .assets/；在脚本中使用复制的路径，例如 LoadImage("task.assets/<id>.png")，相对路径以脚本目录为基准。静态字面 LoadImage 依赖仍在时不能移除资源；动态路径仅提示无法静态分析。脚本重命名/复制会同步改写资源目录前缀和清单；删除脚本会删除对应清单与资产目录。移除清单条目不会删除原 PNG。
 - 主窗口工具栏“视觉调试：开/关”控制屏幕覆盖层。它显示截图区域、颜色点/颜色块和找图命中框；标签可含相似度、RGB 与耗时。覆盖层是点击穿透窗口；Windows Display Affinity 排除截图为系统能力，必须在目标 Windows 环境实测。已关闭覆盖层不处理输入。
 - CaptureWindow/CaptureClient 读取当前桌面可见合成像素，不保证覆盖窗口后台内容，也不承诺硬件加速或受保护表面可截图。未实现 OCR；所有 M8 Windows 桌面检查仍需按验收表实测。
+
+## 10. OCR 文字识别（main 开发版，未包含在 preview.4）
+
+首次使用 OCR 时，先打开主窗口工具栏的 **“OCR 模型”**。选择简体中文、英语或日语，点击“下载/补齐模型”。下载器会检查上游模型文件的 SHA-256，并把模型缓存到：
+
+`%LOCALAPPDATA%\\Anjian2026\\Ocr\\Models`
+
+只有你明确点击下载时程序才联网；脚本运行时默认严格离线。缺少模型会报告错误并提示打开模型管理器，不会自动下载。
+
+### 识别一张已有图像
+
+```lua
+local screen = CaptureScreen()
+local result = OCR(screen, "ch", 0.55)
+
+Log(result.text)
+Log("识别行数：" .. result.lineCount)
+
+for _, line in ipairs(result.lines) do
+    Log(line.text .. " confidence=" .. line.confidence)
+    Log("局部区域：" .. line.x .. "," .. line.y .. " " ..
+        line.width .. "x" .. line.height)
+    if line.screenX then
+        Log("屏幕坐标：" .. line.screenX .. "," .. line.screenY)
+    end
+end
+
+ReleaseImage(screen)
+```
+
+`OCR` 返回全文、逐行文本、置信度、矩形和多边形边界。局部 `x/y` 是图像左上角起点的零基像素。截图额外包含 `screenX/screenY`，表示虚拟桌面绝对物理像素；副屏位于左侧或上方时允许负坐标。磁盘图片只有局部坐标。
+
+### 在图像中查找文字
+
+```lua
+local screen = CaptureScreen()
+local hit = FindText(screen, "登录", "ch", 0.70, "contains")
+
+if hit then
+    Log("命中：" .. hit.text)
+    MoveTo(hit.screenX, hit.screenY)
+else
+    Log("没有找到登录文字")
+end
+
+ReleaseImage(screen)
+```
+
+`matchMode` 支持 `contains`（不区分大小写包含匹配）和 `exact`（不区分大小写整行完全匹配）。未命中返回 nil，低于 `minConfidence` 的行会被忽略。
+
+### 等待屏幕文字出现
+
+```lua
+local hit = WaitText("订单提交成功", 15000, 250, "ch", 0.65, "contains")
+if hit then
+    Log("识别到：" .. hit.text)
+else
+    Log("等待超时")
+end
+```
+
+`WaitText` 默认最多等待 10 秒、每 300 毫秒重新截图识别；timeout 范围 0–600000 毫秒，interval 范围 10–5000 毫秒。timeout=0 仍会立即检测一次。等待期间按 F11 暂停后会在检查点停住，F12 会终止独立 OCR Worker 并清理该轮图片资源。
+
+### 当前限制
+- 首轮支持语言代码 `ch`、`en`、`japan`；`zh-cn`/ `zh` 和 `ja` 也会在桥接层归一化。
+- 单张 OCR 图像最多 16,000,000 像素；PNG IPC 最多 64 MiB。超大截图先 CropImage 缩小区域。
+- OCR 读取当前桌面可见合成画面；被遮挡窗口的后台像素不保证可见，不绕过 UIPI/UAC/安全桌面。
+- PaddleOcrNet 适配器只在独立 Lua Worker 中运行，主 UI 不执行 OCR 推理。桌面识别精度、速度、语言模型体积和长时间内存表现需要后续 Windows 10/11 集中实机验收。

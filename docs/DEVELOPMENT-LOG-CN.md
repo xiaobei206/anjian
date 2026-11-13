@@ -555,3 +555,26 @@ M4 基础调试器与 M5 可视化录制/动作列表均已完成 Windows CI 验
 
 ### 精确后续
 下一会话仍只做 M8-DESKTOP-ACCEPTANCE：在可交互的 Windows 10/11 桌面使用最新 main 对应的 win-x64 artifact，逐项记录 OS build、DPI、显示器布局/负坐标、步骤、结果与日志/截图；优先覆盖资源管理 UI、manifest/路径/hash 防护、GDI 截图/透明像素、颜色/模板算法、overlay 点击穿透和 Display Affinity 截图隔离。没有实际桌面和证据时，保持 M8 IN_PROGRESS、M8-01..M8-18 NOT RUN，不进入 M9。
+
+
+## 2026-11-13 — M9 OCR 首轮实现（Windows CI 待验证，桌面验收延期）
+
+### 已提交代码
+- API registry 0.6 → 0.7；公开 Lua API 78 → 81，新增 `OCR`、`FindText`、`WaitText`。函数/参数手册由注册表重新生成，编辑器提示仍直接读取相同注册表。
+- 新增 Core 引擎中立 OCR DTO 与 `IOcrRecognitionService`；Core 不引用 PaddleOcrNet、ONNX Runtime 或第三方模型类型。
+- App 引入 PaddleOcrNet 2.4.0 适配层，CPU 模式；主窗口新增“OCR 模型”管理器，支持 ch/en/japan 语言模型显式下载、进度/取消和 SHA-256 校验。缓存目录为 `%LOCALAPPDATA%\\Anjian2026\\Ocr\\Models`。
+- Worker 端采用严格离线模式。模型缺失明确报错并提示用户下载；脚本执行时不会自动联网。识别仅在独立 Lua Worker 中运行。
+- 新增图像 PNG 导出 IPC，受限为 16 MP 和 64 MiB；OCR 行结果包含全文、confidence、局部矩形与 polygon，截图还保留 screenX/screenY。
+- WaitText 使用主进程截图，在每次轮询前走 checkpoint，支持 Pause；Stop 终止 Worker，并通过 finally 释放每轮截图 ID。
+- 新增 Core Lua API 自动化测试：OCR table/置信度/坐标原点、FindText contains/exact、WaitText checkpoint/资源释放、非法语言/置信度/模式/interval 校验。
+
+### 技术选择
+- 精确 NuGet 依赖：PaddleOcrNet 2.4.0（MIT；.NET 10），固定在 Anjian.App，不进入 Core。源代码参考 <https://github.com/FarhanLodi/PaddleOcrNet/tree/v2.4.0>。
+- 模型只有通过用户点击“OCR 模型”后下载；识别服务的 `Offline=true`，CPU provider，不要求用户安装 GPU Runtime。模型/语言的完整许可和分发清单仍需在 M14 发布审查时最终确认。
+- 上游项目规模较小，使用适配层隔离并锁定版本；如 Windows CI/许可/质量不达标，可替换引擎但不改变 Core DTO 与 Lua API。
+
+### 验证状态
+- 当前会话本地环境为 Debian 13，无 .NET SDK；本地 Restore/Build/Test：NOT RUN。
+- Windows Actions 当前 M9 提交结果尚待检查；在实际获取到 Restore/Build/Test/API handbook/self-contained publish 结果前，不将其标为 PASS。
+- M9-01..M9-08 真实 Windows 桌面验收均 NOT RUN，延后至 M14 功能开发结束后的统一验收；M8-01..M8-18 状态也不改变。
+- 未修改 VERSION、AssemblyVersion、FileVersion；未创建 Release，preview.4 正式 ZIP/SHA256 不变。

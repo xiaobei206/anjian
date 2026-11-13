@@ -308,3 +308,25 @@ M4 基础调试器已在 main 实现并通过 Windows CI。具体实现提交与
 ### 下一会话唯一任务（保持不变）
 
 继续 M8-DESKTOP-ACCEPTANCE。执行前先核对 main HEAD 和本文件，再读取 `docs/ACCEPTANCE-TEST-CN.md` 的 M8-01..M8-18 全部步骤。只有在获得可交互的 Windows 10/11 桌面（或收到可追溯的用户实测环境、步骤、日志/截图证据）后，才能逐项执行并改变状态。若仍只有远程 GitHub/CI 能力，必须继续保持全部 NOT RUN，不得用 Windows Server CI、静态代码审查或理论推断替代；不要进入 M9，不修改 VERSION，不创建 Release。
+
+
+## 当前策略覆盖：先完成 M9–M14 全部开发，再集中实机验收（用户决定，2026-11-13）
+
+本节优先于文档中早先的“M8-DESKTOP-ACCEPTANCE 是下一任务”记录。用户最新明确要求：直接调整文档进入 M9，先整体开发完成，之后由用户统一进行 Windows 实机验收。
+
+- M1–M13 桌面实机验收不再阻塞下一阶段开发；所有尚未执行项目继续保持 NOT RUN。M8-01..M8-18 不改为 PASS。
+- M14 所有功能开发完成后集中执行 Windows 10/11 实机测试；M14 正式 1.0.0 Release 仍必须等待这轮验收。
+- M9 首轮 API registry 已升为 0.7 / 81 项，新增 OCR、FindText、WaitText；Core DTO/interface、PaddleOcrNet 2.4.0 CPU 适配器、离线模型管理器、PNG IPC 已进入 main。
+- 模型下载由用户点击“OCR 模型”显式触发；Worker 识别使用 Offline=true，缓存位置 `%LOCALAPPDATA%\\Anjian2026\\Ocr\\Models`。当前真实识别质量和桌面运行表现未验收。
+
+### 当前 M9 代码检查点
+- API/Core 起始实现提交：`87d4bf8799e60ba65c16a8b0f88c61c38c7d6e9a`。
+- App 引擎/模型 UI/IPC 接入提交：`3858fd62e441bdd351bbd67b72eba64e6cf13c7b`。
+- MainForm 与 API 测试修复：`7da4316652e7d09e907b92c0f48b691d8ec8a288`。
+- Core OCR 测试 using 修复：`c9f51d5c7c7917e284336acda9dac88cfe5211c5`。
+- 产品/架构/API/路线图策略文档：`63a98d7de2ca0f81804a6a635c9829538ce1e9da`。
+- 函数手册 API 0.7 生成区：`95558736a2e0ebf8af5228217450e0bdb51d73da`。
+- M9 完整 README/使用说明/验收/交接日志正在本次会话继续完善；必须重新核对当前 main HEAD。
+
+### 下一会话唯一任务
+先核对本次 M9 首轮代码提交触发的 Windows Actions 结果。若失败，读取真实 job log 并修复；如果通过，按剩余 M9 目标继续补充功能/测试并把 M9 实现与 CI 状态更新为 DONE（桌面验收 NOT RUN、统一延期），然后进入 M10 参数、配置与脚本自定义 UI。不要回头要求先执行 M8 桌面验收，不修改 VERSION，不创建 Release。
