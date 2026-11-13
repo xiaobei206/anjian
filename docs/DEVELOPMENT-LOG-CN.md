@@ -485,3 +485,19 @@ M4 基础调试器与 M5 可视化录制/动作列表均已完成 Windows CI 验
 - `Read release version` / `Create GitHub Release` 按非 release commit 预期跳过；无新 Release，VERSION、preview.4 Release ZIP 和 SHA256 未变化。
 - M6-01..M6-10 Windows 桌面验收仍全部 NOT RUN；M1 Hook 与 M3/M4/M5 桌面验收仍 NOT RUN。CI 不等于桌面实机通过。
 - M5 sidecar schemaVersion 1 的坐标字段仍固定为 `virtual-desktop-physical-pixels`，动作生成继续用 `MoveTo`。持久窗口选择器和相对窗口坐标录制/回放重定位尚未实现；这是明确保留的产品缺口，不纳入本次 M6 API/Win32 交付完成声明。
+
+
+## 2026-11-13 — M7 — 控件自动化与前后台能力适配（实现中；待最新完整 CI）
+
+### 本轮实现
+- API registry 从 0.3 升为 0.4，新增 14 个公开 API，合计 54 项；同步生成函数参考、Lua API 说明、用户指南、架构说明、功能矩阵和 M7-01..M7-10 桌面验收清单。
+- 增加 UI Automation Control View 遍历和 Value/Text/Selection/SelectionItem/Toggle/Invoke Pattern 探测、值/文本/选择/勾选/Invoke 操作、密码字段 Value/Text 读取保护、控件缓存上限和元素失效后重新枚举策略。
+- UIA 与 COM AutomationElement 保存在独立 Lua worker。主进程通过本轮唯一命名管道把经过 M6 校验的窗口目标身份描述送给 worker；worker 每次操作前再向主进程复核原 M6 窗口 ID。脚本只能得到随机 binding/control ID，无法读取 HWND/COM 对象。Stop 通过杀死 worker 处理中途卡住的 UIA provider 调用。
+- WindowInput 留在主进程执行 SendInput，只接受 auto/foreground；校验窗口可见、非最小化、前台、键盘焦点与客户区坐标。通用后台鼠标/键盘/文本注入明确 unsupported；不静默回退、不伪造后台消息、不绕过权限边界。
+- 增加 `--automation-probe` 自建 WinForms 测试窗口，含文本框、密码框、复选框、组合框、列表和 Invoke 按钮，供真实 Windows 桌面手验。
+
+### CI 与修正记录
+- run `43350032217` 在首次 worker-provider 实现上 Build 失败：测试缺少 System.Text.Json 引用、provider 的能力对象用了错误变量名、JSON 序列化导入和窗口类名读取函数缺失。修复已提交至主线，最新候选 commit `3092e690a84b37503b47c037829ffd010ac2a6fc` 的 run `43350367379` 已通过 Restore、Release Build、Core Tests 和 API handbook check；publish/package 进行中。
+- 最新主线后续修正测试顺序，commit `7624763610ae83a74d73b71c048e179a98f0cd6f`，run `43350412493` 当前排队。最终完整 CI 结果待补。
+- Windows 桌面 M7-01..M7-10 全部 NOT RUN；CI 结果不能替代 UIA Pattern/焦点/UIPI/Stop 响应实机验证。
+- 本阶段未升级 VERSION、未创建 Release，已发布 v0.1.0-preview.4 资产不变。

@@ -113,3 +113,13 @@
 - 决策：建立机器可读公开 API 注册表；注册表为运行时绑定验证、编辑器补全、参数签名提示、命令面板和中文函数/参数手册的单一来源。
 - API 描述至少包含名称/签名、参数类型/必填/默认/范围/单位、返回值、错误、副作用、坐标语义、暂停/停止行为、后端/权限、最低 API 版本、示例、测试 ID 和实现状态。
 - 影响：新增或修改任何公开函数时必须同步更新注册表、自动生成的手册/提示和契约测试；计划函数不能显示为可用函数。
+
+
+## ADR-020：UI Automation 在可停止的 Lua worker 内运行
+
+- 状态：ACCEPTED（M7）
+- 决策：UI Automation/COM 调用必须运行在每轮独立 Lua worker 进程中，禁止把可能阻塞的第三方 provider 调用直接放在主 UI 进程。主进程仍是 M6 窗口引用与前台 SendInput 的唯一所有者。
+- 窗口绑定时，主进程仅经本轮唯一命名管道把经过 M6 引用校验的短期目标身份描述送入 worker；脚本只接触随机 binding/control ID，不暴露 HWND 或 .NET/UIA 对象。每个 UIA 操作前 worker 重新请求主进程复核原窗口 ID，并验证句柄、PID、线程、类名与进程启动时间。
+- Stop 通过终止 worker 来中断可能挂起的同步 UIA/COM provider 调用；主进程的 UI 不等待该 COM 调用结束，并继续执行统一输入释放。所有 binding 与 AutomationElement 缓存随 worker 生命周期结束。
+- UIA 的 Value/Selection/Toggle/Invoke 被定义为标准控件语义操作，不能称作通用后台键鼠输入。通用后台鼠标、键盘和文本注入在未经过具体技术验证之前明确返回 unsupported；不伪造 PostMessage 输入、不绕过 UIPI/UAC/安全桌面。
+- 影响：新增控件 API 时必须声明实际 Pattern、支持状态、错误/限制，并加入能力探测和 worker 停止测试。CI PASS 不视为 Windows 桌面验收完成。

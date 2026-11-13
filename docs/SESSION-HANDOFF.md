@@ -20,7 +20,7 @@
 - API 当前实现契约：[docs/LUA-API-CN.md](LUA-API-CN.md)。
 - 阶段路线图：[docs/ROADMAP-CN.md](ROADMAP-CN.md)。
 - 完整 IDE、窗口/坐标、图色/OCR、参数 UI、小精灵、插件及函数手册均为正式目标，不得再从大纲中删除或只标为可选远期项目。
-- 当前 main 已完成 M3 IDE、M4 基础调试器、M5 结构化录制/动作列表和 M6 坐标系统/窗口 API；下一阶段转入 M7 控件与前后台能力适配。公开 API 增改仍必须遵守 M2 单一注册表。
+- 当前 main 已完成 M3 IDE、M4 基础调试器、M5 结构化录制/动作列表和 M6 坐标系统/窗口 API；M7 控件与前后台能力适配正在完成。公开 API 增改仍必须遵守 M2 单一注册表。
 
 
 ## preview.4 窗口与托盘决策
@@ -234,11 +234,14 @@ M4 基础调试器已在 main 实现并通过 Windows CI。具体实现提交与
 - M5 Recorder 当前 schemaVersion 1 仍固定 `virtual-desktop-physical-pixels`；Lua generated block 使用 `MoveTo`。窗口相对录制/回放绑定尚未实现，切勿将其描述为支持窗口移动后自动跟随。
 - M6 不提供后台输入、控件值读写、UI Automation、图像/OCR，不绕过 UIPI/UAC/安全桌面。
 
-## 下一会话接手指令
+## M7 当前进度与接手指令
 
-开始前必须重新核对 main 最新 HEAD，再读取 `AGENTS.md`、`README.md`、本文件、`docs/ROADMAP-CN.md`、`docs/PRD-CN.md`、`docs/FEATURE-MATRIX-CN.md`。按本 handoff 指定的唯一任务继续；不得重复询问仓库已有答案。默认直接在 main 小步提交，不创建长期分支/PR。
-
-**下一会话唯一开发任务：M7 — 控件自动化与前台/后台能力适配。** 严格以 PRD 第 2.6/2.7 节、FEATURE-MATRIX F14/F15、ROADMAP M7 和现有 M6 WindowFind/WindowEnumerate/WindowGetInfo/窗口引用 API 为准。
+- 当前 main 开发头（开始本次文档更新前）为 `7624763610ae83a74d73b71c048e179a98f0cd6f`；继续操作前必须重新核对 main 最新 HEAD。
+- API registry version `0.4`，共 54 个公开函数（原 40 个 + M7 新增 14 个）。新增函数：WindowBind、WindowUnbind、WindowGetCapabilities、ControlEnumerate、ControlGetInfo、ControlGetValue、ControlSetValue、ControlGetText、ControlGetSelection、ControlSelect、ControlGetToggleState、ControlToggle、ControlInvoke、WindowInput。
+- UI Automation 已隔离到独立 Lua worker，标准 Pattern 的绑定层/能力探测、密码读取保护、M6 窗口身份二次验证与前台 WindowInput 边界已接入；自建 WinForms `--automation-probe` 可用于手工验证。
+- Windows Actions run `43350367379` 对代码 commit `3092e690a84b37503b47c037829ffd010ac2a6fc` 已完成 Restore、Release Build、Core Tests 和 API handbook check；win-x64 publish/package 进行中。最新 main commit `7624763610ae83a74d73b71c048e179a98f0cd6f` 已修正契约测试里 WindowInput/Unbind 的调用顺序，run `43350412493` 排队待验。
+- **仍未结项**：必须等待最新 main 的完整 Windows CI 通过；若再失败，检查完整日志并修复后重跑。确认 registry->function reference 的 `--check` 通过后，更新 run ID / commit / 结果并把 ROADMAP M7 状态改为 DONE（仅代码/CI范围），保留 M7-01..M7-10 桌面验收 NOT RUN。
+- 后台语义操作限于目标 provider 实际暴露的 UIA Pattern。通用后台鼠标/键盘/文本注入当前明确 unsupported；不要补入无验证的 PostMessage 假后台。不得绕过 UIPI/UAC/安全桌面。
 
 ### M7 实施范围
 1. **能力探测与报告**：建立后端能力模型，明确每个目标窗口对控件树、读取/设置文本、选择项、勾选状态、Invoke、前台鼠标/键盘、后台消息/自动化的逐项支持状态；不得只返回一个模糊的“支持后台”布尔值。API 查询目标窗口当前支持能力、后端名称、拒绝原因与限制。
