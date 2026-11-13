@@ -1581,7 +1581,8 @@ internal sealed class MainForm : Form
             var initial = ScriptParameterService.LoadSavedValues(ScriptParameterService.ConfigurationPath(scriptPath), schema, Path.GetDirectoryName(scriptPath));
             using var dialog = new ScriptParameterDialog(scriptPath, schema, initial);
             if (dialog.ShowDialog(this) != DialogResult.OK) return false;
-            values = dialog.Values;
+            values = ScriptParameterValidator.ResolveRuntimePaths(
+                schema, dialog.Values, Path.GetDirectoryName(Path.GetFullPath(scriptPath))!);
             return true;
         }
         catch (Exception ex)
