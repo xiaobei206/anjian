@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.IO.Compression;
 using System.Text;
 using System.Text.Json;
@@ -18,6 +19,42 @@ public sealed class PluginPackageStoreTests : IDisposable
         Directory.CreateDirectory(_temporaryRoot);
         _storeRoot = Path.Combine(_temporaryRoot, "installed");
         _store = new PluginPackageStore(_storeRoot, "1.2");
+    }
+
+
+    [Fact]
+    public void PublishedRuntimeBuildsAndRunsAnIndependentPluginWorker()
+    {
+        var runtime = Environment.GetEnvironmentVariable("ANJIAN_PUBLISHED_RUNTIME");
+        if (string.IsNullOrWhiteSpace(runtime))
+            return; // Repeated by Windows CI after the actual self-contained publish.
+        Assert.True(Directory.Exists(runtime), "Published runtime directory does not exist: " + runtime);
+
+        var executable = Path.Combine(runtime, "Anjian.App.exe");
+        Assert.True(File.Exists(executable), "Published apphost is missing: " + executable);
+        var logPath = Path.Combine(_temporaryRoot, "plugin-worker-smoke.log");
+        using var process = Process.Start(new ProcessStartInfo
+        {
+            FileName = executable,
+            WorkingDirectory = runtime,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            Environment =
+            {
+                ["ANJIAN_PLUGIN_SMOKE_LOG"] = logPath
+            },
+            ArgumentList = { "--plugin-smoke-test" }
+        });
+        Assert.NotNull(process);
+        if (!process!.WaitForExit(90_000))
+        {
+            process.Kill(entireProcessTree: true);
+            Assert.Fail("Published plugin Worker smoke test did not finish within 90 seconds.");
+        }
+
+        var log = File.Exists(logPath) ? File.ReadAllText(logPath) : "";
+        Assert.True(process.ExitCode == 0, $"Published plugin Worker smoke failed ({process.ExitCode}). {log}");
+        Assert.Contains("plugin-worker-ok:verified-module", log, StringComparison.Ordinal);
     }
 
     [Fact]
