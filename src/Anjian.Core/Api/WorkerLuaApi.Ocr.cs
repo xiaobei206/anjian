@@ -61,10 +61,10 @@ public sealed partial class WorkerLuaApi
                 catch (IOException) { }
             }
 
-            if (timer.ElapsedMilliseconds >= timeout)
-                break;
             var remaining = timeout - (int)Math.Min(timeout, timer.ElapsedMilliseconds);
-            Thread.Sleep(Math.Min(interval, remaining));
+            if (remaining <= 0)
+                break;
+            _ = pipe.Request("delay", milliseconds: Math.Min(interval, remaining));
         }
 
         return null;

@@ -108,14 +108,39 @@ public sealed class OcrApiTests
         }
     }
 
+    [Fact]
+    public void WaitTextUsesPauseAwareDelayBetweenPolls()
+    {
+        var pipe = new FakePipe();
+        var service = new FakeOcr { MatchAfterCall = 2 };
+        using var lua = new Lua(openLibs:true);
+        LuaApiRuntime.Register(lua, new WorkerLuaApi(pipe, lua, ocrService:service));
+
+        var values = lua.DoString("""
+            local hit = WaitText("登录", 1000, 10, "ch", 0.5, "contains")
+            return hit.text
+            """);
+
+        Assert.Equal("欢迎登录", values[0]?.ToString());
+        Assert.Equal(2, pipe.Types.Count(x => x == "image-capture-screen"));
+        Assert.Contains(pipe.Types, x => x == "delay");
+        Assert.Equal(2, pipe.Types.Count(x => x == "checkpoint"));
+    }
+
     private sealed class FakeOcr : IOcrRecognitionService
     {
+        private int _calls;
+        public int MatchAfterCall { get; init; } = 1;
         public string? LastLanguage { get; private set; }
         public double LastConfidence { get; private set; }
+
         public OcrRecognitionResult Recognize(ReadOnlyMemory<byte> pngBytes,string language,double minConfidence)
         {
             LastLanguage=language;
             LastConfidence=minConfidence;
+            var call = Interlocked.Increment(ref _calls);
+            if (call < MatchAfterCall)
+                return new OcrRecognitionResult("",[],[language],[],100,60,12);
             return new OcrRecognitionResult(
                 "欢迎登录",
                 [new OcrTextLine("欢迎登录",0.92,5,6,30,10,[new OcrTextPoint(5,6),new OcrTextPoint(35,6),new OcrTextPoint(35,16),new OcrTextPoint(5,16)])],

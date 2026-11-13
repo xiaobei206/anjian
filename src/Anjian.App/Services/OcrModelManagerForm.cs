@@ -20,6 +20,7 @@ internal sealed class OcrModelManagerForm : Form
     private readonly Button _download = new() { Text = "下载/补齐模型", Width = 130 };
     private readonly Button _cancel = new() { Text = "取消", Width = 90, Enabled = false };
     private CancellationTokenSource? _downloadCts;
+    private bool _closeAfterDownload;
 
     public OcrModelManagerForm()
     {
@@ -129,18 +130,33 @@ internal sealed class OcrModelManagerForm : Form
         }
         finally
         {
-            _downloadCts.Dispose();
+            _downloadCts?.Dispose();
             _downloadCts = null;
+            if (IsDisposed || Disposing)
+                return;
+
             _download.Enabled = true;
             _cancel.Enabled = false;
             _language.Enabled = true;
+            if (_closeAfterDownload)
+            {
+                _closeAfterDownload = false;
+                BeginInvoke(new Action(Close));
+                return;
+            }
             RefreshModelState();
         }
     }
 
     protected override void OnFormClosing(FormClosingEventArgs e)
     {
-        _downloadCts?.Cancel();
         base.OnFormClosing(e);
+        if (e.Cancel || _downloadCts is null)
+            return;
+
+        _closeAfterDownload = true;
+        _status.Text = "正在取消模型下载，完成后关闭窗口……";
+        _downloadCts.Cancel();
+        e.Cancel = true;
     }
 }
