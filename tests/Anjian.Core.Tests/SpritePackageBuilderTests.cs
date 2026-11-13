@@ -364,7 +364,7 @@ public sealed class SpritePackageBuilderTests
             if (!process!.WaitForExit(90_000))
             {
                 process.Kill(entireProcessTree: true);
-                Assert.True(false, "Packaged sprite launcher did not finish its Worker smoke test within 90 seconds.");
+                Assert.Fail("Packaged sprite launcher did not finish its Worker smoke test within 90 seconds.");
             }
             var log = File.Exists(logPath) ? File.ReadAllText(logPath) : "";
             Assert.True(process.ExitCode == 0, $"Packaged sprite smoke test failed ({process.ExitCode}). {log}");
