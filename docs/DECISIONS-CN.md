@@ -233,3 +233,15 @@
 - 范围限制：本批提供有上限的缓冲请求，不是任意 TCP、WebSocket、代理配置、Cookie jar、下载器、上传器或浏览器会话。通过 body/json 可以向已授权服务发送文本/JSON；大文件/流式传输保留后续独立设计。网络请求只由脚本显式调用，不会自动联网。
 - 验证：Core 契约测试使用可注入 HttpMessageHandler 覆盖授权、重定向、请求头、timeout、Stop、响应上限、JSON 与 Worker Lua table。Windows Actions run [43427860126](https://github.com/xiaobei206/anjian/actions/runs/43427860126) SUCCESS：161/161 Core tests、0 warnings/0 errors、103 项 API handbook、自包含包与 Sprite/Worker smoke、ZIP/SHA256/artifact upload 全 PASS；Artifact 14037418047，87,234,303 bytes，SHA-256 f8eafdbeb01727c96467a1882a95e9e55db40e4dd83d82e82c19ac3199b314bd。WinForms 权限审阅、真实网络/DPI/Stop 交互仍留 M14。
 
+
+## ADR-030：本地 Lua 插件包、权限交集与 Worker 生命周期
+
+- 状态：ACCEPTED（M12-10 契约冻结；具体实现与 CI 状态以路线图/handoff 最新条目为准）。
+- 插件采用本地目录或 ZIP 包，根 manifest 为 Anjian.Plugin.json，schemaVersion=1。格式详见本地插件包格式规格 PLUGIN-MANIFEST-CN.md。pluginId 稳定、版本语义化，按 pluginId/version 独立安装；初次安装默认禁用。
+- manifest 声明 minApiVersion/maxApiVersion（major.minor），以唯一 Lua API registry 当前 apiVersion 做区间兼容检查；不修改当前 Lua API registry，也不将插件提供的函数伪装成已注册的内置 API。
+- files 排除 manifest 自身、但必须精确列出包内其余文件和 SHA-256；安装和每次运行都校验完整闭合文件集、SHA、大小、路径边界和 reparse/symlink。拒绝 DLL/EXE/Shell/驱动/安装器，不执行包内原生代码；ZIP 解包有文件数与解压字节上限，拒绝穿越、重复路径和链接。
+- 插件 entry 和模块仅由单独 Worker 执行。Worker 对 entry/module 的读取使用 manifest hash；require 只加载模块根下 manifest 已登记的 Lua 文件，未知模块、改动文件或加载异常会失败，不影响主 UI 进程。
+- 权限取三层交集：插件 manifest permissions、entry sidecar entry.lua.permissions.json 中的脚本请求及用户本次逐项批准 Grant。文件根求交集时仅保留较窄重叠根；EXE 路径/HTTP host/method/dialog 为精确交集，clipboard/HTTP 明文 bool 使用 AND；缺少批准则为空 Grant。host 每条 IPC 仍复核有效 Grant，unknown IPC fail-closed。
+- Catalog schemaVersion=1，原子写入并保留未来版本/损坏文件；安装/升级不覆盖现有不同内容，同 ID/版本目录已存在而 hash 不符时失败。禁用项不可运行，卸载仅允许已禁用项；用户数据与包文件分离。
+- M12-10 不增加 Lua 公共函数，因此 API registry 保持 1.2 / 103，FUNCTION-REFERENCE 和 IDE 补全来源不变。插件动态贡献 API、命令面板集成与 M12-11 小精灵 sidecar 接入不在此子任务范围。
+- 验证分为 Core 包/哈希/ZIP/权限交集/生命周期自动测试、Windows CI Worker smoke；真实 WinForms/DPI/权限交互继续属于 M14，不以 CI 代替。
