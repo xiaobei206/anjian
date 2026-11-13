@@ -1,5 +1,6 @@
 using System.IO;
 using System.IO.Pipes;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Anjian.Core.Api;
@@ -26,12 +27,18 @@ internal static class WorkerProgram
             pipe.Connect(10_000);
             using var reader = new StreamReader(pipe, new UTF8Encoding(false), false, 4096, leaveOpen: true);
             using var writer = new StreamWriter(pipe, new UTF8Encoding(false), 4096, leaveOpen: true) { AutoFlush = true };
-            var client = new WorkerPipeClient(reader, writer);
+
+            var handshakeLine = reader.ReadLine() ?? throw new IOException("主进程未发送 Worker 会话握手。");
+            var handshake = JsonSerializer.Deserialize<WorkerHandshake>(handshakeLine)
+                ?? throw new InvalidDataException("Worker 会话握手无效。");
+            ValidateHandshake(handshake);
+            var client = new WorkerPipeClient(reader, writer, handshake);
             var launchPayload = client.Request("worker-ready");
             var launch = string.IsNullOrWhiteSpace(launchPayload)
-                ? new WorkerLaunchPayload()
+                ? throw new InvalidDataException("主进程未返回启动载荷。")
                 : JsonSerializer.Deserialize<WorkerLaunchPayload>(launchPayload)
                     ?? throw new InvalidDataException("主进程返回了无效的启动参数。");
+            ValidateLaunchIdentity(handshake, launch);
             var debugOptions = launch.DebugOptions;
 
             try
@@ -113,9 +120,46 @@ internal static class WorkerProgram
             return 70;
         }
     }
+
+    private static void ValidateHandshake(WorkerHandshake handshake)
+    {
+        if (!Guid.TryParseExact(handshake.InstanceId, "N", out var instance) ||
+            !string.Equals(instance.ToString("N"), handshake.InstanceId, StringComparison.Ordinal) ||
+            !Guid.TryParseExact(handshake.WorkerAttemptId, "N", out var attempt) ||
+            !string.Equals(attempt.ToString("N"), handshake.WorkerAttemptId, StringComparison.Ordinal) ||
+            handshake.SessionNonce.Length != 64 ||
+            !handshake.SessionNonce.All(Uri.IsHexDigit))
+            throw new InvalidDataException("Worker 会话身份格式无效。");
+    }
+
+    private static void ValidateLaunchIdentity(WorkerHandshake handshake, WorkerLaunchPayload launch)
+    {
+        if (!string.Equals(handshake.InstanceId, launch.InstanceId, StringComparison.Ordinal) ||
+            !string.Equals(handshake.WorkerAttemptId, launch.WorkerAttemptId, StringComparison.Ordinal) ||
+            !FixedNonceEquals(handshake.SessionNonce, launch.SessionNonce))
+            throw new InvalidDataException("Worker 启动载荷身份与当前管道会话不匹配。");
+    }
+
+    private static bool FixedNonceEquals(string expected, string actual)
+    {
+        if (expected.Length != 64 || actual.Length != 64)
+            return false;
+        try
+        {
+            return CryptographicOperations.FixedTimeEquals(
+                Convert.FromHexString(expected), Convert.FromHexString(actual));
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
+    }
 }
 
-internal sealed class WorkerPipeClient(StreamReader reader, StreamWriter writer) : ILuaCommandPipe
+internal sealed class WorkerPipeClient(
+    StreamReader reader,
+    StreamWriter writer,
+    WorkerHandshake handshake) : ILuaCommandPipe
 {
     public void Send(string type, string? name = null, double x = 0, double y = 0, int milliseconds = 0, string? text = null) =>
         _ = Request(type, name, x, y, milliseconds, text);
@@ -124,7 +168,15 @@ internal sealed class WorkerPipeClient(StreamReader reader, StreamWriter writer)
     {
         var message = JsonSerializer.Serialize(new IpcMessage
         {
-            Type = type, Name = name, X = x, Y = y, Milliseconds = milliseconds, Text = text
+            Type = type,
+            InstanceId = handshake.InstanceId,
+            WorkerAttemptId = handshake.WorkerAttemptId,
+            SessionNonce = handshake.SessionNonce,
+            Name = name,
+            X = x,
+            Y = y,
+            Milliseconds = milliseconds,
+            Text = text
         });
         writer.WriteLine(message);
         var response = reader.ReadLine();
@@ -138,8 +190,20 @@ internal sealed class WorkerPipeClient(StreamReader reader, StreamWriter writer)
                 ? error.GetString()
                 : "自动化命令失败。");
 
+        ValidateResponseIdentity(root, handshake);
         return root.TryGetProperty("payload", out var payload) && payload.ValueKind == JsonValueKind.String
             ? payload.GetString()
             : null;
+    }
+
+    private static void ValidateResponseIdentity(JsonElement root, WorkerHandshake expected)
+    {
+        if (!root.TryGetProperty("instanceId", out var instance) ||
+            instance.GetString() != expected.InstanceId ||
+            !root.TryGetProperty("workerAttemptId", out var attempt) ||
+            attempt.GetString() != expected.WorkerAttemptId ||
+            !root.TryGetProperty("sessionNonce", out var nonce) ||
+            nonce.GetString() != expected.SessionNonce)
+            throw new InvalidDataException("主进程响应不属于当前 Worker 会话。");
     }
 }
