@@ -203,6 +203,26 @@ public sealed class RunInstanceCoordinator
         }
     }
 
+    public RunInstanceStopResult RequestTimeout(RunInstanceId instanceId)
+    {
+        ArgumentNullException.ThrowIfNull(instanceId);
+        lock (_sync)
+        {
+            var entry = GetEntry(instanceId);
+            var current = entry.Snapshot;
+            if (RunInstanceLifecycle.IsTerminal(current) || current.Outcome != RunInstanceOutcome.None)
+                return new RunInstanceStopResult(false, false, current);
+
+            if (current.State is not (RunInstanceState.Starting or RunInstanceState.Running or RunInstanceState.Paused))
+                return new RunInstanceStopResult(false, false, current);
+
+            current = RunInstanceLifecycle.Transition(current, RunInstanceState.TimeoutRequested);
+            current = RunInstanceLifecycle.Transition(current, RunInstanceState.Cancelling);
+            entry.Snapshot = current;
+            return new RunInstanceStopResult(true, false, current);
+        }
+    }
+
     public RunInstanceSnapshot MarkForceTerminating(RunInstanceId instanceId)
     {
         ArgumentNullException.ThrowIfNull(instanceId);
