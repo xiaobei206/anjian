@@ -305,7 +305,7 @@ public sealed class ScriptFileSystemTests
         using (var stream = new FileStream(cancellableSource, FileMode.CreateNew, FileAccess.Write, FileShare.None))
             stream.SetLength(ScriptFileSystem.MaximumTransferBytes);
         using var cts = new CancellationTokenSource();
-        cts.CancelAfter(TimeSpan.FromMilliseconds(20));
+        cts.Cancel(); // Deterministic cancellation before the copy commit boundary.
         var cancelledDestination = Path.Combine(sandbox.Root, "cancel-destination.bin");
         File.WriteAllText(cancelledDestination, "preserve-existing-target");
         Assert.Throws<OperationCanceledException>(() =>
