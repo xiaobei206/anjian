@@ -265,7 +265,7 @@ M7 实现/CI 已完成不代表 M7-01..M7-10 Windows 桌面验收通过；这些
 2. M12-08：DONE（Windows CI run 43414530292 全 PASS）；精确 EXE 启动/等待/查询及退出状态，不开放任意 Shell；真实桌面验收留 M14。
 3. M12-09：DONE（Windows Actions run 43427860126 全 PASS：161/161 Core tests、0 warnings/0 errors、API handbook 103 项、自包含 win-x64/Sprite Worker smoke/ZIP/SHA256 上传全通过）；HttpRequest、精确主机/方法、HTTPS 默认、HTTP 单独审批、重定向逐跳授权、超时/Stop、请求/响应上限；真实网络桌面验收留 M14。
 4. M12-10：DONE（本地 manifest/目录 ZIP、安全校验、API 兼容、三方权限交集、版本隔离、管理窗口与独立 Worker；自动化结果见下方 M12-10 实施与验证记录；真实桌面验收 M14）。不加载任意 DLL，不在主 UI 执行插件 Lua。
-5. M12-11：小精灵包构建/manifest 收集 permissions sidecar，Launcher 复用逐次权限审阅；不得在缺少批准时扩大 Grant。
+5. M12-11：DONE（Windows Actions run 43436997492 全 PASS：173/173 Core tests、0 warnings/0 errors、API handbook、自包含 win-x64 发布、Sprite/Plugin Worker smoke、ZIP/SHA256 与 artifact upload 全通过）。小精灵按入口收集并绑定 permissions sidecar，Launcher 按 manifest SHA-256 对正在审阅的字节做校验并复用逐次权限审阅；无 sidecar 时为空 Grant，声明本身不授权。真实 WinForms/权限/DPI/多屏实机验收仍留 M14。
 6. 每批功能完成后同步 registry/API version、中文函数手册、IDE 提示和契约测试；Windows CI 不替代 M14 桌面验收。
 
 - 增加有边界的文件/目录、剪贴板、对话框、进程、HTTP(S)/JSON 等常用 API。
@@ -381,3 +381,12 @@ M7 实现/CI 已完成不代表 M7-01..M7-10 Windows 桌面验收通过；这些
 - 安装默认停用；catalog schema v1 原子写入并保留损坏/未来版本；同 ID/版本不覆盖不同内容；启用一个版本会停用同 ID 其他版本，卸载需先停用。已损坏安装包在列表中隔离显示并不能运行。
 - 权限为脚本入口 sidecar 请求 ∩ 插件 manifest 声明 ∩ 用户本次明确批准；文件根只保留重叠的较窄根，EXE/HTTP/dialog 集合精确相交，布尔权限 AND。没有 sidecar/批准时能力为空；host 对每条 IPC 再校验。插件在单独 Worker 的 Lua state 执行，受限 require 禁止普通 io/debug/dofile/loadfile/package 原生模块入口。
 - 管理 UI 可导入目录/ZIP、查看声明权限、显式启用/停用/卸载、逐次审阅权限并运行/暂停/停止插件。此任务没有新增公共 Lua API；registry 仍为 1.2 / 103，函数手册与 IDE 补全仍以 registry 为唯一来源，因此无需改写 FUNCTION-REFERENCE。
+
+
+### M12-11 小精灵权限 sidecar（2026-11-13；自动化 DONE，桌面审阅留 M14）
+
+- `<entry.lua>.permissions.json` 按入口独立收集，精确绑定到 `SpritePackageEntry.PermissionManifestPath`；文件进入 `Anjian.Sprite.json` 的 files 闭合清单，并纳入 SHA-256 / `SHA256SUMS.txt`。
+- 构建和包校验验证 schema v1、256 KiB 上限、reparse point 与入口绑定；每次启动所选入口再次校验文件、大小和 hash。Launcher 将 manifest 中的期望 SHA-256 传入权限审阅服务，服务对实际解析请求的同一份 UTF-8 字节验证哈希，避免仅先验证后重新读取而产生的内容替换窗口。
+- 复用既有逐次 WinForms 审阅；明确拒绝/取消不会启动 Worker。没有 sidecar 的入口合法但 Grant 为空；声明不代表批准。Host 对每条 IPC 仍独立检查 Grant，未修改公开 Lua API registry（1.2 / 103）。
+- 最新 Windows Actions run [43436997492](https://github.com/xiaobei206/anjian/actions/runs/43436997492) 对 HEAD `ff5dc1510f4f68fe23e4abf54e2c291f6df6229b` 全 PASS：Restore、Release Build 0 warnings / 0 errors、173/173 Core tests、API handbook check、自包含 win-x64 publish、发布包 Sprite 与 Plugin Worker smoke、ZIP/SHA256 及 artifact upload。Artifact ID `14044230189`，87,267,435 bytes，archive SHA-256 `8c4312eb072012db084917bd025d5640e105d623a4d7df819632bf7cf1e58fc0`；这是临时 Actions artifact，不是 GitHub Release。
+- 本地容器无 .NET SDK，local Restore/Build/Test 为 NOT RUN。Windows 10/11 WinForms 审阅 UI、批准/拒绝路径、DPI/多屏实机验收 NOT RUN，统一留 M14；不能用 CI smoke 代替。

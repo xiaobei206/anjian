@@ -45,8 +45,8 @@ M1–M13 的 Windows 桌面实机验收统一延期至 M14 全部功能开发完
 | F21 | 变量与流程 | Lua 原生变量/表/循环/函数、模块与可复用函数库 | Lua 原生语法可用；模块/工程集成部分 | M3/M10 | 示例库、模块查找和错误传播测试通过 |
 | F22 | 运行选项 | 次数、轮间隔、热键、超时、错误策略和运行实例状态 | 部分实现：次数/轮间隔、F10/F11/F12 | M1/M10 | 主/悬浮窗同步、持久化、停止/暂停和错误策略通过 |
 | F23 | 日志与诊断 | 结构化日志、级别/脚本/行号、导出、轮转、可复制错误报告 | 部分实现 | M2/M10 | Lua 运行失败可关联行号，日志脱敏且可导出 |
-| F24 | 小精灵打包器 | 独立运行包/EXE 入口、独立 UI、参数表单、图标、资源依赖 | DONE（M11 main；Windows CI run 229 的真实 self-contained 包/Worker 冒烟 PASS；桌面 UI/DPI 验收 M14） | M11 | 干净 Windows 用户环境无需 IDE 即能运行生成包 |
-| F25 | 打包完整性 | manifest、依赖检查、SHA256、版本/API 最低要求、配置迁移 | DONE（逐文件 SHA256、清单闭合校验、路径/资源/schema/OCR 验证；稳定 PackageId/EntryId；Windows CI run 229 PASS） | M11 | 损坏/缺失资源能被提前检测；版本和校验信息一致 |
+| F24 | 小精灵打包器 | 独立运行包/EXE 入口、独立 UI、参数表单、图标、资源依赖 | DONE（M11 + M12-11 main；Windows Actions run 43436997492 的 self-contained 包/Worker smoke PASS；权限审阅 UI/DPI 实机验收仍留 M14） | M11/M12 | 干净 Windows 用户环境无需 IDE 即能运行生成包；每个入口权限请求不串用且逐次审阅 |
+| F25 | 打包完整性 | manifest、依赖检查、SHA256、版本/API 最低要求、配置迁移 | DONE（逐文件 SHA256、清单闭合校验、路径/资源/schema/OCR 验证、稳定 PackageId/EntryId；M12-11 侧车按入口绑定并纳入 manifest/hash，启动时复核；Windows Actions run 43436997492 全 PASS） | M11/M12 | 损坏/缺失资源与权限侧车篡改能被检测；manifest、SHA256 和授权审阅依据一致 |
 | F26 | 自定义用户界面 | 标签、文本/数字框、开关、选项、文件/目录、热键等参数控件 | DONE（M10 参数设计器/动态表单及 M11 小精灵复用同一 schema/validator；配置跨包版本稳定隔离；自动化 PASS；WinForms/DPI/交互验收 M14） | M10/M11 | UI 可配置、参数验证和用户运行状态完整 |
 | F27 | 插件扩展 | 本地插件包、manifest、API 版本、权限提示、启停/卸载 | M12-10 本地 manifest/目录 ZIP 校验、生命周期、管理窗口与独立 Worker 已实现；Windows CI run 43433992383 PASS（171/171 tests、发布包插件/Sprite Worker smoke 与 artifact upload 全绿）；真实桌面验收 M14 pending。暂未提供第三方动态 API/命令注册 | M12 | 安装与每次运行都校验闭合文件/hash；权限为脚本请求、插件声明、用户本次批准三方交集；停用版本不能运行，异常限定到插件 Worker 会话 |
 | F28 | 文件/目录/剪贴板 | 受控文件操作、剪贴板、对话框与常用数据 API | PARTIAL：受控文件/目录 13 项与剪贴板/对话框 5 项 API 已实现；均使用本次 Grant 双层校验；Windows Actions run 43408020908 的 147/147 tests、Build、API handbook、自包含发布与 Sprite/Worker smoke 全 PASS；真实桌面交互待 M14 | M12 | 文件权限/链接/上限/取消契约测试；剪贴板读写、三类对话框、默认拒绝、伪造 IPC 与主线程/停止路径验证 |
