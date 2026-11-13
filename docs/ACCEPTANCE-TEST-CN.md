@@ -254,3 +254,27 @@ M7 使用 Windows 自带 UI Automation Control View / Pattern，不宣称任意�
 - LuaApiRegistryTests 覆盖：14 个新增公开函数绑定、worker-local UIA service 接口、内部 HWND 目标描述的 IPC 传递不向 Lua 返回 HWND、字符串结果、WindowInput 必填动作参数。
 - Windows Actions 负责 .NET Restore/Release Build/Core Tests、API 函数手册 `--check`、self-contained win-x64 publish 与 artifact/package；最终 run 结果将在 DEVELOPMENT-LOG-CN.md 记录。
 - 当前未在用户的 Windows 10/11 桌面执行 M7-01..M7-10，不能把这些项目标记为 PASS。
+
+## 14. M8 截图、图色与模板资源（main 核心 API/CI 已通过；桌面实测 NOT RUN）
+
+此处桌面项目必须在用户实际 Windows 10/11 桌面执行。CI 的 73/73 Core tests 和自包含发布成功不代表截图在真实 DPI、多显示器、遮挡与硬件加速场景已验收。
+
+| ID | 场景 | 操作 | 通过标准 | 当前状态 |
+|---|---|---|---|---|
+| M8-01 | 虚拟桌面截图 | 在单屏与副屏位于左侧/上方的多屏环境运行 CaptureScreen、GetImageSize | 宽高正确；屏幕原点可为负数；hasScreenCoordinates 与原点字段准确；不发生坐标重复换算 | NOT RUN（桌面） |
+| M8-02 | 窗口外框/客户区 | 对可见、未最小化窗口调用 CaptureWindow/CaptureClient，并改变窗口大小/位置 | 外框与客户区区域区分准确；窗口 ID 失效或窗口隐藏/最小化时明确失败；不宣称可读后台像素 | NOT RUN（桌面） |
+| M8-03 | 区域截图与坐标空间 | 分别用 screen、window、client、anchor、ratio 调用 CaptureRegion，包含负屏幕坐标和边界 | 截图区域与 M6 CoordinateToScreen/FromScreen 几何契约一致；无效/越界矩形有明确错误；MoveTo 原语义不变 | NOT RUN（桌面） |
+| M8-04 | PNG 加载/保存/裁剪 | LoadImage PNG，SaveScreenshot 到 PNG，CropImage 后再读取边角像素 | 文件释放及时；像素顺序/透明 alpha 正确；裁剪尺寸和屏幕原点偏移准确；非 PNG 输出扩展名被拒绝 | NOT RUN（桌面） |
+| M8-05 | 图像资源生命周期 | 连续创建资源到 128 个、累计到 256 MiB，测试 ReleaseImage、重复释放、轮次结束/Stop 清理 | 上限失败可诊断；释放后可继续创建；重复释放返回 false；脚本下一轮没有旧 ID/资源泄漏 | NOT RUN（桌面） |
+| M8-06 | RGB 像素与颜色容差 | 用测试图像检查 GetPixelColor/CompareColor，逐个调整 R/G/B 差值及 tolerance 边界 | 颜色为 0xRRGGBB；三个通道分别应用绝对差容差；越界坐标/非法参数明确报错 | NOT RUN（桌面） |
+| M8-07 | 单点找色 | 对已知色块调用 FindColor，设置区域、step、容差，并测试无命中 | 结果排序为自上而下/从左到右；无命中返回 nil；截图结果带正确 screenX/screenY | NOT RUN（桌面） |
+| M8-08 | 多点找色 | 使用 dx,dy,RRGGBB 分号模式；测试负偏移、越界点、格式错误与超过 256 点 | 所有相对点都满足才命中；格式错误/点数超限明确报错；不会读到区域外像素 | NOT RUN（桌面） |
+| M8-09 | 区域颜色计数 | 在已知测试区域调用 CountColors，改变宽高、容差与 step | 统计范围正确；step 稀疏采样结果与约定一致；区域非法时明确报错 | NOT RUN（桌面） |
+| M8-10 | 透明模板/阈值/灰度缩放 | 加载含透明区模板，验证 RGB、grayscale、scale=0.25/1/2/4 与非法范围 | 透明像素为通配；相似度分数/阈值稳定；灰度与最近邻缩放符合规格；全透明模板拒绝 | NOT RUN（桌面） |
+| M8-11 | 多结果与性能上限 | 使用多个相隔/相邻图标的模板，设置 maxResults、region、step；构造较大搜索 | 结果按扫描顺序、避免重叠重复；maxResults 上限 1000；超过 50,000,000 次像素比较时明确报错而非无限卡死 | NOT RUN（桌面） |
+| M8-12 | 等待/超时/暂停/停止 | 测试 WaitImage/WaitImageGone/WaitColor/WaitColorGone 的命中、未命中、stableCount、timeout，并在循环中按暂停/Stop | 连续条件重置准确；超时返回 nil/false；Pause 暂停轮询，Stop 能取消并清理资源；不把取消伪装为超时 | NOT RUN（桌面） |
+| M8-13 | 遮挡与保护内容边界 | 部分覆盖目标窗口，尝试对窗口与客户区截图；验证受保护/硬件加速应用 | 结果只承诺桌面合成的可见像素；不可读内容如实失败或显示为桌面实际像素，不尝试绕过安全限制 | NOT RUN（桌面） |
+| M8-14 | 模板资源 UI 与视觉调试层 | 在图像资源管理 UI 中导入/预览/命名模板；开启视觉调试层观察区域框、命中位置、相似度、颜色值与耗时 | 资源路径/版本可校验；可视化命中叠加准确且不会拦截输入；失败路径可诊断 | NOT RUN（UI 尚未实现） |
+
+### M8 自动化测试范围
+Windows Actions run [43353801969](https://github.com/xiaobei206/anjian/actions/runs/43353801969) 对 commit 1b87af713ff17c907feac6984bb96aa5dd8e821f 通过：Release Build 0 warnings / 0 errors；73 passed / 0 failed / 0 skipped；API handbook generation --check、self-contained win-x64 publish、ZIP/SHA256 package 与 artifact upload PASS。Pure-Core 自动测试覆盖像素原点/裁剪、颜色区域/容差、多点模式、透明模板、多结果、灰度/缩放、资源/参数边界、取消和连续确认；GDI 与真实桌面行为仍须执行本表手工验收。

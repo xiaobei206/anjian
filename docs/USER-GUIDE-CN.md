@@ -134,3 +134,53 @@ UI Automation 的后台 `ValuePattern.SetValue`、`SelectionItem.Select`、`Togg
 - 无限循环可能持续重复点击、输入或提交操作；使用前确认脚本和目标窗口。
 - 停止时执行输入释放，但如果进程崩溃、系统拒绝注入或目标应用丢失输入，仍应自行确认目标状态。
 - 当前 preview.4 尚不含图像识别、OCR、完整窗口相对坐标、插件或经过验证的后台输入。它们已进入完整产品正式目标；当前缺失项以 FEATURE-MATRIX-CN.md 为准。
+
+## 9. 截图、图色与模板找图（main 开发版，未包含在 preview.4）
+
+M8 的核心 Lua API 已进入 main，但尚未进入已发布的 v0.1.0-preview.4 Release。当前以脚本 API 形式使用；模板资源管理/预览 UI 和视觉调试叠加层还未完成。
+
+```lua
+-- 捕获当前虚拟桌面的可见合成画面
+local screen = CaptureScreen()
+local size = GetImageSize(screen)
+Log("screen=" .. size.width .. "x" .. size.height)
+
+-- 获取一个像素 RGB（颜色为 0xRRGGBB）
+local rgb = GetPixelColor(screen, 10, 20)
+if CompareColor(screen, 10, 20, 0xFF0000, 8) then
+    Log("这个像素接近红色")
+end
+
+-- 单点找色：未命中返回 nil；截图结果同时带局部 x/y 与 screenX/screenY
+local red = FindColor(screen, 0xFF0000, 8)
+if red then
+    Log("red at " .. red.screenX .. "," .. red.screenY)
+end
+
+-- 多点颜色模式使用 dx,dy,RRGGBB 分号列表
+local marker = FindMultiColor(screen, 0x112233, "1,0,FF0000;0,1,00FF00", 4)
+
+-- 加载模板；PNG 透明像素可用作模板通配区
+local template = LoadImage("C:\\scripts\\button.png")
+local hit = FindImage(screen, template, 0.95, 4, 0, 0, 0, 0, 1, false, 1)
+if hit then
+    Log("template at " .. hit.screenX .. "," .. hit.screenY ..
+        " similarity=" .. hit.similarity)
+end
+
+-- 等待目标稳定出现：默认超时 5000ms、间隔 100ms；stableCount=2 表示连续两次命中
+local ready = WaitImage(template, 0.95, 4, 5000, 100, false, 1, 2)
+if ready then
+    Log("目标连续两次检测命中")
+end
+
+ReleaseImage(template)
+ReleaseImage(screen)
+```
+
+### 使用限制
+- 所有图像 ID 仅在当前脚本运行轮次有效，不要写入文件或跨轮次重用。脚本结束/异常/停止后资源池会清空；长脚本应主动调用 ReleaseImage。
+- 单图最多 32,000,000 像素；每轮最多 128 个图像资源、256 MiB 缓存；模板单次搜索最多 50,000,000 次像素比较。
+- 找色颜色采用 0xRRGGBB；容差是 R/G/B 各通道独立允许的最大绝对差，并非 RGB 总距离。搜索区域使用图像局部零基像素，截图命中额外返回屏幕绝对坐标。
+- 模板找图默认 similarity 0.95、grayscale=false、scale=1；支持 0.25–4 倍最近邻缩放。Wait 系列支持 timeout、interval 和 stableCount 连续确认。
+- CaptureWindow/CaptureClient 读取的是当前桌面可见合成像素，不保证覆盖窗口的后台内容，也不承诺硬件加速或受保护表面可截图。未实现 OCR；M8 模板管理 UI 和视觉调试层仍待完成。

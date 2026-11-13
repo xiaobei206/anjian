@@ -20,7 +20,7 @@
 - API 当前实现契约：[docs/LUA-API-CN.md](LUA-API-CN.md)。
 - 阶段路线图：[docs/ROADMAP-CN.md](ROADMAP-CN.md)。
 - 完整 IDE、窗口/坐标、图色/OCR、参数 UI、小精灵、插件及函数手册均为正式目标，不得再从大纲中删除或只标为可选远期项目。
-- 当前 main 已完成 M3 IDE、M4 基础调试器、M5 结构化录制/动作列表和 M6 坐标系统/窗口 API；M7 控件与前后台能力适配正在完成。公开 API 增改仍必须遵守 M2 单一注册表。
+- 当前 main 的 M3–M7 已完成各自代码/CI 阶段；M8 核心图像 API 已实现并经 Windows CI 验证，但模板资源 UI、视觉调试层与 Windows 桌面实测仍未完成。API registry 现为 0.5，共 74 个公开函数。每轮任务仍以文末唯一任务为准。公开 API 增改仍必须遵守 M2 单一注册表。
 
 
 ## preview.4 窗口与托盘决策
@@ -252,8 +252,32 @@ M4 基础调试器已在 main 实现并通过 Windows CI。具体实现提交与
 - **桌面验收仍未完成**：M7-01..M7-10 在 `docs/ACCEPTANCE-TEST-CN.md` 全部保持 NOT RUN。不要将 GitHub Actions CI 当成 Windows 10/11 UIA Pattern、焦点、UIPI、Stop 响应的实机通过证明。
 - 本阶段未更新 VERSION/csproj 预览版本、未创建 Release；已发布的 v0.1.0-preview.4 资产未改变。
 
-## 下一会话唯一开发任务：M8 — 截图、图色与模板资源
+## M8 阶段交付结果（核心 API/CI 已完成；整个阶段尚未 DONE）
 
-严格以 `docs/PRD-CN.md` 第 2.8 节、`docs/FEATURE-MATRIX-CN.md` F16/F17/F18、`docs/ROADMAP-CN.md` 的 M8 与验收清单为准。开始前重新核对 main 最新 HEAD，并读取 `AGENTS.md`、`README.md`、本 handoff、路线图、PRD、功能矩阵和当前截图/图色相关源码。
+### 实现范围
+- 核心代码基线 1b87af713ff17c907feac6984bb96aa5dd8e821f。API registry 已从 0.4 升到 0.5，共 74 个真实公开函数；新增 20 个图像 API，函数手册从同一 registry 生成。
+- 图像模型/纯算法：Anjian.Core.Imaging.PixelImage 与 ImageSearchEngine。覆盖像素/裁剪原点、RGB 容差、单点/多点找色、区域计数、透明模板、相似度、多结果、灰度、最近邻缩放、取消预算和连续确认跟踪。
+- Windows 侧：WindowsImageService 使用 GDI+ CopyFromScreen，支持虚拟桌面、可见窗口外框/客户区、自定义区域、PNG 加载/保存、尺寸/原点、裁剪、像素读取与资源释放；每轮最多 128 资源/256 MiB，单张 32,000,000 像素。
+- 模板匹配默认 similarity=0.95、grayscale=false、scale=1；scale 范围 0.25–4 最近邻；多结果上限 1000，单次模板匹配最多 50,000,000 次像素比较。Wait 系列支持 timeout/interval/stableCount 和 Stop 取消。
+- 不新增第三方图像引擎或 OCR 依赖；不提供后台真实窗口像素保证，不绕过 UIPI/UAC/安全桌面。遮挡窗口获取的是当前桌面合成像素，不是可信后台截图。
 
-M8 应形成截图资源生命周期、区域/窗口/客户区截图、像素与颜色比较、多点找色、模板找图、阈值、多结果、未命中/超时和资源释放的可验证闭环。必须复用既有 screen/window/client/anchor/ratio 坐标契约；不改写 MoveTo 旧语义，不把后台截图/受保护窗口截图保证成通用能力，不纳入 OCR（M9）。先梳理当前源码、依赖与离线授权/包体积，再实现 API、注册表/函数手册、自动化样例、Windows CI 和桌面验收说明；直接在 main 小步提交，不创建长期分支/PR或无要求的 Release。
+### Windows CI 最终证据
+- 代码提交 1b87af713ff17c907feac6984bb96aa5dd8e821f，run [43353801969](https://github.com/xiaobei206/anjian/actions/runs/43353801969) SUCCESS：Restore PASS、Release Build 0 warnings/0 errors、73/73 Core tests、API handbook check、self-contained win-x64 publish、ZIP/SHA256 package、artifact upload 均 PASS。
+- CI artifact ID 14004658368，76,430,108 bytes。它是 workflow 临时产物；本会话没有创建 Release，也没有替换 v0.1.0-preview.4 官方 ZIP/SHA256。
+- 中间迭代确实出现过测试类结构、手册生成区漂移和灰度/缩放接线相关失败；修正后最新 run 通过，详细 run/根因和修复记录见 docs/DEVELOPMENT-LOG-CN.md。
+- Windows 桌面验收仍未执行：M8-01..M8-13 全部 NOT RUN；M8-14 的资源管理 UI/视觉调试层尚未实现。CI PASS 不代表截图/颜色/模板在真实显示器上已实测成功。
+
+### M8 尚未完成（不可标 DONE）
+- 图像资源管理 UI：模板列表、预览、命名、路径/版本校验和工程资源依赖联动。
+- 视觉调试 overlay：截图区域、命中位置、similarity、颜色值和耗时展示。
+- F17 剩余规格：RGB/十六进制辅助转换、颜色差值、颜色块识别及测试。
+- M8-01..M8-14 实机验收与相关 Windows 边界测试。
+
+## 下一会话唯一开发任务：M8-CLOSE — 完成图像资源管理与视觉调试闭环
+
+开始时重新核对 main 最新 HEAD，并读取 AGENTS.md、README.md、本 handoff、docs/ROADMAP-CN.md、docs/PRD-CN.md、docs/FEATURE-MATRIX-CN.md、docs/ACCEPTANCE-TEST-CN.md 与 M8 源码。范围严格限于完成 M8，不进入 M9 OCR：
+1. 实现模板资源列表/预览/命名、路径与版本校验及资源依赖关系；明确图像资源 UI 不直接持有 GDI Bitmap。
+2. 实现视觉调试层，能显示截图区域框、找色/找图命中位置、相似度、RGB 值和检测耗时，关闭时不拦截用户输入。
+3. 补齐 F17 的 RGB/十六进制辅助转换、颜色差值与颜色块识别规格/API/测试；更新 registry、函数手册、编辑器提示/面板消费、用户指南。
+4. 更新 M8 UI/集成测试与 docs/ACCEPTANCE-TEST-CN.md；所有实际 Windows 10/11 桌面检查在有真实验收证据之前保持 NOT RUN，不能拿 CI 替代。
+5. 更新 Feature Matrix、Roadmap、Architecture、Development Log 和本 handoff；直接在 main 小步提交，不建长期分支/PR，不创建 Release，继续保持 preview.4 官方资产不变。

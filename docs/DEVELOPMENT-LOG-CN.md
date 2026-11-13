@@ -504,3 +504,24 @@ M4 基础调试器与 M5 可视化录制/动作列表均已完成 Windows CI 验
 - 状态更新 commit `52ef72957bb0202b116e8459261604bf2dc1da6d` 已把 M7 标记为代码/CI 范围 DONE；run `43350753487` 生成本日志更新时仍在运行，必须在下一次接手时核对最终状态和最新 HEAD。
 - M7-01..M7-10 Windows 桌面人工验收仍全部 NOT RUN；CI 不代表 UIA Pattern、焦点权限、后台语义操作或 Stop 响应已经实机通过。
 - 未升级 VERSION/csproj 预览版本、未创建 Release；v0.1.0-preview.4 正式 Release/ZIP/SHA256 未变化。
+
+## 2026-11-13 — M8 — 截图、图色与模板识别核心 API（CI PASS；阶段仍 IN_PROGRESS）
+
+### 实现与 API
+- 新增 Anjian.Core.Imaging.PixelImage、ImageSearchEngine、图像请求 DTO 和纯算法测试；新增 Windows 侧 WindowsImageService，使用 GDI+ CopyFromScreen 获取当前桌面可见合成画面，资源由每轮脚本执行拥有，停止/异常/轮次结束统一清理。
+- 新增 20 个公开 Lua 函数：CaptureScreen、CaptureWindow、CaptureClient、CaptureRegion、LoadImage、SaveScreenshot、ReleaseImage、GetImageSize、CropImage、GetPixelColor、CompareColor、FindColor、FindMultiColor、CountColors、FindImage、FindImages、WaitImage、WaitImageGone、WaitColor、WaitColorGone。registry 从 0.4 升至 0.5，共 74 项；函数手册从同一 registry 生成。
+- 图片尺寸/资源界限：每张最多 32,000,000 像素；每轮最多 128 个资源、256 MiB 缓存；模板搜索最多 50,000,000 次像素比较。RGB 通道容差 0–255；多点模式最多 256 个偏移点；模板相似度 0–1、灰度开关、0.25–4 倍最近邻缩放；多结果最多 1000；等待 timeout 0–600000ms、interval 10–5000ms、stableCount 1–20。
+- 支持截图 screen/window/client/anchor/ratio 区域换算、屏幕原点/负坐标保留、PNG 加载/保存、裁剪、显式 ReleaseImage、透明像素模板通配、结果局部与 screen 坐标、颜色/图像稳定等待、暂停/停止与循环内部取消令牌。
+- 无新增第三方图像引擎/OCR 依赖；未改写 MoveTo 的屏幕绝对坐标语义。截图来自可见桌面合成结果，不保证被遮挡窗口真实后台像素，也不绕过 UIPI/UAC/安全桌面。
+
+### 关键提交与 Windows CI
+- 核心图像 API：e6433f4dca5d1dc0dfaad900481ef83351cc408a。
+- 取消、灰度/缩放与稳定确认的后续接线/测试提交包括 cfffbca97cfdf951fb4f0789ea0fbd3574f90482、1c31de462e4b232e7b6d191851782dbffd0fa46b、09556c15f2652f53870c65f17c7c6631c29a39bb、d57f5f4ff2421c9b0105a96fdb57943363de2a41、482f4303d0867e8998f870eb1b6100206ff57cd6、d7546b491a280b6aaa182f52bc67b714c2c3d698、1b87af713ff17c907feac6984bb96aa5dd8e821f。
+- 中间 CI 有失败，未隐藏：run 43352282268/43352416611 发现 API 契约测试结构与生成函数手册范围不一致；后续灰度/缩放迭代的 run 43353086988、43353344151、43353379802 失败于功能接线尚未完成的中间提交。修正后 run 43353694932 SUCCESS，后续加入连续确认跟踪器测试的最终代码基线 commit 1b87af713ff17c907feac6984bb96aa5dd8e821f 对应 run 43353801969 也 SUCCESS。
+- 最终 Windows Actions run 43353801969：Restore PASS；Release Build 0 warnings/0 errors；73 passed / 0 failed / 0 skipped；API handbook --check PASS；self-contained win-x64 publish、ZIP/SHA256 package、artifact upload PASS。Artifact ID 14004658368，76,430,108 bytes。该 CI artifact 不是正式 Release，且上传 artifact digest 不应与内部应用 ZIP 的 SHA256 混为一谈。
+- 本地执行容器没有 .NET SDK，因此本地 Restore/Build/Test 未运行；实际构建/测试由 Windows GitHub Actions 执行。
+
+### M8 未完成与验收边界
+- 尚未实现图像资源管理/模板预览 UI、模板命名及路径/版本校验、工程资源依赖联动、视觉调试 overlay、RGB/十六进制辅助转换、颜色差值和颜色块识别；因此 M8 保持 IN_PROGRESS，不能进入 DONE 状态。
+- docs/ACCEPTANCE-TEST-CN.md M8-01..M8-13 的 Windows 桌面场景尚未执行（NOT RUN）；M8-14 对应 UI 尚未实现。CI PASS 不替代 Windows 10/11 的 DPI/多显示器/负坐标、遮挡、受保护窗口、Stop 与资源清理实测。
+- 未修改 VERSION/csproj 预览版本，没有创建新 Release；v0.1.0-preview.4 官方 Release ZIP/SHA256 未变化。
