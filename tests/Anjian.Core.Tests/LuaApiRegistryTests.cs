@@ -157,7 +157,6 @@ public sealed class LuaApiRegistryTests
   public void Dispose() { }
  }
 
-}
 
 [Fact]
 public void ImagingApiDefaultsAndValidationAreRegistered()
@@ -174,4 +173,5 @@ public void ImagingApiDefaultsAndValidationAreRegistered()
  var result=lua.DoString("local a=pcall(CompareColor, 'image', 0, 0, 0xFF0000, 256); local b=pcall(FindImage, 'image', 'template', 1.2, 0, 0, 0, 0, 0, 0, 1); return a,b");
  Assert.False(Convert.ToBoolean(result[0]));
  Assert.False(Convert.ToBoolean(result[1]));
+}
 }

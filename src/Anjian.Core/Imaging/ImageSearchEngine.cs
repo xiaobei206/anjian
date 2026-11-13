@@ -24,7 +24,7 @@ public static class ImageSearchEngine
 
     public static ImageMatchPoint? FindColor(
         PixelImage image, uint expected, int tolerance = 0,
-        int left = 0, int top = 0, int width = 0, int height = 0, int step = 1)
+        int left = 0, int top = 0, int width = 0, int height = 0, int step = 1, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(image);
         ValidateTolerance(tolerance);
@@ -32,6 +32,7 @@ public static class ImageSearchEngine
         var region = NormalizeRegion(image, left, top, width, height);
         for (var y = region.Top; y < region.Top + region.Height; y += step)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             for (var x = region.Left; x < region.Left + region.Width; x += step)
             {
                 if (ColorsMatch(image.GetPixelColor(x, y), expected, tolerance))
@@ -43,7 +44,7 @@ public static class ImageSearchEngine
 
     public static ImageMatchPoint? FindMultiColor(
         PixelImage image, uint baseColor, IReadOnlyList<ImageColorProbe> probes, int tolerance = 0,
-        int left = 0, int top = 0, int width = 0, int height = 0, int step = 1)
+        int left = 0, int top = 0, int width = 0, int height = 0, int step = 1, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(image);
         ArgumentNullException.ThrowIfNull(probes);
@@ -55,6 +56,7 @@ public static class ImageSearchEngine
         var region = NormalizeRegion(image, left, top, width, height);
         for (var y = region.Top; y < region.Top + region.Height; y += step)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             for (var x = region.Left; x < region.Left + region.Width; x += step)
             {
                 if (!ColorsMatch(image.GetPixelColor(x, y), baseColor, tolerance))
@@ -82,7 +84,7 @@ public static class ImageSearchEngine
 
     public static int CountColors(
         PixelImage image, uint expected, int tolerance = 0,
-        int left = 0, int top = 0, int width = 0, int height = 0, int step = 1)
+        int left = 0, int top = 0, int width = 0, int height = 0, int step = 1, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(image);
         ValidateTolerance(tolerance);
@@ -90,23 +92,26 @@ public static class ImageSearchEngine
         var region = NormalizeRegion(image, left, top, width, height);
         var count = 0;
         for (var y = region.Top; y < region.Top + region.Height; y += step)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
             for (var x = region.Left; x < region.Left + region.Width; x += step)
                 if (ColorsMatch(image.GetPixelColor(x, y), expected, tolerance))
                     count = checked(count + 1);
+        }
         return count;
     }
 
     public static ImageMatchPoint? FindImage(
         PixelImage source, PixelImage template, double similarity = 0.95, int tolerance = 0,
-        int left = 0, int top = 0, int width = 0, int height = 0, int step = 1)
+        int left = 0, int top = 0, int width = 0, int height = 0, int step = 1, CancellationToken cancellationToken = default)
     {
-        var matches = FindImages(source, template, similarity, tolerance, 1, left, top, width, height, step);
+        var matches = FindImages(source, template, similarity, tolerance, 1, left, top, width, height, step, cancellationToken);
         return matches.Count == 0 ? null : matches[0];
     }
 
     public static IReadOnlyList<ImageMatchPoint> FindImages(
         PixelImage source, PixelImage template, double similarity = 0.95, int tolerance = 0, int maxResults = 100,
-        int left = 0, int top = 0, int width = 0, int height = 0, int step = 1)
+        int left = 0, int top = 0, int width = 0, int height = 0, int step = 1, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(template);
@@ -120,7 +125,7 @@ public static class ImageSearchEngine
         if (template.Width > region.Width || template.Height > region.Height)
             return Array.Empty<ImageMatchPoint>();
 
-        var totalSamples = CountOpaquePixels(template);
+        var totalSamples = CountOpaquePixels(template, cancellationToken);
         if (totalSamples == 0)
             throw new ArgumentException("模板图像不能全部透明。", nameof(template));
         var requiredSamples = (int)Math.Ceiling(similarity * totalSamples);
@@ -131,9 +136,10 @@ public static class ImageSearchEngine
         var lastX = region.Left + region.Width - template.Width;
         for (var y = region.Top; y <= lastY && matches.Count < maxResults; y += step)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             for (var x = region.Left; x <= lastX && matches.Count < maxResults;)
             {
-                var score = ScoreAt(source, template, x, y, tolerance, totalSamples, requiredSamples, ref comparisons);
+                var score = ScoreAt(source, template, x, y, tolerance, totalSamples, requiredSamples, ref comparisons, cancellationToken);
                 if (score >= similarity)
                 {
                     var candidate = CreatePoint(source, x, y, score);
@@ -236,18 +242,20 @@ public static class ImageSearchEngine
 
     private static double ScoreAt(
         PixelImage source, PixelImage template, int originX, int originY,
-        int tolerance, int totalSamples, int requiredSamples, ref long comparisons)
+        int tolerance, int totalSamples, int requiredSamples, ref long comparisons, CancellationToken cancellationToken)
     {
         var matched = 0;
         var examined = 0;
         for (var y = 0; y < template.Height; y++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             for (var x = 0; x < template.Width; x++)
             {
                 var expected = template.GetRawPixelUnchecked(x, y);
                 if ((expected >> 24) == 0)
                     continue;
 
+                if ((comparisons & 1023) == 0) cancellationToken.ThrowIfCancellationRequested();
                 if (++comparisons > MaximumPixelComparisons)
                     throw new InvalidOperationException(
                         $"模板搜索超过 {MaximumPixelComparisons:N0} 次像素比较上限；请缩小区域/模板或增大 step。");
@@ -264,13 +272,16 @@ public static class ImageSearchEngine
         return (double)matched / totalSamples;
     }
 
-    private static int CountOpaquePixels(PixelImage image)
+    private static int CountOpaquePixels(PixelImage image, CancellationToken cancellationToken)
     {
         var count = 0;
         for (var y = 0; y < image.Height; y++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
             for (var x = 0; x < image.Width; x++)
                 if ((image.GetRawPixelUnchecked(x, y) >> 24) != 0)
                     count++;
+        }
         return count;
     }
 

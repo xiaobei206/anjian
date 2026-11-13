@@ -315,15 +315,15 @@ internal sealed class PlaybackRunner : IDisposable
             case "image-compare-color":
                 return JsonSerializer.Serialize(_images.CompareColor(ReadWindowPayload<ImageCompareColorRequest>(message.Text)));
             case "image-find-color":
-                return JsonSerializer.Serialize(_images.FindColor(ReadWindowPayload<ImageColorSearchRequest>(message.Text)), WindowApiJson.Options);
+                return JsonSerializer.Serialize(_images.FindColor(ReadWindowPayload<ImageColorSearchRequest>(message.Text), token), WindowApiJson.Options);
             case "image-find-multi-color":
-                return JsonSerializer.Serialize(_images.FindMultiColor(ReadWindowPayload<ImageMultiColorSearchRequest>(message.Text)), WindowApiJson.Options);
+                return JsonSerializer.Serialize(_images.FindMultiColor(ReadWindowPayload<ImageMultiColorSearchRequest>(message.Text), token), WindowApiJson.Options);
             case "image-count-colors":
-                return JsonSerializer.Serialize(_images.CountColors(ReadWindowPayload<ImageColorSearchRequest>(message.Text)));
+                return JsonSerializer.Serialize(_images.CountColors(ReadWindowPayload<ImageColorSearchRequest>(message.Text), token));
             case "image-find-image":
-                return JsonSerializer.Serialize(_images.FindImage(ReadWindowPayload<ImageTemplateSearchRequest>(message.Text)), WindowApiJson.Options);
+                return JsonSerializer.Serialize(_images.FindImage(ReadWindowPayload<ImageTemplateSearchRequest>(message.Text), token), WindowApiJson.Options);
             case "image-find-images":
-                return JsonSerializer.Serialize(_images.FindImages(ReadWindowPayload<ImageTemplateSearchRequest>(message.Text)), WindowApiJson.Options);
+                return JsonSerializer.Serialize(_images.FindImages(ReadWindowPayload<ImageTemplateSearchRequest>(message.Text), token), WindowApiJson.Options);
             case "image-wait-image":
             {
                 var request = ReadWindowPayload<ImageWaitImageRequest>(message.Text);
@@ -363,7 +363,7 @@ internal sealed class PlaybackRunner : IDisposable
             token.ThrowIfCancellationRequested();
             await _gate.WaitUntilRunnableAsync(token).ConfigureAwait(false);
             var match = ImageSearchEngine.FindImage(_images.CaptureScreenPixels(), template,
-                request.Similarity, request.Tolerance);
+                request.Similarity, request.Tolerance, cancellationToken: token);
             if (match is not null)
                 return match;
             var remaining = request.TimeoutMilliseconds - (int)Math.Min(int.MaxValue, timer.ElapsedMilliseconds);
@@ -399,7 +399,7 @@ internal sealed class PlaybackRunner : IDisposable
         {
             token.ThrowIfCancellationRequested();
             await _gate.WaitUntilRunnableAsync(token).ConfigureAwait(false);
-            var match = ImageSearchEngine.FindColor(_images.CaptureScreenPixels(), request.Color, request.Tolerance);
+            var match = ImageSearchEngine.FindColor(_images.CaptureScreenPixels(), request.Color, request.Tolerance, cancellationToken: token);
             if (match is not null)
                 return match;
             var remaining = request.TimeoutMilliseconds - (int)Math.Min(int.MaxValue, timer.ElapsedMilliseconds);

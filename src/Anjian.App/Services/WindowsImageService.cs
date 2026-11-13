@@ -179,41 +179,41 @@ internal sealed class WindowsImageService(WindowsWindowManager windows)
             request.Color, request.Tolerance);
     }
 
-    public ImageMatchPoint? FindColor(ImageColorSearchRequest request)
+    public ImageMatchPoint? FindColor(ImageColorSearchRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
         return ImageSearchEngine.FindColor(Get(request.ImageId), request.Color, request.Tolerance,
-            request.Left, request.Top, request.Width, request.Height, request.Step);
+            request.Left, request.Top, request.Width, request.Height, request.Step, cancellationToken);
     }
 
-    public ImageMatchPoint? FindMultiColor(ImageMultiColorSearchRequest request)
+    public ImageMatchPoint? FindMultiColor(ImageMultiColorSearchRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
         var probes = ImageSearchEngine.ParseColorPattern(request.Pattern);
         return ImageSearchEngine.FindMultiColor(Get(request.ImageId), request.Color, probes, request.Tolerance,
-            request.Left, request.Top, request.Width, request.Height, request.Step);
+            request.Left, request.Top, request.Width, request.Height, request.Step, cancellationToken);
     }
 
-    public int CountColors(ImageColorSearchRequest request)
+    public int CountColors(ImageColorSearchRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
         return ImageSearchEngine.CountColors(Get(request.ImageId), request.Color, request.Tolerance,
-            request.Left, request.Top, request.Width, request.Height, request.Step);
+            request.Left, request.Top, request.Width, request.Height, request.Step, cancellationToken);
     }
 
-    public ImageMatchPoint? FindImage(ImageTemplateSearchRequest request)
+    public ImageMatchPoint? FindImage(ImageTemplateSearchRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
         return ImageSearchEngine.FindImage(Get(request.ImageId), Get(request.TemplateId),
-            request.Similarity, request.Tolerance, request.Left, request.Top, request.Width, request.Height, request.Step);
+            request.Similarity, request.Tolerance, request.Left, request.Top, request.Width, request.Height, request.Step, cancellationToken);
     }
 
-    public IReadOnlyList<ImageMatchPoint> FindImages(ImageTemplateSearchRequest request)
+    public IReadOnlyList<ImageMatchPoint> FindImages(ImageTemplateSearchRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
         return ImageSearchEngine.FindImages(Get(request.ImageId), Get(request.TemplateId),
             request.Similarity, request.Tolerance, request.MaxResults, request.Left, request.Top,
-            request.Width, request.Height, request.Step);
+            request.Width, request.Height, request.Step, cancellationToken);
     }
 
     private string Add(PixelImage image)
