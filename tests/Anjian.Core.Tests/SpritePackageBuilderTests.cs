@@ -120,6 +120,23 @@ public sealed class SpritePackageBuilderTests
             Assert.True(File.Exists(Path.Combine(result.PackageDirectory, entry.ModuleRootPath.Replace('/', Path.DirectorySeparatorChar), "lib", "helper.lua")));
             Assert.Contains(manifest.Files, f => f.Path.EndsWith("/images/button.png", StringComparison.Ordinal));
             Assert.Empty(SpritePackageBuilder.Verify(result.PackageDirectory));
+
+            var upgraded = SpritePackageBuilder.Build(new SpritePackageBuildOptions
+            {
+                RuntimeDirectory = runtime,
+                ProjectRoot = project,
+                EntryScriptPaths = [Path.Combine(project, "secondary.lua"), Path.Combine(project, "main.lua")],
+                OutputDirectory = Path.Combine(root, "output-upgrade"),
+                ProductName = "订单助手",
+                Version = "1.2.4",
+                MinimumApiVersion = "0.7",
+                MinimumRuntimeVersion = "10.0",
+                OcrModelDirectories = new Dictionary<string, string> { ["en"] = ocrModels }
+            });
+            Assert.Equal(result.Manifest.PackageId, upgraded.Manifest.PackageId);
+            Assert.Equal(
+                result.Manifest.Entries.Select(x => (x.DisplayName, x.Id)).OrderBy(x => x.DisplayName),
+                upgraded.Manifest.Entries.Select(x => (x.DisplayName, x.Id)).OrderBy(x => x.DisplayName));
         }
         finally
         {

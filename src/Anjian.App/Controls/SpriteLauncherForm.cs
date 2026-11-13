@@ -180,7 +180,7 @@ internal sealed class SpriteLauncherForm : Form
     {
         if (m.Msg == HotkeyMessage && m.WParam.ToInt32() == HotkeyId)
         {
-            if (!_runner.IsRunning)
+            if (_launchCts is null && !_runner.IsRunning)
                 _ = StartSelectedEntryAsync();
             return;
         }

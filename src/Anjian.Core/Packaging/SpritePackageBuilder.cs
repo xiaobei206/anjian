@@ -318,6 +318,10 @@ public static class SpritePackageBuilder
                 .Select(Path.GetFullPath)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
+            var packageId = CreateStableId(
+                "anjian-sprite-package-v1\n" +
+                projectRoot.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar).ToUpperInvariant() +
+                "\n" + options.ProductName.Trim().ToUpperInvariant());
 
             foreach (var entryScript in normalizedEntries)
             {
@@ -327,10 +331,12 @@ public static class SpritePackageBuilder
                 if (!string.Equals(Path.GetExtension(entryScript), ".lua", StringComparison.OrdinalIgnoreCase))
                     throw new InvalidDataException("入口文件必须是 .lua 脚本。");
 
-                var entryId = Guid.NewGuid().ToString("N");
+                var entryRelativeWithinProject = Path.GetRelativePath(projectRoot, entryScript);
+                var entryId = CreateStableId(
+                    "anjian-sprite-entry-v1\n" + packageId + "\n" +
+                    ToPackagePath(entryRelativeWithinProject).ToUpperInvariant());
                 var entryOutputRoot = Path.Combine(contentRoot, entryId);
                 Directory.CreateDirectory(entryOutputRoot);
-                var entryRelativeWithinProject = Path.GetRelativePath(projectRoot, entryScript);
                 var scriptOutput = ResolveWithin(entryOutputRoot, entryRelativeWithinProject);
                 Directory.CreateDirectory(Path.GetDirectoryName(scriptOutput)!);
                 CopyFile(entryScript, scriptOutput);
@@ -498,7 +504,7 @@ public static class SpritePackageBuilder
 
             var manifest = new SpritePackageManifest(
                 CurrentManifestVersion,
-                Guid.NewGuid().ToString("N"),
+                packageId,
                 options.ProductName.Trim(),
                 options.Version.Trim(),
                 options.Description.Trim(),
@@ -975,6 +981,10 @@ public static class SpritePackageBuilder
         using var stream = File.OpenRead(path);
         return Convert.ToHexString(SHA256.HashData(stream)).ToLowerInvariant();
     }
+
+    private static string CreateStableId(string identity) =>
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(identity)))
+            .ToLowerInvariant()[..32];
 
     private static void WriteText(string path, string content)
     {
