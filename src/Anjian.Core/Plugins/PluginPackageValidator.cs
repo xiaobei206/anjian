@@ -433,6 +433,12 @@ public static class PluginPackageValidator
                 continue;
             _ = NormalizeRelativePath(value);
         }
+        foreach (var executable in permissions.ProcessExecutables)
+        {
+            if (Path.IsPathRooted(executable))
+                throw new InvalidDataException("processExecutables 必须是相对插件包根目录的路径。");
+            _ = NormalizeRelativePath(executable);
+        }
         if (permissions.Dialogs.Any(string.IsNullOrWhiteSpace) ||
             permissions.ProcessExecutables.Any(string.IsNullOrWhiteSpace) ||
             permissions.HttpHosts.Any(string.IsNullOrWhiteSpace) ||

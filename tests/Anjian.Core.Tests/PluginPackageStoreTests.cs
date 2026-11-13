@@ -111,6 +111,12 @@ public sealed class PluginPackageStoreTests : IDisposable
         Assert.Throws<InvalidDataException>(() => PluginPackageValidator.Inspect(source, "1.2"));
         File.Delete(Path.Combine(source, "unlisted.txt"));
 
+        var unsafePermissionPackage = CreatePackage(Path.Combine(_temporaryRoot, "unsafe-process-permission"));
+        var unsafePermissionManifest = ReadManifest(unsafePermissionPackage);
+        unsafePermissionManifest.Permissions.ProcessExecutables.Add("../outside.exe");
+        WriteManifest(unsafePermissionPackage, unsafePermissionManifest);
+        Assert.Throws<InvalidDataException>(() => PluginPackageValidator.Inspect(unsafePermissionPackage, "1.2"));
+
         var nativePath = Path.Combine(source, "helper.dll");
         File.WriteAllText(nativePath, "not a native library");
         var manifest = ReadManifest(source);
