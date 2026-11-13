@@ -9,7 +9,7 @@ namespace Anjian.App.Controls;
 /// </summary>
 internal sealed class LuaEditorControl : UserControl
 {
-    private readonly LuaApiRegistry _registry;
+    private LuaApiRegistry _registry;
     private readonly RichTextBox _editor = new();
     private readonly Panel _gutter = new();
     private readonly ListBox _completionList = new();
@@ -80,6 +80,15 @@ internal sealed class LuaEditorControl : UserControl
         Controls.Add(_gutter);
         Controls.Add(_completionList);
         _highlightTimer.Tick += async (_, _) => await HighlightAsync();
+    }
+
+    public void UpdateRegistry(LuaApiRegistry registry)
+    {
+        _registry = registry ?? throw new ArgumentNullException(nameof(registry));
+        UpdateCompletionFromCaret();
+        UpdateSignatureHelp();
+        _highlightTimer.Stop();
+        _highlightTimer.Start();
     }
 
     private void EditorTextChanged(object? sender, EventArgs e)

@@ -19,7 +19,7 @@ internal sealed class MainForm : Form
     private readonly GlobalRecorder _recorder = new();
     private readonly PlaybackRunner _playback = new();
     private readonly ListBox _scripts = new();
-    private readonly LuaApiRegistry _apiRegistry = LuaApiRegistry.Load();
+    private LuaApiRegistry _apiRegistry = LuaApiRegistry.Load();
     private readonly TabControl _editorTabs = new() { Dock = DockStyle.Fill };
     private readonly RichTextBox _emptyEditor = new();
     private readonly Dictionary<string, ScriptTab> _openTabs = new(StringComparer.OrdinalIgnoreCase);
@@ -92,6 +92,7 @@ internal sealed class MainForm : Form
         Icon = (Icon)_applicationIcon.Clone();
         BuildUi();
         _playback.SetUiOwner(this);
+        RefreshPluginApiRegistry();
 
         _playback.Log += message => Ui(() =>
         {
@@ -239,6 +240,7 @@ internal sealed class MainForm : Form
         toolbar.Controls.Add(MakeButton("参数定义", (_, _) => OpenParameterDesigner()));
         toolbar.Controls.Add(MakeButton("小精灵打包", (_, _) => OpenSpritePackager()));
         toolbar.Controls.Add(MakeButton("插件管理", (_, _) => OpenPluginManager()));
+        toolbar.Controls.Add(MakeButton("API 命令面板", (_, _) => OpenApiCommandPalette()));
         _visualDebugButton = MakeButton("视觉调试：关", (_, _) => ToggleVisualDebug());
         toolbar.Controls.Add(_visualDebugButton);
         toolbar.Controls.Add(MakeButton("返回悬浮窗", (_, _) => HideMainWindow(showFloatingWindow: true)));
@@ -1755,6 +1757,51 @@ internal sealed class MainForm : Form
         _applicationIcon = null;
         base.OnFormClosing(e);
     }
+
+    private static string GetPluginStoreRoot() =>
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Anjian2026", "Plugins");
+
+    private void RefreshPluginApiRegistry()
+    {
+        var builtIn = LuaApiRegistry.Load();
+        try
+        {
+            var store = new Anjian.Core.Plugins.PluginPackageStore(GetPluginStoreRoot(), builtIn.ApiVersion);
+            var plans = store.GetEnabledApiContributionPlans();
+            _apiRegistry = builtIn.WithPluginContributions(plans);
+            var count = plans.Sum(plan => plan.Functions.Count);
+            if (count > 0)
+                AppendLog($"已注册 {count} 个启用插件 Lua API；内置 registry 仍为 {builtIn.ApiVersion}/{builtIn.Apis.Count}。");
+        }
+        catch (Exception ex)
+        {
+            _apiRegistry = builtIn;
+            AppendLog("插件 Lua API 注册失败；本次仅显示内置 API：" + ex.Message);
+        }
+
+        foreach (var tab in _openTabs.Values)
+            tab.Editor.UpdateRegistry(_apiRegistry);
+    }
+
+    private void OpenApiCommandPalette()
+    {
+        if (_activeTab is null)
+        {
+            MessageBox.Show(this, "请先打开一个脚本，再从 API 命令面板插入函数。",
+                "API 命令面板", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        using var form = new LuaApiCommandPaletteForm(_apiRegistry);
+        if (form.ShowDialog(this) != DialogResult.OK || form.SelectedApi is not { } api)
+            return;
+
+        var arguments = string.Join(", ", api.Parameters.Select(parameter => parameter.Name));
+        _activeTab.Editor.TextBox.SelectedText = api.Name + "(" + arguments + ")";
+        _activeTab.Editor.TextBox.Focus();
+    }
+
     private void OpenPluginManager()
     {
         if (_recordSessionActive || _playback.IsRunning)
@@ -1771,6 +1818,7 @@ internal sealed class MainForm : Form
                 "Anjian2026", "Plugins");
             using var form = new PluginManagerForm(pluginRoot, _apiRegistry.ApiVersion);
             form.ShowDialog(this);
+            RefreshPluginApiRegistry();
         }
         catch (Exception ex)
         {

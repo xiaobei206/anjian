@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Anjian.Core.Editor;
 using Anjian.Core.Permissions;
+using Anjian.Core.Plugins;
 
 namespace Anjian.App.Services;
 
@@ -11,6 +12,7 @@ internal sealed class WorkerLaunchPayload
     public string? ModuleRootPath { get; set; }
     public string? OcrModelDirectory { get; set; }
     public PluginWorkerRuntimeOptions? PluginRuntime { get; set; }
+    public List<PluginApiRuntimePlan> PluginApiContributions { get; set; } = [];
     public ScriptPermissionGrant Permissions { get; set; } = ScriptPermissionGrant.Empty;
 }
 

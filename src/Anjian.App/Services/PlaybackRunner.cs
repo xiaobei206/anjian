@@ -7,6 +7,8 @@ using Anjian.Core.Editor;
 using Anjian.Core.Imaging;
 using Anjian.Core.Parameters;
 using Anjian.Core.Permissions;
+using Anjian.Core.Api;
+using Anjian.Core.Plugins;
 using Anjian.Core.Windows;
 
 namespace Anjian.App.Services;
@@ -25,6 +27,7 @@ internal sealed class PlaybackRunner : IDisposable
     private IReadOnlyDictionary<string, JsonElement> _launchParameters = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
     private SpriteWorkerRuntimeOptions? _spriteRuntimeOptions;
     private PluginWorkerRuntimeOptions? _pluginRuntimeOptions;
+    private IReadOnlyList<PluginApiRuntimePlan> _pluginApiContributions = [];
     private ScriptPermissionGrant _launchPermissions = ScriptPermissionGrant.Empty;
     private string _launchScriptDirectory = string.Empty;
     private ClipboardDialogHost? _clipboardDialogHost;
@@ -75,6 +78,26 @@ internal sealed class PlaybackRunner : IDisposable
             throw new ArgumentException("小精灵运行参数与插件运行参数不能同时使用。");
         if (_runCts is not null)
             throw new InvalidOperationException("已有脚本正在运行。");
+
+        IReadOnlyList<PluginApiRuntimePlan> pluginApiContributions = [];
+        if (pluginRuntimeOptions is null && spriteRuntimeOptions is null)
+        {
+            try
+            {
+                var pluginRoot = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "Anjian2026", "Plugins");
+                var apiRegistry = LuaApiRegistry.Load();
+                var pluginStore = new PluginPackageStore(pluginRoot, apiRegistry.ApiVersion);
+                pluginApiContributions = pluginStore.GetEnabledApiContributionPlans();
+                _ = apiRegistry.WithPluginContributions(pluginApiContributions);
+            }
+            catch (Exception ex)
+            {
+                Log?.Invoke("插件 API 加载失败；本次脚本将只使用内置 API：" + ex.Message);
+                pluginApiContributions = [];
+            }
+        }
         if (debugOptions is not null && (options.RepeatCount != 1 || options.IntervalMilliseconds != 0))
             throw new ArgumentException("调试运行固定执行单轮，不支持循环次数和轮间隔。", nameof(options));
 
@@ -84,6 +107,7 @@ internal sealed class PlaybackRunner : IDisposable
         _launchParameters = parameters ?? new Dictionary<string, JsonElement>(StringComparer.Ordinal);
         _spriteRuntimeOptions = spriteRuntimeOptions;
         _pluginRuntimeOptions = pluginRuntimeOptions;
+        _pluginApiContributions = pluginApiContributions;
         _launchPermissions = permissions ?? ScriptPermissionGrant.Empty;
         _launchScriptDirectory = Path.GetDirectoryName(Path.GetFullPath(scriptPath))
             ?? throw new InvalidDataException("无法确定脚本目录。");
@@ -127,6 +151,7 @@ internal sealed class PlaybackRunner : IDisposable
             _launchParameters = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
             _spriteRuntimeOptions = null;
             _pluginRuntimeOptions = null;
+            _pluginApiContributions = [];
             _launchPermissions = ScriptPermissionGrant.Empty;
             _launchScriptDirectory = string.Empty;
             _runCts = null;
@@ -212,6 +237,7 @@ internal sealed class PlaybackRunner : IDisposable
                 ModuleRootPath = _spriteRuntimeOptions?.ModuleRootPath,
                 OcrModelDirectory = _spriteRuntimeOptions?.OcrModelDirectory,
                 PluginRuntime = _pluginRuntimeOptions,
+                PluginApiContributions = _pluginApiContributions.ToList(),
                 Permissions = _launchPermissions
             });
 

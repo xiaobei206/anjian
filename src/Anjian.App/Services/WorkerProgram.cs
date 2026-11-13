@@ -59,6 +59,8 @@ internal static class WorkerProgram
                 using var automation = new WindowsControlAutomationProvider(client);
                 using var ocr = new PaddleOcrRecognitionService(launch.OcrModelDirectory);
                 using var lua = new NLua.Lua(openLibs: true);
+                if (launch.PluginApiContributions.Count > 0)
+                    PluginApiContributionRuntime.Register(lua, launch.PluginApiContributions, LuaApiRegistry.Load().ApiVersion);
                 var api = new WorkerLuaApi(client, lua, automation, ocr, launch.Permissions, scriptDirectory);
                 LuaApiRuntime.Register(lua, api);
                 if (launch.PluginRuntime is { } pluginOptions)

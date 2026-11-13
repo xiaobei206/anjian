@@ -364,6 +364,7 @@ internal sealed class PluginManagerForm : Form
             _details.Text =
                 $"来源：本地目录/ZIP 导入\n包目录：{package.PackageDirectory}\n" +
                 $"API 兼容：{manifest.MinApiVersion} – {manifest.MaxApiVersion ?? "无上限"}；入口：{manifest.Entry}\n" +
+                $"Lua API 贡献：{manifest.Contributions?.Functions.Count ?? 0} 个（仅纯 Lua helper；不授予额外宿主权限）\n" +
                 $"插件声明的能力上限：文件读 [{string.Join(", ", permissions.FileReadRoots)}]；文件写 [{string.Join(", ", permissions.FileWriteRoots)}]；" +
                 $"剪贴板读/写 [{permissions.ClipboardRead}/{permissions.ClipboardWrite}]；对话框 [{string.Join(", ", permissions.Dialogs)}]；" +
                 $"进程 [{string.Join(", ", permissions.ProcessExecutables)}]；HTTP 主机 [{string.Join(", ", permissions.HttpHosts)}]；" +
