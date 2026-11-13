@@ -493,7 +493,7 @@ end
 ## M12-11 小精灵入口权限 sidecar（main 开发版，不包含在 preview.4）
 
 - 权限请求文件与入口一一对应，源文件命名为 `main.lua.permissions.json`（即 `<入口脚本完整文件名>.permissions.json`）。多入口包会分别收集，不会跨入口合并或继承。
-- 构建时会验证现有 schema v1 与 256 KiB 上限，将 sidecar 放入 `Anjian.Sprite.json` 的 `files` 和 SHA-256 清单；缺失、损坏、路径/入口绑定异常、符号链接/重解析点或哈希不一致都会在运行前被拒绝。
+- 构建时会验证现有 schema v1 与 256 KiB 上限，将 sidecar 放入 `Anjian.Sprite.json` 的 `files` 和 SHA-256 清单；**已绑定的 sidecar 文件**缺失、损坏、路径/入口绑定异常、符号链接/重解析点或哈希不一致都会在运行前被拒绝。源工程没有 sidecar 属于合法情形。
 - Launcher 在每次启动选中的入口前复核 manifest 绑定和 hash，并复用现有脚本权限审阅窗体逐项询问本次权限；选项默认不勾选。用户拒绝或取消时不会启动 Worker，之前批准的权限不会持久保存或传给其他入口。
 - 没有 sidecar 的入口仍可运行，但使用空 Grant，不会因包内其他入口的声明而获得权限。sidecar 本身只是请求，不是授权；每个实际 IPC 仍由主进程按本次 Grant 再检查。
 - SHA-256 只保证相对清单的完整性，不是发布者签名。此开发版尚未经过 Windows 10/11 的 WinForms 权限审阅、DPI 和多显示器人工验收；这些项目继续列入 M14，且本功能不包含在已发布的 v0.1.0-preview.4 中。

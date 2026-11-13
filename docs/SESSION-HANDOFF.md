@@ -765,12 +765,15 @@ M12-10 已完成本地插件包/manifest/生命周期与独立 Worker 基础；�
 - 本地没有 .NET SDK，local Restore/Build/Test 为 NOT RUN。真实 Windows 10/11 WinForms 权限审批、批准/拒绝交互、DPI/多显示器仍 NOT RUN（M14）。
 - 没有修改 `VERSION`、AssemblyVersion、FileVersion；没有创建 tag/Release；`v0.1.0-preview.4` 发布资产不变。registry 保持 1.2 / 103，没有新增 Lua API。
 
-## 下一会话唯一任务：M13-01 — 独立运行实例生命周期 Core 契约
+## 下一会话唯一任务：M12-12 — 插件 Lua API/命令贡献接入统一注册体系
 
-先重新核对 main HEAD，读取 `AGENTS.md`、`README.md`、本 handoff、PRD §2.10、ROADMAP、FEATURE-MATRIX、ARCHITECTURE、DECISIONS，以及当前 `PlaybackRunner`、Worker 进程/IPC、停止和输入清理边界。严格按本项推进，不要先做定时器或大规模 WinForms 重构。
+这是 M12 的剩余冻结范围，不要提前跳至 M13。开始时重新核对 main HEAD，读取 `AGENTS.md`、`README.md`、本 handoff、PRD §2.12、FEATURE-MATRIX、ROADMAP、ARCHITECTURE、DECISIONS、API registry、`PLUGIN-MANIFEST-CN.md`，以及插件 package store/manager、Worker、Lua API binding、IDE completion、command palette 与函数手册生成链。
 
-1. 先冻结 ADR-032：为每个受控运行实例定义稳定实例 ID、状态机（Idle/Validating/Running/Paused/Stopping/Completed/Cancelled/Failed）、参数/日志关联、权限 Grant、取消令牌、Worker 与输入清理资源的拥有权；明确非法状态转移与实例间隔离规则。
-2. 先实现可独立测试的 Core 生命周期/状态转换模型和契约测试，确保停止/取消一个实例不会改变其他实例的状态、权限、参数或取消令牌；状态终结只能发生一次，并保留可查询的完成/失败状态。
-3. 暂不实现日历/cron/定时任务、自动重启编排或公开 Lua API；先根据现有程序边界完成生命周期基础，再由后续 handoff 定义 M13 后续切片。
-4. 更新 DECISIONS、ARCHITECTURE、ROADMAP、FEATURE-MATRIX、ACCEPTANCE、DEVELOPMENT-LOG 与 handoff；直接小步提交 main，运行实际可用的测试和 Windows Actions，不创建 Release。
-5. Windows 10/11 多实例真实桌面交互、Stop/输入清理、DPI/多屏继续标记 NOT RUN，集中留 M14。CI 通过不等于桌面实机验收。
+### 目标与执行边界
+
+1. **先冻结 ADR-032 和贡献 schema**：定义插件如何声明可提供的 Lua 函数/命令元数据、稳定 ID、参数/返回契约、文档/示例、插件与 API 版本兼容范围、命名冲突策略、启停/卸载后可见性及错误传播。优先考虑本地 manifest 中声明的受限 Lua 模块/函数，不加载任意 DLL/原生代码。
+2. **最小端到端垂直切片**：选定一个明确的 Lua 插件函数调用路径，让可信的已安装/启用插件贡献可发现/可调用的能力；保持第三方 Lua 在受控 Worker 内执行，不能在主 UI 执行 Lua。若调用跨 Worker/IPC，定义严格的 schema、超时/取消、错误结构和每调用的权限边界。
+3. **统一机器可读来源**：插件贡献的签名/说明同步进入 API registry 扩展层（或经过 ADR 说明的 registry extension provider），IDE 补全/签名、命令面板、生成的中文函数参考与 API 兼容性检查必须引用同一数据，不能只改 UI 或手写文档。
+4. **安全与生命周期**：必须复用插件的闭合文件/hash 校验、API 版本检查和三方权限交集；插件 disabled/损坏/卸载后不得继续暴露或调用其贡献；碰撞、未知贡献字段、未来 schema 和伪造 IPC 默认拒绝。不得自动联网、不加载任意 DLL、不扩大当前用户批准的 Grant。
+5. 添加 Core/集成测试覆盖贡献 schema、命名冲突、启停/兼容、调用/失败隔离、registry/IDE/handbook 一致性；实际 Windows Actions build/test/self-contained package 需要通过。不创建 Release，不改版本号。
+6. 同步 DECISIONS、ARCHITECTURE、ROADMAP、FEATURE-MATRIX、ACCEPTANCE、USER-GUIDE、DEVELOPMENT-LOG 与 handoff。Windows 10/11 的插件管理、WinForms/DPI/多屏及完整用户交互仍 NOT RUN，统一留 M14；CI PASS 不等于桌面实测。
