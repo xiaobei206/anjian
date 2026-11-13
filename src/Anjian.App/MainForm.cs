@@ -105,7 +105,6 @@ internal sealed class MainForm : Form
         {
             SetIdle();
             UpdateInstanceStatus();
-            _runInstanceManager?.RefreshFromCoordinator();
         });
         _playback.Log += message => Ui(() =>
         {

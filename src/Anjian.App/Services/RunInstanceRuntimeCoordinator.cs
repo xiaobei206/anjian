@@ -391,7 +391,7 @@ internal sealed class RunInstanceRuntimeCoordinator : IDisposable
     {
         lock (_sync)
         {
-            return _model.GetInstances()
+            var statuses = _model.GetInstances()
                 .Select(descriptor =>
                 {
                     if (!_entries.TryGetValue(descriptor.InstanceId, out var entry))
@@ -423,6 +423,13 @@ internal sealed class RunInstanceRuntimeCoordinator : IDisposable
                         entry.RuntimeTimeout,
                         diagnostic);
                 })
+                .ToArray();
+            return statuses
+                .Where(status => !RunInstanceLifecycle.IsTerminal(status.Snapshot))
+                .Concat(statuses
+                    .Where(status => RunInstanceLifecycle.IsTerminal(status.Snapshot))
+                    .OrderByDescending(status => status.CreatedAtUtc)
+                    .Take(500))
                 .OrderByDescending(status => status.CreatedAtUtc)
                 .ToArray();
         }
@@ -516,7 +523,6 @@ internal sealed class RunInstanceRuntimeCoordinator : IDisposable
                 entry.TotalIterations = total;
                 snapshot = _model.GetSnapshot(entry.InstanceId);
             }
-            StateChanged?.Invoke(snapshot);
             if (SelectedInstanceId == entry.InstanceId)
                 IterationChanged?.Invoke(current, total);
         };

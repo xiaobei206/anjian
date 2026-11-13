@@ -21,7 +21,11 @@ internal static class RunInstanceMonitorSmokeTestRunner
         var coordinator = new RunInstanceRuntimeCoordinator();
         try
         {
-            File.WriteAllText(scriptPath, "Log(""monitor-smoke-marker"")\nDelay(20000)\nLog(""monitor-smoke-end"")\n");
+            File.WriteAllText(scriptPath, """
+                Log("monitor-smoke-marker")
+                Delay(20000)
+                Log("monitor-smoke-end")
+                """);
             coordinator.StateChanged += snapshot => seenStates.Enqueue(snapshot);
             coordinator.StructuredLogAdded += entry =>
                 lines.Enqueue($"{entry.InstanceId?.Value ?? "GLOBAL"}|{entry.EventCode}|{entry.Message}");
