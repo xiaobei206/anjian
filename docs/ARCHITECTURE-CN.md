@@ -388,3 +388,12 @@ preview.4 当前采用低级鼠标/键盘 Hook，已纳入 Windows CI 编译与�
 - Pause 在调用前的 Runner 命令边界生效；打开对话框期间进入 Pause 时，当前对话框继续显示，脚本在下一命令边界等待恢复。Stop 取消等待任务并尝试关闭挂起窗体；如果剪贴板写入已由 Windows 接受，不承诺回滚副作用。
 - 小精灵尚未接入逐次 permissions sidecar 审阅，故启动其 Worker 时未传入 Grant 仍然使用 Empty，所有剪贴板/对话框 API 默认拒绝。CI 自动化不能代替 M14 实际 Windows 10/11 权限/DPI/交互验收。
 - M12-07 Windows Actions run [43408020908](https://github.com/xiaobei206/anjian/actions/runs/43408020908)：147/147 Core tests、0 warnings/0 errors、API handbook check、自包含 win-x64 publish、Sprite/Worker smoke、ZIP/SHA256 和 artifact 上传均 PASS；此结果不代表真实 Windows 桌面验收通过。
+
+
+### 18. M12-08 受控进程 Host 与会话句柄
+
+- Core `ScriptProcessPolicy` 统一规范化相对/绝对 EXE 路径、精确 Grant、参数数组、GUID 句柄和等待时间；Worker bridge 在发 IPC 前检查，host 的 `ScriptProcessSession` 对 start/wait/info 每次重新检查 Grant。
+- `ScriptProcessSession` 只保存本次 RunAsync 由 StartProcess 创建的 Process 对象，句柄随机且只在本次运行内有效。WaitProcess 使用 ExecutionGate 注入的 pause-aware delay，超时返回 false、Stop 仅取消等待；查询返回 processId/hasExited/exitCode。
+- 启动必须 `.exe`、文件存在、路径链不经过 reparse point；WorkingDirectory 固定为 EXE 所在目录。UseShellExecute=false，ArgumentList 保留参数边界，不经 Shell。
+- 每轮最多 32 个进程；参数上限 64 项/单项 8,192 字符/总长 32,768 字符；Wait 默认 30 秒、上限 10 分钟。运行结束释放 Process 句柄但不结束外部进程。
+- 只允许当前运行会话创建的句柄；不允许传入 PID、任意进程枚举、附加、终止或 Shell。此能力不是对已批准 EXE 的 OS 级沙箱；真实应用启动、窗口交互、UIPI/DPI 和 Stop 边界仍需 M14 实机验收。

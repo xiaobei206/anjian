@@ -17,6 +17,7 @@ internal sealed class PlaybackRunner : IDisposable
     private readonly WindowsWindowManager _windows = new();
     private readonly WindowsImageService _images;
     private readonly ExecutionGate _gate = new();
+    private readonly ScriptProcessSession _processSession = new();
     private CancellationTokenSource? _runCts;
     private Process? _worker;
     private LuaDebugLaunchOptions? _debugLaunchOptions;
@@ -113,6 +114,7 @@ internal sealed class PlaybackRunner : IDisposable
         finally
         {
             KillWorker();
+            _processSession.ClearHandles();
             _input.ReleaseAll();
             Volatile.Read(ref _debugCommandSource)?.TrySetCanceled();
             _debugLaunchOptions = null;
@@ -419,6 +421,14 @@ internal sealed class PlaybackRunner : IDisposable
             case "directory-create-temp":
                 return ScriptFileSystemHostDispatcher.Dispatch(
                     _launchPermissions, _launchScriptDirectory, message.Type, message.Name, message.Text, token);
+            case "process-start":
+                return _processSession.Start(_launchPermissions, _launchScriptDirectory, message.Text);
+            case "process-wait":
+                return JsonSerializer.Serialize(await _processSession.WaitAsync(
+                    _launchPermissions, message.Text, (milliseconds, ct) => _gate.DelayAsync(milliseconds, ct), token)
+                    .ConfigureAwait(false));
+            case "process-info":
+                return _processSession.GetInfo(_launchPermissions, message.Text);
             default:
                 throw new InvalidDataException($"未知执行命令：{message.Type}");
         }

@@ -754,3 +754,20 @@ M4 基础调试器与 M5 可视化录制/动作列表均已完成 Windows CI 验
 - Run 250（HEAD 21886b64d31623e74ac96bfee7d988b6780ff9ee）执行的是手册修正前的树，不作为修正后的验证结果。按 Catalog 规则重新生成后的 HEAD 为 6d1ae9e64764dd55bec9c55b439b3f8b6fcff4f0；对应 Windows Actions run 43407935185 正在验证，完成后需把真实结论追加至日志与 handoff。
 - 随后文档/验收清单 HEAD `81a221e4d6a7b7754b084ff9209dc46fe176878d` 对应 Windows Actions run [43408020908](https://github.com/xiaobei206/anjian/actions/runs/43408020908) 同样 SUCCESS：Restore PASS；Release Build 0 warnings/0 errors；147/147 Core tests；API handbook check；self-contained win-x64 publish；Sprite/Worker smoke 1/1；ZIP/SHA256 与 artifact upload 全 PASS。Artifact ID `14027962784`，87,207,518 bytes，archive SHA-256 `0887a163767200037a81109f6be5e0695cdd7d66aeda0341fdeccf429fca0cce`。没有创建 Release，preview.4 资产不变。
 - Windows 10/11 真实剪贴板、权限审阅和模态对话框/DPI/停止交互均 NOT RUN（M14）；未修改产品 VERSION、未创建 tag/Release，preview.4 资产不变。
+
+
+## 2026-11-13 — M12-08 — 受控进程 API（首次实现提交；Windows CI 待确认）
+
+### 规格与实现
+- 复用 ADR-024 的 processExecutables 精确 .exe 路径请求/逐次批准；现有权限审阅 UI 已逐项默认拒绝显示 EXE 路径，无需新增授权字段。Worker bridge 和 host 每次重新验证本轮 Grant。
+- 新增 Core ScriptProcessPolicy 与 ScriptProcessSession，限制仅当前运行由本 API 启动的进程句柄；不接受任意 PID、枚举、附加或终止进程。
+- 新增 Lua API StartProcess(executablePath, arguments?)、WaitProcess(processHandle, timeoutMs?)、GetProcessInfo(processHandle)，registry 1.0/99 → 1.1/102，函数手册由 Catalog 生成，IDE 补全继续读取同一 registry。
+- EXE 路径相对脚本目录解析并要求 .exe、文件存在、路径链不经过 reparse point。UseShellExecute=false；参数使用 ProcessStartInfo.ArgumentList 逐项传递，不拼 Shell 命令。参数最多 64 项，单项 8,192 字符，总长 32,768 字符；每次运行最多 32 个进程。
+- Wait 默认 30,000ms，范围 0–600,000ms；每 100ms 或更短轮询，经 ExecutionGate 支持 Pause/Stop。超时 false、已退出 true，GetProcessInfo 查询 PID/退出状态/退出码。
+- Stop 只终止 Worker 并取消等待，不终止外部进程；脚本运行结束释放 Process 引用，已启动应用继续运行。当前明确不提供任意 shell、PID 查询、进程枚举/附加/终止、HTTP/JSON 或插件。
+
+### 验证边界
+- 新增 Core API/policy 测试以及 Windows 进程会话集成测试（ping.exe 启动、参数数组、短等待取消、确认外部进程仍运行、最终退出码）。
+- 当前容器没有 .NET SDK，本地 Restore/Build/Test：NOT RUN。Windows GitHub Actions 将在本次 main push 后触发；必须核对实际 run 结论并据实回填，不把推送当作 CI 通过。
+- Windows 10/11 权限审阅、实际启动 GUI EXE、Stop 后应用保留、DPI/UIPI 等桌面实机验收：NOT RUN，统一留 M14。
+- 未修改 VERSION/AssemblyVersion/FileVersion；不创建 tag/Release；v0.1.0-preview.4 保持不变。

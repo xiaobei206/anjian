@@ -204,3 +204,15 @@
 - Stop 取消挂起 IPC，并关闭正在显示的自定义对话框；Pause 在命令边界生效，打开模态对话框时不强制关闭。Windows 已接受的剪贴板写入无法保证回滚。剪贴板/对话框内容不自动进入应用日志。
 - 小精灵未接入 permissions sidecar 审阅，缺少 Grant 仍为空授权；禁止把这批 API 视为默认开放。M14 仍需在 Windows 10/11 实机验收权限审阅、剪贴板占用/错误、对话框停止、DPI 与多显示器布局。
 
+
+
+## ADR-028：受控进程 API 仅操作本次批准的 EXE 与本次运行句柄
+
+- 状态：ACCEPTED（M12-08；Windows 自动化测试执行后更新最终 CI 结果，桌面实机留 M14）。
+- 公开 API：`StartProcess(executablePath, arguments?)`、`WaitProcess(processHandle, timeoutMs?)`、`GetProcessInfo(processHandle)`；API registry 从 1.0 / 99 项升为 1.1 / 102 项。
+- 授权：复用 ADR-024 的 `processExecutables` 精确 .exe 路径声明；路径相对入口脚本目录解析。每次运行由现有权限审阅 UI 逐项默认拒绝，批准集合必须是请求集合子集。Worker bridge 和 PlaybackRunner host 分别重新验证精确完整路径；空 Grant/伪造 IPC 一律拒绝。
+- 启动：仅启动批准路径中的现存 .exe；拒绝路径链中的 reparse point。使用 `ProcessStartInfo.UseShellExecute=false` 与 `ArgumentList` 逐项传递参数，不构造 shell 命令、不调用 cmd/PowerShell。参数最多 64 项，单项 8,192 字符、总长 32,768 字符；每轮 RunAsync 最多启动 32 个进程。
+- 句柄：每次 Start 生成随机 GUID N 格式句柄；仅在当前 PlaybackRunner 会话内保留 Process 对象。Wait/Info 仅查找当前会话由本 API 创建且 EXE 仍获当前 Grant 的句柄，不接受任意 PID，不枚举/附加已有进程。
+- 等待：`WaitProcess` 默认 30,000ms，范围 0–600,000ms；0 表示立即查询。每 100ms 或更短轮询一次，并经 ExecutionGate 处理 Pause/Stop；超时返回 false，进程已退出返回 true，GetProcessInfo 在退出后读取 exitCode。
+- 生命周期：Stop 只取消 Worker/等待，不终止已启动外部应用。单轮运行结束后释放 Process 对象句柄；已启动的外部进程继续由 Windows 独立运行。当前子任务不提供任意进程终止、Shell、HTTP/JSON 或插件。
+- 限制：路径/reparse 检查降低误启动风险，但进程 API 不是 OS 沙箱；用户批准的 EXE 本身仍可以执行其自身逻辑并访问该用户已有能力。

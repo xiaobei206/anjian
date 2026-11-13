@@ -2192,6 +2192,73 @@ if Confirm("继续执行下一步？") then
 end
 ```
 
+### 2.10 进程与应用
+
+#### `StartProcess(executablePath, arguments?)` — 启动已批准的应用
+
+- **稳定 ID：** `anjian.process.start`
+- **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
+- **说明：** 启动用户在本次运行中明确批准的 EXE，并返回仅在当前脚本运行期间有效的随机句柄。参数逐项通过 ProcessStartInfo.ArgumentList 传递，不经过 Shell；每轮最多启动 32 个进程。
+
+| 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
+|---|---|---|---|---|---|
+| `executablePath` | `string` | 是 | — | — | 已批准的 .exe 路径；相对路径以入口脚本目录为基准。 |
+| `arguments` | `string[]` | 否 | `[]` | — | 可选参数字符串数组；最多 64 项、单项最多 8,192 字符，所有参数总长最多 32,768 字符。 |
+
+**返回值：** `string` — 当前运行内的随机进程句柄；不暴露或接受任意系统 PID。
+**错误：** 未获本次运行对该精确 EXE 路径的批准时拒绝启动。；EXE 不存在、路径包含 reparse point、参数表格式/长度无效、单次运行达到 32 个进程上限或 Windows 启动失败时产生错误。
+**执行/取消语义：** 在执行器命令边界遵循暂停状态；创建进程是一次同步启动动作。 Stop 只终止 Lua Worker 并清理本程序输入；不会终止已启动的外部进程。进程句柄在本轮 RunAsync 结束时释放。
+**坐标/权限：** 坐标空间：none。Worker bridge 和 PlaybackRunner host dispatcher 分别检查本次 Grant 中的 processExecutables 精确路径；未声明/未批准默认拒绝。UseShellExecute=false，使用 ArgumentList，不调用 cmd.exe、PowerShell 或其他 Shell。
+
+**示例：**
+```lua
+local handle = StartProcess("C:\\Windows\\System32\\notepad.exe", {"notes.txt"})
+```
+
+#### `WaitProcess(processHandle, timeoutMs?)` — 等待已启动的进程
+
+- **稳定 ID：** `anjian.process.wait`
+- **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
+- **说明：** 等待 StartProcess 在当前脚本运行中启动的进程退出；超时返回 false，已退出返回 true。超时期间以短间隔检查暂停和 Stop。
+
+| 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
+|---|---|---|---|---|---|
+| `processHandle` | `string` | 是 | — | — | StartProcess 返回的当前运行进程句柄。 |
+| `timeoutMs` | `integer` | 否 | `30000` | 0–600000 毫秒 | 最多等待时间；0 表示仅立即检查一次。 |
+
+**返回值：** `boolean` — 进程在超时前退出返回 true；仍在运行且达到超时返回 false。
+**错误：** 进程句柄不存在、属于其他运行会话或当前 Grant 不再允许其 EXE 时拒绝访问。；超时参数不在 0–600000ms 范围、进程状态不可查询或 Stop 取消等待时产生错误/取消。
+**执行/取消语义：** 每次等待轮询都经过 ExecutionGate.DelayAsync；暂停会暂停超时轮询，恢复后继续。 Stop 取消等待并终止 Worker，但不杀死外部进程；timeout 返回 false，不影响该进程。
+**坐标/权限：** 坐标空间：none。Worker bridge 验证句柄格式；PlaybackRunner host dispatcher 仅允许查询当前运行内自己启动的句柄，并重新检查对应 EXE 的本次 processExecutables Grant。
+
+**示例：**
+```lua
+local handle = StartProcess("C:\\Windows\\System32\\whoami.exe")
+if WaitProcess(handle, 10000) then Log("进程已退出") end
+```
+
+#### `GetProcessInfo(processHandle)` — 查询已启动进程状态
+
+- **稳定 ID：** `anjian.process.get-info`
+- **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
+- **说明：** 查询 StartProcess 在当前脚本运行中启动的进程；返回当前句柄、系统 PID、是否退出及退出码。仍在运行时 exitCode 为 nil。
+
+| 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
+|---|---|---|---|---|---|
+| `processHandle` | `string` | 是 | — | — | StartProcess 返回的当前运行进程句柄。 |
+
+**返回值：** `table` — 包含 processHandle、processId、hasExited 和 exitCode；进程运行中 exitCode 为 nil。
+**错误：** 进程句柄不存在、属于其他运行会话或当前 Grant 不再允许其 EXE 时拒绝访问。；Windows 无法读取进程状态或退出码时产生错误。
+**执行/取消语义：** 在执行器命令边界遵循暂停状态。 查询为短时同步操作；Stop 会终止 Worker。不会终止目标进程。
+**坐标/权限：** 坐标空间：none。仅接受当前运行 StartProcess 返回的随机句柄；host 不接受任意 PID，不枚举/附加其他进程，并重新检查对应 EXE 的本次 processExecutables Grant。
+
+**示例：**
+```lua
+local handle = StartProcess("C:\\Windows\\System32\\whoami.exe")
+local info = GetProcessInfo(handle)
+Log("PID: " .. tostring(info.processId))
+```
+
 <!-- END GENERATED API REFERENCE -->
 
 ## 3. 当前参数约定

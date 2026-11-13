@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "apiVersion": "1.0",
+  "apiVersion": "1.1",
   "product": "按键精灵 2026",
   "categories": [
     {
@@ -47,6 +47,11 @@
       "id": "clipboardDialogs",
       "title": "剪贴板与对话框",
       "description": "经逐次授权后读写文本剪贴板，并显示可取消的消息、输入与确认对话框。"
+    },
+    {
+      "id": "process",
+      "title": "进程与应用",
+      "description": "逐次授权的精确 EXE 启动、等待与本次运行进程状态查询。"
     }
   ],
   "apis": [
@@ -6255,6 +6260,164 @@
       "implementationStatus": "implemented",
       "verificationStatus": "automated-contract-test;desktop-unverified",
       "introducedIn": "1.0.0-dev.1"
+    },
+    {
+      "id": "anjian.process.start",
+      "name": "StartProcess",
+      "category": "process",
+      "title": "启动已批准的应用",
+      "description": "启动用户在本次运行中明确批准的 EXE，并返回仅在当前脚本运行期间有效的随机句柄。参数逐项通过 ProcessStartInfo.ArgumentList 传递，不经过 Shell；每轮最多启动 32 个进程。",
+      "signature": "StartProcess(executablePath, arguments?)",
+      "parameters": [
+        {
+          "name": "executablePath",
+          "type": "string",
+          "required": true,
+          "description": "已批准的 .exe 路径；相对路径以入口脚本目录为基准。"
+        },
+        {
+          "name": "arguments",
+          "type": "string[]",
+          "required": false,
+          "defaultValue": [],
+          "description": "可选参数字符串数组；最多 64 项、单项最多 8,192 字符，所有参数总长最多 32,768 字符。"
+        }
+      ],
+      "returns": {
+        "type": "string",
+        "description": "当前运行内的随机进程句柄；不暴露或接受任意系统 PID。"
+      },
+      "errors": [
+        "未获本次运行对该精确 EXE 路径的批准时拒绝启动。",
+        "EXE 不存在、路径包含 reparse point、参数表格式/长度无效、单次运行达到 32 个进程上限或 Windows 启动失败时产生错误。"
+      ],
+      "example": "local handle = StartProcess(\"C:\\\\Windows\\\\System32\\\\notepad.exe\", {\"notes.txt\"})",
+      "runtime": {
+        "definition": "function(executablePath, arguments) return __AnjianBridge_StartProcess(executablePath, arguments or {}) end",
+        "bindings": [
+          {
+            "name": "__StartProcess",
+            "method": "StartProcess",
+            "localName": "__AnjianBridge_StartProcess"
+          }
+        ]
+      },
+      "behavior": {
+        "pauseBehavior": "在执行器命令边界遵循暂停状态；创建进程是一次同步启动动作。",
+        "cancellationBehavior": "Stop 只终止 Lua Worker 并清理本程序输入；不会终止已启动的外部进程。进程句柄在本轮 RunAsync 结束时释放。",
+        "sideEffects": [
+          "启动一个精确路径的外部 EXE，并将参数逐项传递给该程序。"
+        ],
+        "coordinateSpace": "none",
+        "permissionNotes": "Worker bridge 和 PlaybackRunner host dispatcher 分别检查本次 Grant 中的 processExecutables 精确路径；未声明/未批准默认拒绝。UseShellExecute=false，使用 ArgumentList，不调用 cmd.exe、PowerShell 或其他 Shell。"
+      },
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;windows-process-session-test;desktop-unverified",
+      "introducedIn": "1.1.0-dev.1"
+    },
+    {
+      "id": "anjian.process.wait",
+      "name": "WaitProcess",
+      "category": "process",
+      "title": "等待已启动的进程",
+      "description": "等待 StartProcess 在当前脚本运行中启动的进程退出；超时返回 false，已退出返回 true。超时期间以短间隔检查暂停和 Stop。",
+      "signature": "WaitProcess(processHandle, timeoutMs?)",
+      "parameters": [
+        {
+          "name": "processHandle",
+          "type": "string",
+          "required": true,
+          "description": "StartProcess 返回的当前运行进程句柄。"
+        },
+        {
+          "name": "timeoutMs",
+          "type": "integer",
+          "required": false,
+          "defaultValue": 30000,
+          "minimum": 0,
+          "maximum": 600000,
+          "unit": "毫秒",
+          "description": "最多等待时间；0 表示仅立即检查一次。"
+        }
+      ],
+      "returns": {
+        "type": "boolean",
+        "description": "进程在超时前退出返回 true；仍在运行且达到超时返回 false。"
+      },
+      "errors": [
+        "进程句柄不存在、属于其他运行会话或当前 Grant 不再允许其 EXE 时拒绝访问。",
+        "超时参数不在 0–600000ms 范围、进程状态不可查询或 Stop 取消等待时产生错误/取消。"
+      ],
+      "example": "local handle = StartProcess(\"C:\\\\Windows\\\\System32\\\\whoami.exe\")\nif WaitProcess(handle, 10000) then Log(\"进程已退出\") end",
+      "runtime": {
+        "definition": "function(processHandle, timeoutMs) return __AnjianBridge_WaitProcess(processHandle, timeoutMs == nil and 30000 or timeoutMs) end",
+        "bindings": [
+          {
+            "name": "__WaitProcess",
+            "method": "WaitProcess",
+            "localName": "__AnjianBridge_WaitProcess"
+          }
+        ]
+      },
+      "behavior": {
+        "pauseBehavior": "每次等待轮询都经过 ExecutionGate.DelayAsync；暂停会暂停超时轮询，恢复后继续。",
+        "cancellationBehavior": "Stop 取消等待并终止 Worker，但不杀死外部进程；timeout 返回 false，不影响该进程。",
+        "sideEffects": [
+          "仅等待由本次运行启动并持有句柄的进程，不枚举或附加其他进程。"
+        ],
+        "coordinateSpace": "none",
+        "permissionNotes": "Worker bridge 验证句柄格式；PlaybackRunner host dispatcher 仅允许查询当前运行内自己启动的句柄，并重新检查对应 EXE 的本次 processExecutables Grant。"
+      },
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;windows-process-session-test;desktop-unverified",
+      "introducedIn": "1.1.0-dev.1"
+    },
+    {
+      "id": "anjian.process.get-info",
+      "name": "GetProcessInfo",
+      "category": "process",
+      "title": "查询已启动进程状态",
+      "description": "查询 StartProcess 在当前脚本运行中启动的进程；返回当前句柄、系统 PID、是否退出及退出码。仍在运行时 exitCode 为 nil。",
+      "signature": "GetProcessInfo(processHandle)",
+      "parameters": [
+        {
+          "name": "processHandle",
+          "type": "string",
+          "required": true,
+          "description": "StartProcess 返回的当前运行进程句柄。"
+        }
+      ],
+      "returns": {
+        "type": "table",
+        "description": "包含 processHandle、processId、hasExited 和 exitCode；进程运行中 exitCode 为 nil。"
+      },
+      "errors": [
+        "进程句柄不存在、属于其他运行会话或当前 Grant 不再允许其 EXE 时拒绝访问。",
+        "Windows 无法读取进程状态或退出码时产生错误。"
+      ],
+      "example": "local handle = StartProcess(\"C:\\\\Windows\\\\System32\\\\whoami.exe\")\nlocal info = GetProcessInfo(handle)\nLog(\"PID: \" .. tostring(info.processId))",
+      "runtime": {
+        "definition": "function(processHandle) return __AnjianBridge_GetProcessInfo(processHandle) end",
+        "bindings": [
+          {
+            "name": "__GetProcessInfo",
+            "method": "GetProcessInfo",
+            "localName": "__AnjianBridge_GetProcessInfo"
+          }
+        ]
+      },
+      "behavior": {
+        "pauseBehavior": "在执行器命令边界遵循暂停状态。",
+        "cancellationBehavior": "查询为短时同步操作；Stop 会终止 Worker。不会终止目标进程。",
+        "sideEffects": [
+          "读取当前运行启动进程的状态与退出码。"
+        ],
+        "coordinateSpace": "none",
+        "permissionNotes": "仅接受当前运行 StartProcess 返回的随机句柄；host 不接受任意 PID，不枚举/附加其他进程，并重新检查对应 EXE 的本次 processExecutables Grant。"
+      },
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;windows-process-session-test;desktop-unverified",
+      "introducedIn": "1.1.0-dev.1"
     }
   ],
   "runtime": {

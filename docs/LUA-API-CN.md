@@ -328,3 +328,40 @@ Clipboard 与所有自定义对话框都通过主 UI 线程执行，满足 WinFo
 }
 ```
 
+
+
+## 13. M12-08 受控进程 API（API 1.1；main 开发版）
+
+本节功能只存在于 main 开发版，不包含在 v0.1.0-preview.4。完整参数/返回/错误契约以 API 注册表和自动生成函数手册为准。
+
+### 13.1 权限与 sidecar
+
+在脚本同目录的 `<script>.permissions.json` 声明精确 EXE 路径；相对路径以脚本目录为基准。声明只发起请求，仍需用户每次运行在权限审阅窗口逐项批准，默认全拒绝：
+
+```json
+{
+  "schemaVersion": 1,
+  "processExecutables": [
+    "C:\\\\Windows\\\\System32\\\\notepad.exe",
+    "tools\\\\helper.exe"
+  ]
+}
+```
+
+### 13.2 启动、等待和查询
+
+- `StartProcess(executablePath, arguments?)`：启动批准的 EXE。arguments 是 Lua 字符串数组，默认空数组；返回仅在当前脚本运行有效的随机句柄。每次最多启动 32 个进程；参数最多 64 项，单项 8,192 字符、总长 32,768 字符。
+- `WaitProcess(processHandle, timeoutMs?)`：等待该句柄对应进程退出，默认 30,000ms，范围 0–600,000ms；0 表示立即检查。超时返回 false，已退出返回 true。暂停会暂停等待轮询；Stop 取消等待但不会杀死外部进程。
+- `GetProcessInfo(processHandle)`：返回 `processHandle`、`processId`、`hasExited`、`exitCode`；仍运行时 exitCode 为 nil。只能查询本次运行由 StartProcess 创建的进程，不接受任意 PID。
+
+示例：
+
+```lua
+local handle = StartProcess("C:\\\\Windows\\\\System32\\\\whoami.exe", {"/user"})
+if WaitProcess(handle, 10000) then
+  local info = GetProcessInfo(handle)
+  Log("退出码：" .. tostring(info.exitCode))
+end
+```
+
+参数通过 `.NET ProcessStartInfo.ArgumentList` 逐项传递；UseShellExecute=false。不拼接 shell 命令、不调用 cmd.exe/PowerShell。当前不提供进程终止、任意进程枚举或附加、HTTP/JSON 和插件 API。已启动的外部进程在脚本停止/结束后继续独立运行。

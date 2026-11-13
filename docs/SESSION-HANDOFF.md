@@ -613,3 +613,31 @@ M12-02 验收前不做剪贴板、对话框、进程、HTTP 或插件加载。�
 ## 下一会话唯一任务：M12-08 — 受控进程 API
 
 先核对 main HEAD 并读取本 handoff、ROADMAP、PRD、FEATURE-MATRIX、ADR-024、API registry 和当前 Worker/PlaybackRunner dispatcher。只实现严格授权的进程/应用启动、等待与查询能力：精确批准的 EXE 路径、参数安全传递（不得拼 Shell 命令）、超时/Stop 取消、退出状态和错误契约；未声明/未批准路径默认拒绝。不得开放任意 shell、任意进程终止、HTTP/JSON 或插件。新增公开 API 前先定好参数/返回/权限/取消规格，再同步 registry、函数手册、IDE 提示、测试、开发日志和验收清单。直接在 main 小步提交，不建长期分支/PR；不改产品版本、不创建 Release。真实桌面验收统一留 M14。
+
+
+---
+
+# 最新交接状态覆盖：M12-08 受控进程 API 已实现，Windows CI 待确认（2026-11-13）
+
+本节覆盖本文之前的 M12-07 下一任务描述。当前 main 已包含 M12-08 首轮代码、API 注册表与文档；Windows Actions 尚待实际确认，本地容器无 .NET SDK，因此不得声称 Build/Test 已通过。
+
+## 当前状态与边界
+- 基于 M12-07 完成提交后的 main `e92d4a73722e2029404bd8d1f12b4ed2991e30c7` 实施。M12-08 唯一范围：受控进程 API。
+- 新增 StartProcess(executablePath, arguments?)、WaitProcess(processHandle, timeoutMs?)、GetProcessInfo(processHandle)，API registry 1.1 / 102 项。
+- 复用 permissions sidecar 的 processExecutables 精确 .exe 路径、主窗口逐次授权 UI 与 ScriptPermissionGrant。没有 sidecar/未批准默认拒绝；Worker bridge/host session 每次重新校验 Grant。
+- 参数字符串数组经 ProcessStartInfo.ArgumentList 逐项传递；UseShellExecute=false，不调用命令 Shell。EXE 必须存在并且路径链不经过 reparse point。最多 32 个进程/每运行；64 参数/项 8,192 字符/总长 32,768。
+- Wait 默认 30 秒，上限 10 分钟，0 立即查询；Pause/Stop 在等待轮询中生效，超时 false、退出 true。GetProcessInfo 返回 processId/hasExited/exitCode。
+- Stop 与脚本正常结束都不会杀死已启动外部应用；仅释放本轮 Process 句柄。进程句柄为随机 GUID N 格式，只能查询本轮由 StartProcess 创建的进程，不接受任意 PID/枚举/附加/终止。
+- 目前只提交首轮实现，Windows CI 待运行；本地 .NET SDK 不存在，local Restore/Build/Test NOT RUN；Windows 10/11 GUI、权限审批/DPI/真实 Stop 交互仍 NOT RUN（M14）。不改产品版本、不建 Release。
+
+## 本轮文件与实现要点
+- 新增 Core：`ScriptProcessPolicy.cs`、`ScriptProcessSession.cs`。
+- 新增 Worker bridge：`WorkerLuaApi.Processes.cs`。
+- 修改 PlaybackRunner：增加 process-start/process-wait/process-info host IPC，等待复用 ExecutionGate 的 pause-aware delay；运行收尾只释放 Process 对象句柄。
+- 更新 registry/API 1.1、LuaApiRegistryTests 与进程策略/Worker/Windows Session 测试。
+- 同步 ADR-028、PRD、ARCHITECTURE、LUA-API、FUNCTION-REFERENCE、USER-GUIDE、FEATURE-MATRIX、ROADMAP、ACCEPTANCE、DEVELOPMENT-LOG、README 与本 handoff。
+
+## 下一会话唯一任务：确认和修复 M12-08 Windows CI
+- 查询最新 main HEAD 与对应 Windows Actions run；检查 Restore/Build/Core tests/API handbook/self-contained win-x64/Sprite Worker smoke/ZIP-SHA256/artifact upload 全部步骤。
+- 修复本轮 CI 实际暴露的问题，逐步提交 main；不要为抢先推进 M12-09 而跳过 M12-08 CI 绿灯。
+- Windows CI PASS 后，将 run ID、测试数量、Build warning/error 数与 artifact 信息写回 ROADMAP、DEVELOPMENT-LOG、ACCEPTANCE、handoff。真实桌面仍 NOT RUN（M14）。

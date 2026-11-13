@@ -238,8 +238,9 @@ M7 实现/CI 已完成不代表 M7-01..M7-10 Windows 桌面验收通过；这些
 ## M12–M13 — 扩展 API、插件和自动运行
 
 
-### M12 当前进度（2026-11-13；M12-02 文件/目录 API 已实现；M12-07 剪贴板/对话框已编码，待最新 Windows CI 结果确认）
+### M12 当前进度（2026-11-13；M12-02 文件/目录、M12-07 剪贴板/对话框和 M12-08 受控进程 API 已进入 main；当前 Windows CI 待确认）
 
+- M12-08 已实现三项公开 API：StartProcess、WaitProcess、GetProcessInfo；复用 processExecutables 精确路径请求与每次运行逐项批准，Worker/host 双层 Grant 校验；UseShellExecute=false + ArgumentList，参数数组不经 Shell；当前运行随机句柄隔离，Pause-aware 等待，超时/Stop 只取消等待而不终止外部进程；退出后可查 exitCode。API registry 为 1.1 / 102 项，Windows CI 待确认，桌面留 M14。
 - M12-01 已完成并进入 main：Core 权限请求/批准/Grant 数据模型、schema v1 解析和范围校验；每脚本可选 sidecar 为脚本文件全名后缀 .permissions.json，最大 256 KiB，声明本身不代表授权。
 - 主程序普通播放/调试启动前逐项审阅本次请求，默认全不勾选、取消不启动 Worker；缺少 sidecar 使用空 Grant，损坏/未来 schema/重解析点 sidecar 拒绝启动。
 - M12-02 已完成文件 API 首批 8 项与补齐 5 项：ReadTextFile、WriteTextFile、AppendTextFile、FileExists、DirectoryExists、ListFiles、ListDirectories、CreateDirectory、CopyFile、MoveFile、RenameFile、CreateTempFile、CreateTempDirectory。Worker bridge 发 IPC 前校验 Grant；PlaybackRunner 对每条文件 IPC 再次检查；未知命令 fail-closed。SpriteLauncherForm 复用同一 PlaybackRunner，未提供授权时仍使用 Empty Grant。
@@ -261,7 +262,7 @@ M7 实现/CI 已完成不代表 M7-01..M7-10 Windows 桌面验收通过；这些
 ### M12 后续实施顺序（必须按安全依赖推进）
 
 1. M12-07：已完成；Windows Actions run 43408020908 全 PASS，真实剪贴板/对话框交互待 M14。
-2. M12-08：精确 EXE 启动/等待/查询及退出状态，严格按批准路径，不开放任意 Shell。
+2. M12-08：实现已进入 main，待 Windows CI 验收；精确 EXE 启动/等待/查询及退出状态，不开放任意 Shell。
 3. M12-09：HTTP(S)/JSON，精确主机/方法授权，HTTPS 默认，HTTP 单独审批，重定向重新授权、超时、响应上限和 Stop 取消。
 4. M12-10：本地插件目录/ZIP manifest、稳定 ID、版本/API 兼容、文件清单/hash、脚本声明/插件声明/用户批准权限取交集，启停/卸载及错误隔离；不加载任意 DLL，不在主 UI 执行插件 Lua。
 5. M12-11：小精灵包构建/manifest 收集 permissions sidecar，Launcher 复用逐次权限审阅；不得在缺少批准时扩大 Grant。

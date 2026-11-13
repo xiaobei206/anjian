@@ -410,3 +410,30 @@ end
 ```
 
 剪贴板 API 仅处理文本，最多 1,048,576 个 UTF-16 字符；空字符串传给 SetClipboardText 会清空剪贴板。MessageBox 和 Confirm 正文上限为 32,768 个字符，标题 256 个字符；InputBox 的提示、默认值和输入上限均为 32,768 个字符。InputBox 取消返回 nil；Confirm 点否/关闭返回 false。剪贴板与自定义对话框经 WinForms UI STA 线程执行；Stop 会关闭挂起的自定义对话框。真实 Windows 10/11 行为仍待 M14 实机验收。
+
+
+## M12-08 受控进程 API（main 开发版，不包含在 preview.4）
+
+使用前在脚本同目录创建 `<脚本名>.permissions.json`，列出需要启动的精确 EXE 路径：
+
+```json
+{
+  "schemaVersion": 1,
+  "processExecutables": ["C:\\\\Windows\\\\System32\\\\notepad.exe"]
+}
+```
+
+每次运行时权限窗口会逐项显示这些路径，必须由用户明确勾选批准；默认不勾选。相对路径以入口脚本目录为基准。没有声明或未批准时，StartProcess 会被拒绝。
+
+```lua
+local handle = StartProcess("C:\\\\Windows\\\\System32\\\\whoami.exe", {"/user"})
+if WaitProcess(handle, 10000) then
+  local info = GetProcessInfo(handle)
+  Log("PID=" .. tostring(info.processId) .. " exit=" .. tostring(info.exitCode))
+end
+```
+
+- `StartProcess(path, arguments?)`：只启动已批准的 .exe；参数为字符串数组，通过 Windows 进程启动 API 逐项传递，不经过命令 Shell。每次最多 32 个进程。
+- `WaitProcess(handle, timeoutMs?)`：默认 30 秒，最多 10 分钟；超时返回 false，退出返回 true。Pause 暂停等待轮询，Stop 会取消等待。
+- `GetProcessInfo(handle)`：只查询本次运行启动的进程句柄，不接受任意 PID；返回 PID、退出状态和退出码。
+- Stop/脚本结束不会关闭已启动的外部应用；本轮结束后句柄失效。当前没有 Shell、任意进程终止、进程枚举/附加能力。
