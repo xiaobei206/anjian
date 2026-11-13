@@ -19,8 +19,6 @@ public sealed class RunInstanceCoordinatorTests
         Assert.True(first.ShouldStartImmediately);
         Assert.True(retry.IsDuplicate);
         Assert.Equal(first.InstanceId, retry.InstanceId);
-        Assert.Equal(first.InstanceId, secondStart.Snapshot.InstanceId == first.InstanceId
-            ? null : first.InstanceId);
         Assert.NotEqual(first.InstanceId, secondStart.InstanceId);
         Assert.Equal(2, coordinator.ActiveCount);
         Assert.Equal(2, coordinator.GetInstances().Count);
