@@ -8,6 +8,8 @@ namespace Anjian.Core.Api;
 
 public sealed partial class WorkerLuaApi
 {
+    private static readonly JsonSerializerOptions OcrIpcJsonOptions = new(JsonSerializerDefaults.Web);
+
     public LuaTable OCR(string imageId, string language, double minConfidence)
     {
         var recognized = RecognizeImage(imageId, language, minConfidence);
@@ -54,7 +56,7 @@ public sealed partial class WorkerLuaApi
                 try
                 {
                     _ = pipe.Request("image-release",
-                        text: JsonSerializer.Serialize(new ImageIdRequest(imageId), WindowApiJson.Options));
+                        text: JsonSerializer.Serialize(new ImageIdRequest(imageId), OcrIpcJsonOptions));
                 }
                 catch (IOException) { }
             }
@@ -78,11 +80,11 @@ public sealed partial class WorkerLuaApi
             throw new InvalidOperationException("OCR 引擎不可用；请重新启动按键精灵 2026。");
 
         var idRequest = new ImageIdRequest(imageId);
-        var json = JsonSerializer.Serialize(idRequest, WindowApiJson.Options);
+        var json = JsonSerializer.Serialize(idRequest, OcrIpcJsonOptions);
         var sizePayload = pipe.Request("image-size", text: json);
         var size = string.IsNullOrWhiteSpace(sizePayload)
             ? throw new InvalidDataException("OCR 无法读取图像尺寸。")
-            : JsonSerializer.Deserialize<ImageSizeInfo>(sizePayload, WindowApiJson.Options)
+            : JsonSerializer.Deserialize<ImageSizeInfo>(sizePayload, OcrIpcJsonOptions)
                 ?? throw new InvalidDataException("OCR 收到无效图像尺寸。");
 
         var encoded = pipe.Request("image-export-png", text: json);
