@@ -18,6 +18,7 @@ internal sealed class PlaybackRunner : IDisposable
     private readonly WindowsImageService _images;
     private readonly ExecutionGate _gate = new();
     private readonly ScriptProcessSession _processSession = new();
+    private readonly ScriptHttpSession _httpSession = new();
     private CancellationTokenSource? _runCts;
     private Process? _worker;
     private LuaDebugLaunchOptions? _debugLaunchOptions;
@@ -429,6 +430,9 @@ internal sealed class PlaybackRunner : IDisposable
                     .ConfigureAwait(false));
             case "process-info":
                 return _processSession.GetInfo(_launchPermissions, message.Text);
+            case "http-request":
+                return await _httpSession.SendAsync(_launchPermissions, message.Text, token)
+                    .ConfigureAwait(false);
             default:
                 throw new InvalidDataException($"未知执行命令：{message.Type}");
         }
@@ -646,5 +650,6 @@ internal sealed class PlaybackRunner : IDisposable
         Stop();
         _images.Clear();
         _windows.Dispose();
+        _httpSession.Dispose();
     }
 }

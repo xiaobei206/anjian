@@ -75,9 +75,11 @@ public sealed record ScriptPermissionGrant(
     public bool AllowsHttp(Uri uri, string method)
     {
         ArgumentNullException.ThrowIfNull(uri);
-        if (!uri.IsAbsoluteUri ||
+        if (!uri.IsAbsoluteUri || !uri.IsDefaultPort ||
+            !string.IsNullOrEmpty(uri.UserInfo) || !string.IsNullOrEmpty(uri.Fragment) ||
             !(uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) ||
-              (AllowInsecureHttp && uri.Scheme.Equals(Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase))))
+              (AllowInsecureHttp && uri.Scheme.Equals(Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase))) ||
+            Uri.CheckHostName(uri.IdnHost) != UriHostNameType.Dns)
             return false;
 
         string host;
@@ -181,6 +183,8 @@ public static class ScriptPermissionPolicy
             throw new InvalidDataException("声明 HTTP 方法时必须至少声明一个精确主机名。");
         if (hosts.Count > 0 && methods.Count == 0)
             throw new InvalidDataException("声明 HTTP 主机时必须同时声明允许的方法。");
+        if (dto.AllowInsecureHttp && hosts.Count == 0)
+            throw new InvalidDataException("请求明文 HTTP 权限时必须同时声明至少一个精确 HTTP 主机。");
 
         return new ScriptPermissionRequest(readRoots, writeRoots, dto.ClipboardRead,
             dto.ClipboardWrite, dialogs, processes, hosts, methods, dto.AllowInsecureHttp);

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "apiVersion": "1.1",
+  "apiVersion": "1.2",
   "product": "按键精灵 2026",
   "categories": [
     {
@@ -52,6 +52,11 @@
       "id": "process",
       "title": "进程与应用",
       "description": "逐次授权的精确 EXE 启动、等待与本次运行进程状态查询。"
+    },
+    {
+      "id": "http",
+      "title": "HTTP 与 JSON",
+      "description": "通过逐次授权的 HTTPS/HTTP 主机白名单执行有界请求与 JSON 解析。"
     }
   ],
   "apis": [
@@ -6418,6 +6423,61 @@
       "implementationStatus": "implemented",
       "verificationStatus": "automated-contract-test;windows-process-session-test;desktop-unverified",
       "introducedIn": "1.1.0-dev.1"
+    },
+    {
+      "id": "anjian.http.request",
+      "name": "HttpRequest",
+      "category": "http",
+      "title": "发送受控 HTTP(S)/JSON 请求",
+      "description": "向本次运行明确批准的精确 DNS 主机发送有界 HTTP(S) 请求；默认 HTTPS/GET，可选择 JSON 请求正文并解析 JSON 响应。",
+      "signature": "HttpRequest(url, options?)",
+      "parameters": [
+        {
+          "name": "url",
+          "type": "string",
+          "required": true,
+          "description": "HTTPS 或经单独授权的 HTTP 绝对 URL；仅默认端口 443/80。"
+        },
+        {
+          "name": "options",
+          "type": "table",
+          "required": false,
+          "defaultValue": {},
+          "description": "可选请求配置：method、headers、body 或 json、timeoutMs、followRedirects。"
+        }
+      ],
+      "returns": {
+        "type": "table",
+        "description": "statusCode、reasonPhrase、ok、url、headers、body、json；非 2xx 状态仍返回响应对象。"
+      },
+      "errors": [
+        "URL、方法、请求头、请求正文或 JSON 参数无效，或主机/方法/明文 HTTP 未获本次运行批准。",
+        "重定向目标未重新获得精确主机/方法/协议授权，重定向次数超限或响应头/正文超过上限。",
+        "请求超时、Stop 取消、网络失败、响应不是有效 UTF-8 或声明 JSON 的响应正文无效。"
+      ],
+      "example": "local response = HttpRequest(\"https://api.example.com/items\", {\n  method = \"POST\",\n  headers = { [\"Accept\"] = \"application/json\" },\n  json = { name = \"Anjian\", enabled = true },\n  timeoutMs = 10000\n})\nif response.ok and response.json then\n  Log(response.json.id)\nend",
+      "behavior": {
+        "pauseBehavior": "在请求开始前的执行器命令边界遵循 Pause；已开始的 HTTP 请求不暂停，也不延长其 timeout。",
+        "cancellationBehavior": "Stop cancellation token 贯穿发送、重定向和响应读取；取消后不返回部分响应。timeout 与 Stop 分别报告。",
+        "sideEffects": [
+          "向明确批准的远程主机发送脚本显式构造的 HTTP 请求；不自动联网、不写入请求/响应日志。"
+        ],
+        "coordinateSpace": "none",
+        "permissionNotes": "Worker bridge 与 PlaybackRunner host dispatcher 分别验证 httpHosts 精确 DNS 主机、httpMethods 和 allowInsecureHttp；HTTPS 默认，HTTP 需单独请求并批准。重定向逐跳重新授权，跨 origin 不转发 Authorization/自定义凭据头。"
+      },
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;redirect-cancel-response-limit;desktop-unverified",
+      "introducedIn": "1.2.0-dev.1",
+      "runtime": {
+        "definition": "function(url, options) return __AnjianBridge_HttpRequest(url, options or {}) end",
+        "bindings": [
+          {
+            "name": "__HttpRequest",
+            "method": "HttpRequest",
+            "localName": "__AnjianBridge_HttpRequest"
+          }
+        ]
+      }
     }
   ],
   "runtime": {
