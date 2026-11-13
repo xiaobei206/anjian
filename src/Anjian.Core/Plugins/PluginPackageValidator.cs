@@ -25,6 +25,7 @@ public sealed class PluginManifest
 
 public sealed class PluginPermissionManifest
 {
+    public int SchemaVersion { get; set; } = 1;
     public List<string> FileReadRoots { get; set; } = [];
     public List<string> FileWriteRoots { get; set; } = [];
     public bool ClipboardRead { get; set; }

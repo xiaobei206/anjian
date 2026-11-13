@@ -20,6 +20,7 @@ JSON manifest 示例（示例 hash 为占位文字，真实包必须填入文件
       "entry": "entry.lua",
       "modulesRoot": "Modules",
       "permissions": {
+        "schemaVersion": 1,
         "fileReadRoots": ["data"],
         "fileWriteRoots": ["output"],
         "clipboardRead": false,
