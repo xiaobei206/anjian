@@ -18,7 +18,7 @@
 | M5 可视化录制/动作列表 | DONE（Windows CI PASS；桌面手工验收 NOT RUN） | 结构化原始事件/动作、虚拟化动作编辑器、参数/延时/分组/注释/启用状态、Lua 区块同步保护、sidecar 和单步试运行 |
 | M6 坐标系统与窗口自动化 | DONE（按本 handoff 的 API/Win32 范围；最终 Windows CI PASS；桌面验收 NOT RUN） | screen/window/client/anchor/ratio、双向坐标转换、安全窗口引用/枚举/属性/操作/等待 |
 | M7 控件与前后台能力适配 | DONE（Windows CI PASS；桌面验收 NOT RUN） | UI Automation Control View/Pattern；worker 隔离与可停止性；按能力报告语义后台控件操作、受限前台输入和明确 unsupported 边界；run 43350412493：64/64 tests、0 warning/error、API check、win-x64 publish、ZIP/SHA256、artifact upload 均 PASS |
-| M8 截图、图色与模板资源 | IN_PROGRESS（代码与 Windows CI 已通过；Windows 10/11 桌面验收 NOT RUN） | 截图/图像资源生命周期、脚本级 PNG manifest/assets 管理、相对路径与依赖检查、RGB/hex/颜色差值/八邻域颜色块、透明模板匹配、视觉调试点击穿透 overlay；仍需 M8-01..M8-18 实机验收，CI 不替代真实桌面
+| M8 截图、图色与模板资源 | IN_PROGRESS（Windows Actions run [43358188770](https://github.com/xiaobei206/anjian/actions/runs/43358188770) SUCCESS；85/85 tests、0 warnings/errors；Windows 10/11 桌面验收 NOT RUN） | 截图/图像资源生命周期、脚本级 PNG manifest/assets 管理、相对路径与依赖检查、RGB/hex/颜色差值/八邻域颜色块、透明模板匹配、视觉调试点击穿透 overlay；仍需 M8-01..M8-18 实机验收，CI 不替代真实桌面
 | M9 OCR 与文本识别 | TODO | 本地 OCR、语言/字库配置、文字区域/置信度与等待文本 |
 | M10 参数、配置与脚本自定义 UI | TODO | 参数声明、类型/默认值/范围/选项、校验、持久化和通用表单 |
 | M11 小精灵打包器 | TODO | 独立包/EXE 入口、独立参数界面、图标、依赖收集、运行控制、清单与校验 |

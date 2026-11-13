@@ -286,7 +286,7 @@ M4 基础调试器已在 main 实现并通过 Windows CI。具体实现提交与
 - 已更新 PRD、Feature Matrix、Roadmap、Architecture、Acceptance、Lua API、Function Reference、User Guide、README、Development Log 和本 handoff。没有进入 M9 OCR。
 
 ### 验证边界
-- 本地容器未提供 dotnet SDK，不能进行本地 Restore/Build/Test；以本次 main 提交触发的 Windows Actions 结果为准，CI 完成前不得标 PASS。
+- 本地容器未提供 dotnet SDK，不能进行本地 Restore/Build/Test。实现代码基线 `7dae8af881524fae08ddd5af281ef9d4e47a58c7` 的 run [43357876777](https://github.com/xiaobei206/anjian/actions/runs/43357876777) SUCCESS；文档同步 main HEAD `c2b30c1d9aabd876cd848d6203376060f294c34e` 的 run [43358188770](https://github.com/xiaobei206/anjian/actions/runs/43358188770) 也 SUCCESS：Restore PASS、Release Build 0 warnings / 0 errors、85/85 Core tests、API handbook `--check` PASS、self-contained win-x64 publish 与 ZIP/SHA256 上传 PASS。最新 artifact ID `14006903094`，76,460,671 bytes，30 天保留；[下载 artifact](https://github.com/xiaobei206/anjian/actions/runs/43358188770/artifacts/14006903094)。
 - M8-01..M8-18 Windows 10/11 桌面验收全部 NOT RUN。CI 不等于用户桌面验收。尤其需要验证多显示器/负坐标、资源 rename/duplicate 路径、点击穿透和 SetWindowDisplayAffinity 实际截图隔离。
 - 未修改 VERSION/csproj 预览版本；没有创建 Release；v0.1.0-preview.4 官方 Release ZIP/SHA256 不变。
 
