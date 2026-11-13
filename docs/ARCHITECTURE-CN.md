@@ -515,7 +515,7 @@ M13-01 先冻结契约；新增 Core 类型只负责身份、状态转换和并�
 ### 19.9 M13-04 实例监控、结构化日志与故障恢复
 
 - `RunInstanceListQuery` 是实例列表排序/筛选契约：所有非终态实例始终可见，已终态只取最近 500 条；按脚本名/路径和状态组合过滤，不按脚本路径合并不同 instanceId。WinForms 以 750ms Timer 批量读取状态，不在 Worker 高频事件中同步重绘表格。
-- `RunInstanceLogStore` 是进程内有界缓存，最多 10,000 条；单条消息最多 4,096 字符，查询结果默认/最大 1,000/10,000。字段包括 UTC timestamp、level、eventCode、instanceId（全局事件可为空）、workerAttemptId、iteration 与安全消息。该缓存不落盘，用户显式导出当前筛选 JSONL/JSON。
+- `RunInstanceLogStore` 是进程内有界缓存，最多 10,000 条；单条消息最多 4,096 字符，查询结果默认/最大 1,000/10,000。按 instanceId、level 和文本查询（文本匹配 message/eventCode/workerAttemptId），结果按 UTC 时间顺序展示；iteration 与 timestamp 作为诊断字段显示，不提供独立 iteration 或时间范围筛选。该缓存不落盘，用户显式导出当前筛选 JSONL/JSON。
 - 日志入缓存、送 UI、复制和导出前均经过敏感参数脱敏及控制字符/长度清洗。运行参数的 Sensitive 属性来自脚本参数 schema；若 schema 存在但解析失败，采用更保守的参数值脱敏。权限 sidecar 与 HTTP header/body 不写入实例日志。
 - 独立 Pause/Resume/Stop 经 coordinator 的同步状态转换并使用所选 instanceId；排队 Stop 取消队列项。日志仅观察状态，不是状态写回通道。清理失败保留 CleanupStatus=Failed；人工确认只恢复 InputArbiter 的全局输入故障锁定。
 - 最终自动化验证见 Windows Actions [43517955937](https://github.com/xiaobei206/anjian/actions/runs/43517955937)：228/228 Core tests、Release Build 0 warnings/errors、自包含发布、monitor + Sprite/Plugin/MultiInstance package smoke 4/4；artifact ID 14081741612。Windows 10/11 真实键鼠/WinForms/DPI/多屏/恢复/托盘实测仍 NOT RUN（M14）。

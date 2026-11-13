@@ -454,7 +454,7 @@ M13 代码/自动化工作已结束，但不代表真实 Windows 10/11 桌面验
 
 - 新增非模态“运行实例”窗口：过滤脚本名/路径和状态；活动/排队实例始终显示，已结束历史最多保留最近 500 条；同一脚本的不同 instanceId 不合并。
 - 列表展示实例创建 UTC、状态/Outcome、循环进度、Worker attempt/PID/exit code、运行 timeout、终止方式、CleanupStatus 与最后诊断；按所选 instanceId 独立 Pause/Resume/Stop，排队 Stop 取消队列项。
-- 新增有界内存结构化日志（最多 10,000 条，单条消息最多 4,096 字符），按时间/level/event code/instanceId/attempt/iteration 查询；敏感参数值在送入 UI、旧文本日志和导出前按 schema 脱敏。支持当前过滤结果 JSONL/JSON 安全导出，不采集 HTTP header/body 或权限 sidecar 内容。
+- 新增有界内存结构化日志（最多 10,000 条，单条消息最多 4,096 字符），可按 instanceId、level 和文本（message/event code/attempt ID）过滤；按 UTC 时间顺序展示 timestamp，attempt/iteration 为诊断字段而非独立筛选器。敏感参数值在送入 UI、旧文本日志和导出前按 schema 脱敏。支持当前过滤结果 JSONL/JSON 安全导出，不采集 HTTP header/body 或权限 sidecar 内容。
 - 输入清理失败、Worker crash、强制终止、超时、权限拒绝/参数取消使用单独诊断路径。人工恢复需要明确确认已经检查物理键鼠；该操作只解除 InputArbiter 故障锁定，不改写失败实例的 Outcome/CleanupStatus。
 - 实例列表查询有 Core 单元测试；日志缓存有界、UTC 规范化、过滤、跨实例隔离、脱敏、控制字符清理和上限有 Core 测试；发布包 smoke 使用两个真实 Worker，验证两实例日志隔离、状态事件、独立 Stop。
 - 最终 Windows Actions：Windows Actions [43517955937](https://github.com/xiaobei206/anjian/actions/runs/43517955937)，代码 HEAD `6d9513bec5de35ed8f20f656d8520217d949733a`：Restore/Build PASS（0 warnings、0 errors），Core tests 228/228，API handbook check PASS（内置 API 1.2 / 103），win-x64 self-contained publish PASS，发布包 smoke 4/4 PASS，ZIP/SHA256 与 artifact 上传 PASS。Artifact `14081741612`，87,373,960 bytes，Actions artifact archive digest `sha256:7ea0e15aff79bf89defafdf995ec7739a53045f59d264354c271dae1ef28bc29`，有效至 2026-12-13；仅临时 Actions artifact，不是 Release。
