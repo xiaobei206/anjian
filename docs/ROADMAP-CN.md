@@ -23,7 +23,7 @@
 | M10 参数、配置与脚本自定义 UI | DONE（实现与 Windows 自动化验收完成；WinForms/桌面实测延期 M14） | 参数 sidecar schema v1、10 种类型、统一 validator、配置持久化/恢复、播放/调试前表单、参数设计器、JSON 导入导出、typed Worker IPC、递归只读 Lua Args、脚本目录相对路径解析 |
 | M11 小精灵打包器 | DONE（Windows CI run 229 PASS；WinForms/DPI/真实输入桌面验收延期 M14，NOT RUN） | 独立便携目录 + EXE 启动 ZIP、依赖/资源收集、M10 参数 UI、运行控制、manifest/SHA256、构建日志与离线函数参考 Markdown |
 | M12 内置扩展 API 与插件系统 | DONE（M12-01..M12-12 实现与 Windows CI 自动化完成；WinForms/权限/DPI/多屏桌面验收延期 M14） | 文件/剪贴板/对话框/进程/HTTP(S)/JSON 双层授权；本地插件 manifest/hash/三方 Grant 交集、入口 sidecar 与受限 Lua contribution；内置 API registry 1.2 / 103 |
-| M13 多实例与定时任务 | IN_PROGRESS（M13-01/02/03 DONE；M13-04 下一步） | M13-03 在代码 HEAD 69febaab 已通过 Windows Actions 43470648199：218/218 Core tests、0 warnings/errors、API 103/103、自包含发布、Worker smoke 3/3、ZIP/SHA 上传 PASS；完整实例列表/筛选/日志/恢复 UI 留 M13-04 |
+| M13 多实例与定时任务 | DONE（M13-01..04 实现与 Windows Actions 自动化 PASS；实机验收统一留 M14） | 完整运行实例列表、实例筛选与显式 instanceId 控制、结构化日志/脱敏导出、输入仲裁故障恢复 UI；最终代码 HEAD 6d9513b，Actions 43517955937：228/228 Core tests、0 warnings/errors、API handbook、self-contained publish、package smoke 4/4、ZIP/SHA/artifact 全 PASS |
 | M14 1.0 稳定化与发布 | TODO | 自动与手工验收、依赖许可、离线帮助、性能/长时测试和正式稳定版发布 |
 
 ## 统一 Windows 桌面实机验收策略（用户决定，2026-11-13）
@@ -275,14 +275,14 @@ M7 实现/CI 已完成不代表 M7-01..M7-10 Windows 桌面验收通过；这些
 - 定时任务有时区/触发时刻定义、超时、失败策略和可取消行为。
 - 所有涉及网络和进程的功能不冻结 UI，且默认不自动联网。
 
-### M13 实施顺序（从 M12-12 完成后开始）
+### M13 实施顺序（已完成）
 
-1. **M13-01 — 多实例运行实例模型与隔离契约（下一会话唯一任务）**：先冻结 ADR 与数据模型，定义稳定 instanceId、状态机、脚本/参数/日志/输入清理资源归属、取消/超时、重复启动语义、并发上限、失败策略与可观察性；列出并发输入竞争和权限 Grant 逐实例绑定规则。只完成契约设计与可验证状态转换规格，不在此任务顺手引入定时器或大规模 runtime 重构。
-2. M13-02 — 独立运行实例与资源隔离：根据已验收的 M13-01 契约落地实例协调器与各自 Worker 生命周期。
-3. M13-03 — 单次/定时/周期触发与暂停、取消、超时和失败策略；明确时区/重复触发语义并使用确定性测试，不默认联网。
-4. M13-04 — UI 状态观测、日志与恢复行为、并发/停止回归和 Windows 包 smoke。
+1. M13-01 — 多实例运行实例身份、状态机与隔离契约（DONE；ADR-033）。
+2. M13-02 — 独立实例协调器、Worker/IPC 身份和全局 InputArbiter（DONE；Windows Actions 验证通过）。
+3. M13-03 — 延迟/定时/周期触发、运行超时与失败策略（DONE；Windows Actions 验证通过）。
+4. M13-04 — 实例列表、筛选、日志、诊断和恢复 UI（DONE；Windows Actions 验证通过）。
 
-M13-01 不是新 release；不得以设计文件代替实现测试证据，也不提前执行 M14 桌面验收。
+M13 代码/自动化工作已结束，但不代表真实 Windows 10/11 桌面验收完成。下一阶段为 M14；不修改当前 preview.4、不创建 Release。
 
 ## M14 — 1.0.0 稳定版定义
 
@@ -448,4 +448,15 @@ M13-01 不是新 release；不得以设计文件代替实现测试证据，也�
 
 - 最终代码 HEAD 69febaab37857fbe9186157a4725d52c193ce539，Windows Actions [43470648199](https://github.com/xiaobei206/anjian/actions/runs/43470648199) SUCCESS：Restore；Release Build 0 warnings / 0 errors；Core 218/218；API 文档 103 个公开函数一致；self-contained win-x64 publish；Sprite/Plugin/MultiInstance smoke 3/3；ZIP/SHA256 与 artifact upload 全部 PASS。
 - Artifact ID 14061576124，87,351,703 bytes，uploaded archive SHA-256 1f917e68c0ac35291884d8e747e680814b3cca3884aa6669f76951eb6a4e8a85；仅临时 Actions artifact，非正式 Release。
-- M13-03 功能及 CI 验收完成后，唯一下一任务为 M13-04。Windows 10/11 WinForms、权限弹窗、真实键鼠、DPI/多屏、托盘/退出、长时稳定性仍全部留 M14 NOT RUN。
+- M13-03 完成后进入 M13-04；M13-04 现已完成代码与自动化验收。Windows 10/11 WinForms、权限弹窗、真实键鼠、DPI/多屏、托盘/退出、长时稳定性仍全部留 M14 NOT RUN。
+
+## M13-04 — 完整运行实例列表、日志筛选与恢复 UI（实现与 Windows Actions DONE；桌面验收留 M14）
+
+- 新增非模态“运行实例”窗口：过滤脚本名/路径和状态；活动/排队实例始终显示，已结束历史最多保留最近 500 条；同一脚本的不同 instanceId 不合并。
+- 列表展示实例创建 UTC、状态/Outcome、循环进度、Worker attempt/PID/exit code、运行 timeout、终止方式、CleanupStatus 与最后诊断；按所选 instanceId 独立 Pause/Resume/Stop，排队 Stop 取消队列项。
+- 新增有界内存结构化日志（最多 10,000 条，单条消息最多 4,096 字符），按时间/level/event code/instanceId/attempt/iteration 查询；敏感参数值在送入 UI、旧文本日志和导出前按 schema 脱敏。支持当前过滤结果 JSONL/JSON 安全导出，不采集 HTTP header/body 或权限 sidecar 内容。
+- 输入清理失败、Worker crash、强制终止、超时、权限拒绝/参数取消使用单独诊断路径。人工恢复需要明确确认已经检查物理键鼠；该操作只解除 InputArbiter 故障锁定，不改写失败实例的 Outcome/CleanupStatus。
+- 实例列表查询有 Core 单元测试；日志缓存有界、UTC 规范化、过滤、跨实例隔离、脱敏、控制字符清理和上限有 Core 测试；发布包 smoke 使用两个真实 Worker，验证两实例日志隔离、状态事件、独立 Stop。
+- 最终 Windows Actions：Windows Actions [43517955937](https://github.com/xiaobei206/anjian/actions/runs/43517955937)，代码 HEAD `6d9513bec5de35ed8f20f656d8520217d949733a`：Restore/Build PASS（0 warnings、0 errors），Core tests 228/228，API handbook check PASS（内置 API 1.2 / 103），win-x64 self-contained publish PASS，发布包 smoke 4/4 PASS，ZIP/SHA256 与 artifact 上传 PASS。Artifact `14081741612`，87,373,960 bytes，Actions artifact archive digest `sha256:7ea0e15aff79bf89defafdf995ec7739a53045f59d264354c271dae1ef28bc29`，有效至 2026-12-13；仅临时 Actions artifact，不是 Release。
+- 本地容器未安装 .NET SDK，local Restore/Build/Test 为 NOT RUN。实际 WinForms 操作、DPI/多显示器、真实 SendInput/KeyUp、人工恢复交互、关闭到托盘/明确退出和长时稳定性全部 NOT RUN（M14）。CI 不能代替桌面验收。
+- M13-04 不增加 Lua API（registry 仍 1.2 / 103），不修改 VERSION / AssemblyVersion / FileVersion，不建 tag/Release。

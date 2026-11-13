@@ -917,3 +917,23 @@ M4 基础调试器与 M5 可视化录制/动作列表均已完成 Windows CI 验
 - 调试收敛：首个 M13-03 代码提交 9705065f 的 run [43470218387](https://github.com/xiaobei206/anjian/actions/runs/43470218387) Restore PASS、Core/Test assembly build pass，但 WinForms Release Build 暴露四处 CS0411（泛型 AddChoices 的目标类型 new 无法推断）。随后提交 2c4b7e6 显式传入四种枚举泛型并修正调度容量/pending 处理，提交 69febaab 修正新建任务的默认日期/时间；最终 run 43470648199 对最新代码全 PASS。中间 run [43470500913](https://github.com/xiaobei206/anjian/actions/runs/43470500913) 对 2c4b7e6 也已完整 SUCCESS。
 - 本地容器未安装 .NET SDK，因此本地 Restore/Build/Test 仍为 NOT RUN；Windows Actions 是本轮可复现构建/测试依据。该 CI 在 Windows Server 2025 上运行，不是 Windows 10/11 桌面验收。
 - 未新增 Lua API，registry 仍 1.2 / 103；未改 VERSION / AssemblyVersion / FileVersion；未创建 tag/Release，已发布 v0.1.0-preview.4 不变。Win10/11 实际键鼠、权限弹窗、WinForms/DPI/多屏、托盘退出和长时间稳定性保持 NOT RUN（M14）。
+
+## 2026-11-14 — M13-04 — 运行实例列表、日志筛选与恢复 UI（DONE：Windows Actions PASS；桌面验收留 M14）
+
+### 实现内容
+- 新增 `RunInstanceManagerForm`：“运行实例”窗口按脚本名/路径与状态筛选；列表展示 UTC 创建时刻、状态/Outcome、迭代进度、workerAttemptId/PID/exit code、timeout、termination mode、cleanup status 与末次诊断。
+- 新增 Core `RunInstanceListQuery`：不合并同脚本不同 instanceId；所有非终态实例始终显示，终态保留最近 500 条；提供 path/name 搜索、状态 predicate、倒序时间结果及对应测试。
+- 新增 `RunInstanceLogStore`：有界 10,000 条内存记录、每条最多 4,096 字符，统一 UTC，按 instanceId/level/text 限定查询；带 eventCode、attempt、iteration；日志入 UI/复制/导出前处理 Sensitive 参数值、控制字符和长度。当前导出为用户触发的 JSONL/JSON，不增加磁盘日志、网络正文/headers、权限 sidecar 内容或取证模式。
+- 扩展 App coordinator：完整快照/worker 元数据、instanceId 独立 Pause/Resume/Stop、循环进度、cleanup failure/forced termination diagnostics、权限拒绝/参数取消 global log；人工 InputArbiter 恢复只解除全局故障锁定，不覆写实例失败 cleanup 结果。
+- MainForm 增加入口；窗口每 750ms 使用 WinForms Timer 批量刷新，避免循环进度导致高频同步重绘。退出前关闭监视窗口，既有“隐藏到托盘时继续”、明确退出停止 scheduler -> StopAll -> dispose 顺序保持不变。
+- 发布包新增 monitor smoke：两个真实 Worker 对同一脚本并发运行，验证日志按 instanceId 隔离、状态事件到达、停止一个实例不影响另一个。新增日志缓存和列表查询 Core tests。
+
+### 提交与验证
+- 当前最终代码 HEAD：`6d9513bec5de35ed8f20f656d8520217d949733a`，对应 Windows Actions [43517955937](https://github.com/xiaobei206/anjian/actions/runs/43517955937) SUCCESS：Restore PASS；Release Build 0 warnings / 0 errors；Core tests 228/228；API handbook 103/103；self-contained win-x64 publish；Sprite/Plugin/MultiInstance/Monitor package smoke 4/4；ZIP/SHA256 与 artifact upload 全 PASS。
+- Actions artifact ID `14081741612`，名称 `Anjian2026-preview-win-x64`，87,373,960 bytes，archive digest `sha256:7ea0e15aff79bf89defafdf995ec7739a53045f59d264354c271dae1ef28bc29`，到期 2026-12-13；临时 CI artifact，不是正式 Release。
+- 修复历史完整保留：43517447033 因 smoke string 引号语法失败；43517676054 因 DataGridView row tooltip 和 sanitizer 局部变量命名失败；43517843809 因同阶段编译问题失败；43517905641 因 completed-history test fixture 的时间排序失败。随后修复并以最新 run 43517955937 全 PASS。
+- 本地容器未安装 .NET SDK，因此 local Restore/Build/Test NOT RUN。Windows Actions 只能验证 Build/Core/package smoke；Windows 10/11 的真实键鼠、WinForms 交互、DPI/多屏、日志文件对话框、人工恢复和托盘退出仍 NOT RUN（M14）。
+- 不增加 Lua API（registry 1.2 / 103），不修改 VERSION/AssemblyVersion/FileVersion，不创建 tag/Release；已发布 v0.1.0-preview.4 不变。
+
+### 下一会话
+M13-04 已结束；唯一下一任务为 M14：集中执行 Windows 10/11 桌面实机验收（见最新 `docs/SESSION-HANDOFF.md`）。

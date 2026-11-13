@@ -527,3 +527,15 @@ end
 禁用或删除只取消尚未启动的计划触发和 retry，不会强制终止已经进入运行协调器的实例；编辑仅影响未来计划，已投递 occurrence 使用启动快照。关闭主窗口只隐藏到托盘，调度继续；从托盘明确退出才会停止调度并按 StopAll 流程结束实例。
 
 本节功能只存在于 main 开发版，不包含在已发布 v0.1.0-preview.4。M13-03 的 Windows Actions run [43470648199](https://github.com/xiaobei206/anjian/actions/runs/43470648199) 已通过（218/218 Core tests、API 文档 103/103、win-x64 self-contained 发布及 Worker smoke 3/3）；Windows 10/11 的 WinForms、权限提示、DPI、多屏和实际键鼠操作仍需 M14 桌面实测。
+
+## M13-04 运行实例与日志（main 开发版，不包含在 preview.4）
+
+在主窗口工具栏点击 **“运行实例”**，会打开独立的实例管理窗口，不会停止正在执行的脚本。窗口约每 750ms 批量刷新一次；所有活动/排队实例均保留，已完成历史只显示最近 500 条。可按脚本文件名/路径和状态组合筛选；同一脚本的每次明确 Start 都保留各自的 instanceId，不会因路径相同而合并。
+
+实例列表会显示创建 UTC、状态与结果、循环进度、Worker attempt/PID/退出码、运行超时、终止方式、输入清理结果和最后诊断。选择某一行后，**暂停/继续/停止仅针对这个 instanceId**；队列中的实例可以取消，已清理实例不能再操作。
+
+下半区显示结构化日志，可按级别、事件码或文本筛选，并限定为所选实例。每条记录可包含 UTC 时间、级别、事件码、instanceId、worker attempt 和循环序号。可以复制可见日志，或将当前过滤结果导出为 JSON Lines/JSON。日志仅在内存保留最多 10,000 条，单条消息最多 4,096 字符；导出前按参数 schema 的 Sensitive 字段处理敏感值。当前不提供磁盘日志轮转或 Lua 行号关联。
+
+若显示 **输入清理失败** 或 **全局键鼠仲裁故障锁定**，先检查键盘按键与鼠标按钮实际状态，必要时在物理设备上手动释放，再点击“人工核验后恢复”并明确确认。此操作只尝试解除 InputArbiter 全局锁定；如果某个实例已标记 `CleanupStatus=Failed`，该实例的历史清理结果仍然是失败，不会被改成成功。Worker 崩溃、强制终止、超时以及权限拒绝/参数取消会在对应状态/日志中留下不同诊断。
+
+本节仅对应 main 开发版，不在已发布的 `v0.1.0-preview.4` 中。Windows Actions [43517955937](https://github.com/xiaobei206/anjian/actions/runs/43517955937) 的 228/228 Core tests、0 warnings/errors、API handbook 和发布包 smoke 4/4 全 PASS；真实 WinForms 操作、DPI/多屏、JSONL/JSON 文件对话框、实际键鼠恢复及托盘关闭/退出仍留 M14，当前 NOT RUN。

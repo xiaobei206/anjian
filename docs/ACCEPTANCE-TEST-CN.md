@@ -605,3 +605,19 @@ M12-09 只实现有上限的显式 HTTP 缓冲请求；不代表大文件流式�
 - 初次代码 HEAD 9705065f4978c2fcb3afe32261215fa6ee5c551c 的 run 43470218387 编译失败（四处 CS0411，UI 泛型枚举选项类型推断）；已在 2c4b7e6 修正，最新 UI 默认触发时间在 69febaab 修正。另有完整通过的中间 run 43470500913，最终证据仍以本节最新 HEAD/run 为准。
 - local Restore/Build/Test NOT RUN（本地无 .NET SDK）；Win10/11 实际键鼠、权限审阅、WinForms/DPI/多屏、托盘退出、2 小时稳定性仍 NOT RUN（M14）。CI 不等同于桌面实机验收。
 - M13-03 不改 Lua API（registry 1.2/103）、版本或 Release；preview.4 不变。
+
+## M13-04 完整运行实例列表、日志筛选与恢复验收
+
+| ID | 验收项 | 自动化验证范围 | Windows 10/11 桌面 |
+|---|---|---|---|
+| M13-04-01 | 实例列表排序/筛选/历史上限 | `RunInstanceListQueryTests`：同脚本实例不合并、路径/状态组合过滤、新旧排序、所有活动项保留、最近已结束 history limit | NOT RUN（M14） |
+| M13-04-02 | 结构化日志边界与跨实例隔离 | `RunInstanceLogStoreTests`：容量、UTC、level/text/instance 过滤、global event scope、消息清洗/截断、敏感短/长值脱敏 | NOT RUN（M14） |
+| M13-04-03 | coordinator 状态事件与发布包双 Worker | `PublishedRuntimeExposesCoordinatorStateEventsAndIsolatedInstanceLogs`：同脚本两个 Worker 并发、日志按 instanceId 隔离、Stop 一个不影响另一个、状态 Running/Cleaned 事件 | NOT RUN（M14） |
+| M13-04-04 | 列表状态/结果/诊断和单实例控制 | coordinator 状态机与既有多实例测试；UI 依据快照显示 Outcome/Termination/CleanupStatus/worker metadata，操作绑定所选 instanceId | UI 操作 NOT RUN（M14） |
+| M13-04-05 | cleanup failure 与人工恢复不混淆 | InputArbiter 故障锁定/人工确认由现有 Core 测试覆盖；UI 恢复对话框声明 CleanupStatus=Failed 不会改写 | 物理键鼠检查与恢复对话框 NOT RUN（M14） |
+| M13-04-06 | 导出/筛选/响应和托盘生命周期 | 安全日志过滤与有界导出代码进入 main；窗口 Timer 批量刷新；Tray/StopAll/Scheduler 顺序沿用 M13-03 | JSONL/JSON 对话框、DPI/多屏、Close-to-tray、明确退出 NOT RUN（M14） |
+
+- 最终代码 HEAD `6d9513bec5de35ed8f20f656d8520217d949733a` 对应 Windows Actions [43517955937](https://github.com/xiaobei206/anjian/actions/runs/43517955937) SUCCESS：Restore/Build PASS，0 warnings/0 errors，Core 228/228，API handbook 103/103，自包含 win-x64 发布、4/4 发布包 smoke、ZIP/SHA256 与 artifact upload 全 PASS。
+- Artifact ID 14081741612，87,373,960 bytes，Actions artifact archive digest `sha256:7ea0e15aff79bf89defafdf995ec7739a53045f59d264354c271dae1ef28bc29`，到期时间 2026-12-13；这是临时 Actions artifact，不是 Release。
+- 首轮/中间失败没有隐藏：run 43517447033 的 smoke string CS1003 已修正；run 43517676054 的 row tooltip 与 sanitizer 局部变量 CS1061/CS0136 已修正；run 43517905641 的历史排序测试 fixture 失败通过将 older completed row 的时间调早修正。最终以 run 43517955937 为准。
+- Local .NET SDK 不存在，local Restore/Build/Test NOT RUN；CI runner 的发布包 smoke 不等于 Windows 10/11 桌面实机验收。

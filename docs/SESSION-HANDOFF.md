@@ -947,7 +947,7 @@ M13-03 的核心是确定性的调度与超时/失败策略；完成后唯一下
 - 调试收敛历史：首个 M13-03 代码 HEAD 9705065f4978c2fcb3afe32261215fa6ee5c551c 的 run 43470218387 因四处 CS0411 泛型选项推断失败（WinForms AddChoices）而 Build FAIL；已在 2c4b7e6 显式指定枚举泛型并修复 pending/capacity 管理，69febaab 再修正新建延迟/本地时刻任务的默认日期。中间 HEAD 2c4b7e6c402fc416d9950ebc052fd6917139dc33 的 run 43470500913 亦完整 SUCCESS；最新验证仍以 69febaab / 43470648199 为准。
 - 本地容器未安装 .NET SDK，local Restore/Build/Test NOT RUN；Windows Actions 使用 Windows Server 2025 runner，不代表 Windows 10/11 桌面实测。Win10/11 实际键鼠输入/KeyUp、WinForms 权限弹窗、DPI/多屏、托盘退出、长时间稳定性仍 NOT RUN（M14）。
 
-## 下一会话唯一任务：M13-04 — 完整运行实例列表、日志筛选与恢复 UI
+## 已执行任务：M13-04 — 完整运行实例列表、日志筛选与恢复 UI
 
 只做 M13-04；不提前进入 M14，不修改版本、不创建 Release。开始前核对 main 最新 HEAD，并读取 AGENTS、README、handoff、PRD §2.10、FEATURE-MATRIX F22/F31、ROADMAP、ADR-033/034、Architecture §19、Acceptance M13-02/M13-03，以及当前 RunInstanceRuntimeCoordinator、RunInstanceCoordinator、MainForm 的实例事件/日志和输入仲裁恢复入口。
 
@@ -968,3 +968,32 @@ M13-04 完成后再进入 M14 的集中 Win10/11 桌面实机验收。
 ## 文档提交后复核规则
 
 本节记录的是代码 HEAD 69febaab37857fbe9186157a4725d52c193ce539 的 Windows Actions；本次文档收尾会产生新的 main HEAD。下一轮开始和本轮收尾时都必须核对真实 main HEAD。任何由纯文档提交触发的新 CI run，也要记录它的 HEAD 与结果；不能把本节代码 HEAD 的结果误写成后续文档 HEAD 的结果。
+
+## M13-04 最终收尾记录（2026-11-14；优先于本文早期状态段落）
+
+### 最终实现提交与 Windows Actions
+- 最终代码 HEAD：`6d9513bec5de35ed8f20f656d8520217d949733a`。
+- Windows Actions [43517955937](https://github.com/xiaobei206/anjian/actions/runs/43517955937) SUCCESS：Restore/Build PASS（0 warnings / 0 errors）、Core tests 228/228、API handbook 103/103、自包含 win-x64 发布、发布包 smoke 4/4、ZIP/SHA256 与 artifact upload 全 PASS。
+- Artifact ID `14081741612`，87,373,960 bytes，archive digest `sha256:7ea0e15aff79bf89defafdf995ec7739a53045f59d264354c271dae1ef28bc29`；临时 Actions artifact，有效至 2026-12-13，不是 Release。
+- 失败与修复如实保留：43517447033 smoke 字符串语法错误；43517676054/43517843809 构建阶段分别发现 WinForms row tooltip 与 sanitizer 局部变量名问题；43517905641 的运行实例历史排序 fixture 时间错误。修复后最新 run 43517955937 全 PASS。
+- 本地无 .NET SDK，local Restore/Build/Test NOT RUN。未修改 VERSION、未创建 tag/Release，v0.1.0-preview.4 不变。
+- 桌面验收继续 NOT RUN（M14）：WinForms 交互、Windows 10/11 实际 SendInput/KeyUp、键鼠人工核验/恢复、DPI/多屏、日志导出对话框、主窗口隐藏到托盘、明确退出与 StopAll、长时稳定性。
+
+### M13-04 实现边界
+- “运行实例”窗口使用显式 instanceId 控制；活动项/队列项始终显示，已结束历史最多 500 条；按脚本名/路径和状态筛选。结构化内存日志最多 10,000 条、单条最多 4,096 字符，按 UTC、级别、事件码、实例、Worker attempt、循环序号过滤/展示；Sensitive 参数值经脱敏，支持当前筛选 JSONL/JSON 导出。
+- InputArbiter 故障锁定仅能在用户明确确认已人工检查键鼠后尝试恢复；恢复不改写历史的 `CleanupStatus=Failed`。不新增持久化日志、网络正文采集或额外诊断取证模式。
+- 最终 package smoke 验证真实 Worker 的并发状态、实例日志隔离和独立 Stop；不等于对真实桌面 WinForms/物理输入的验收。
+
+## 下一会话唯一任务：M14 — 集中执行 Windows 10/11 桌面实机验收
+
+M13-01..04 的代码与 Windows 自动化工作已收尾。下一会话不再重复开发 M13；先核对最新 `main` HEAD、读取 README/ROADMAP/ACCEPTANCE/USER-GUIDE/handoff，按既定 M14 清单执行集中 Windows 10/11 实机测试。不能因为 Actions PASS 就把桌面项标成 PASS。
+
+### 必须覆盖的实机项
+1. 真实键鼠：MoveTo/Click/Down/Up/组合键/Unicode 输入，Pause/Stop/Worker crash/forced termination 后释放，输入仲裁故障与人工核验；确认物理键鼠状态，不对真实桌面输入做虚构验收。
+2. 多实例：同脚本独立启动、4 active + 16 FIFO、排队取消、单实例 Pause/Resume/Stop、Worker crash 隔离、timeout 与 cleanup failure，确保失败状态不会被 UI 改写。
+3. “运行实例”界面：脚本名/路径与状态筛选，列表刷新延迟/滚动/选择稳定性，长路径、多个终态、循环计数、worker PID/exit code/诊断显示；验证 WinForms 不因高频循环卡死。
+4. 日志：级别/事件/文本筛选、所选实例范围、跨实例隔离、复制与 JSONL/JSON 导出；确认 Sensitive 参数值不出现，且没有权限 sidecar 或 HTTP header/body 内容。
+5. 恢复：触发真实 InputArbiter cleanup failure（只在安全测试环境中），确认恢复前有强提示；人工核验后只解除全局输入锁定，不把失败的 CleanupStatus 改成 Succeeded。
+6. WinForms：Windows 10/11 build/版本，100/125/150/200% DPI、多显示器/负坐标、长脚本路径、最小化/隐藏到托盘、监视窗口重复打开/关闭、日志大容量滚动、权限弹窗。
+7. 生命周期与稳定性：主窗口关闭隐藏后运行和 Scheduler 保持；托盘明确退出先停止新 scheduler 投递，再 StopAll、清理 Worker/InputArbiter 并退出；重复启动/停止和至少 2 小时长时运行。
+8. 每项记录 OS build、DPI、屏幕拓扑、测试脚本、步骤、结果、日志/截图和实际失败；失败需先修复再重复对应项。Release 1.0.0 仍需完整必需功能、许可/离线文档与测试全 PASS 才可考虑发布。

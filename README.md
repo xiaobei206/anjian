@@ -139,3 +139,10 @@ main 已包含本地 Lua 插件目录/ZIP 导入、Anjian.Plugin.json manifest �
 
 - Windows Actions run [43436997492](https://github.com/xiaobei206/anjian/actions/runs/43436997492) 对 HEAD `ff5dc1510f4f68fe23e4abf54e2c291f6df6229b` 全 PASS：173/173 Core tests、0 warnings/0 errors、自包含 win-x64 发布、真实 Sprite/Plugin Worker smoke、ZIP/SHA256 与 artifact 上传；artifact ID `14044230189`，SHA-256 `8c4312eb072012db084917bd025d5640e105d623a4d7df819632bf7cf1e58fc0`。临时 CI artifact 不是 GitHub Release。
 - 不修改 v0.1.0-preview.4。真实 Windows 10/11 权限审阅窗体、DPI/多屏仍待 M14；CI PASS 不等于桌面实机验收。
+
+### M13-04 运行实例列表、日志与恢复（main 开发版，未进入 v0.1.0-preview.4）
+
+main 已新增“运行实例”独立窗口：按脚本名/路径与状态筛选；每个实例按稳定 instanceId 单独显示状态/结果、循环进度、Worker attempt/PID/退出码、超时、终止方式、输入清理结果和异常诊断；支持按实例暂停/继续/停止、结构化日志过滤、复制与安全导出。日志只在内存保留最多 10,000 条，单条消息最多 4,096 字符，写入 UI/导出前按 Sensitive 参数定义脱敏。所有活动实例保持可见，只显示最近 500 条已结束实例历史。人工恢复只解除 InputArbiter 全局锁定，不会将既有 CleanupStatus=Failed 改写为成功。
+
+Windows Actions [43517955937](https://github.com/xiaobei206/anjian/actions/runs/43517955937)，代码 HEAD `6d9513bec5de35ed8f20f656d8520217d949733a`：Restore/Build PASS（0 warnings、0 errors），Core tests 228/228，API handbook check PASS（内置 API 1.2 / 103），win-x64 self-contained publish PASS，发布包 smoke 4/4 PASS，ZIP/SHA256 与 artifact 上传 PASS。Artifact `14081741612`，87,373,960 bytes，Actions artifact archive digest `sha256:7ea0e15aff79bf89defafdf995ec7739a53045f59d264354c271dae1ef28bc29`，有效至 2026-12-13；仅临时 Actions artifact，不是 Release。
+M13-04 仍需 Windows 10/11 实机验收：真实键鼠释放、WinForms/DPI/多屏、过滤/导出交互、人工恢复及托盘退出均 NOT RUN（M14）；未修改 VERSION、未创建 tag/Release，已发布 v0.1.0-preview.4 不变。

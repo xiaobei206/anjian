@@ -325,3 +325,11 @@
 
 - Windows Actions [43470648199](https://github.com/xiaobei206/anjian/actions/runs/43470648199) 对最终代码 HEAD 69febaab37857fbe9186157a4725d52c193ce539 SUCCESS：218/218 Core tests、Release Build 0 warnings / 0 errors、API 文档一致 103/103、自包含 win-x64 发布、package smoke 3/3、ZIP/SHA256 与 artifact upload 全通过。
 - 该结果验证 Core 自动化与发布包子进程 smoke，不代表 Windows 10/11 桌面上的 WinForms、权限弹窗、实际键鼠、DPI/多屏或托盘行为已验收；全部仍为 M14 NOT RUN。
+
+## ADR-035：运行实例日志采用有界内存与显式安全导出（M13-04）
+
+- 状态：ACCEPTED
+- 决策：运行实例日志先经过敏感值/控制字符/长度处理，再写入最多 10,000 条的进程内缓存；UI 查询有界，导出由用户明确触发，当前只导出符合筛选条件的 JSONL/JSON。实例列表始终显示所有非终态实例并限量保留最近已结束历史。
+- 原因：保持日志可观察性而不额外收集大体积网络正文、权限声明或敏感参数；限制长期运行的内存增长，并避免历史实例无限膨胀 UI。
+- 故障恢复边界：UI 不覆写 coordinator 终态。人工确认只解除 InputArbiter 故障锁定；若实例 `CleanupStatus=Failed`，历史诊断仍为失败，不得以恢复输入锁定冒充资源清理成功。
+- 影响：M13-04 增加实例列表/日志/恢复 UI 和查询/脱敏自动化。当前不提供磁盘日志持久化、轮转、Lua 行号关联；这些仍以功能矩阵和验收清单为准。Windows 10/11 桌面实测留 M14。

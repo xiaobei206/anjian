@@ -477,7 +477,7 @@ M13-01 先冻结契约；新增 Core 类型只负责身份、状态转换和并�
 
 - Core：`Anjian.Core.Runtime.RunInstanceLifecycle`、`RunInstanceId`、`RunInstanceSnapshot`、`RunInstanceLimits`。契约常量：4 active、16 queued、30,000 ms Worker startup watchdog、2,000 ms cancellation grace；M13-02 RunInstanceRuntimeCoordinator 已执行 active/queue、startup watchdog、Stop grace、owner cleanup；M13-03 另以 TimeProvider 管理用户运行超时。
 - 自动化测试覆盖 GUID-N 与 IPC identity/nonce 伪造拒绝、同脚本多实例/Start 幂等、4+16 容量/FIFO 晋升/排队取消、独立状态、跨实例进程句柄拒绝、输入仲裁 FIFO/取消/故障锁定/人工恢复，以及启动超时结果不被 Worker 后续失败覆盖。发布包 smoke 验证多个真实 Worker 同时存活、单独 Stop 和 Worker crash 不影响兄弟实例。
-- M13-02 已落地 coordinator、Worker payload/IPC identity、全局 InputArbiter 与 owner-only cleanup。M13-03 负责用户运行超时/定时触发/失败策略；M13-04 负责完整多实例 UI、日志筛选与恢复；M14 负责真实 Windows 10/11 桌面验收。
+- M13-02 coordinator、Worker payload/IPC identity、全局 InputArbiter 和 owner-only cleanup，M13-03 调度/timeout/failure policy、M13-04 完整实例列表/日志/恢复 UI 均已进入 main 并通过对应 Windows Actions 自动化；M14 负责真实 Windows 10/11 桌面验收。
 
 
 ### 19.5 M13-02 当前实现状态
@@ -486,7 +486,7 @@ M13-01 先冻结契约；新增 Core 类型只负责身份、状态转换和并�
 - 每个 PlaybackRunner 的 Worker/Lua、pipe、attempt、nonce、CTS、pause gate、ScriptProcessSession、HTTP session、Window/Image/debug 资源均独立；普通脚本源码、参数、播放选项、Grant 和 plugin runtime options 在实例启动时复制。每次 Start 继续执行独立权限审阅，不按路径共享审批。
 - Worker pipe 使用 current-user ACL、OS client PID 绑定、identity policy 逐消息检查和响应检查；无效、跨实例、跨 attempt 或 nonce 不匹配均拒绝。
 - 全局 InputArbiter 在故障时拒绝新 lease，Input release failure 需人工恢复；这不解决宿主进程崩溃/断电下操作系统无法收到 KeyUp 的边界。
-- MainForm 目前提供选中/最新实例的基础 Pause/Resume/Stop、容量状态与输入故障恢复，以及 M13-03 定时任务入口和手动运行超时；没有完整运行实例列表、筛选和实例日志独立视图（留 M13-04）。
+- MainForm 提供兼容的当前/选中实例快捷控制；“运行实例”窗口从 coordinator 读取活动实例与最近 500 条已结束历史，按脚本/状态过滤并显式按 instanceId Pause/Resume/Stop。实例与日志数据以 coordinator 的状态和有界结构化缓存为权威来源。
 
 ### 19.6 M13-02 最终验证记录（2026-11-14）
 
@@ -503,7 +503,7 @@ M13-01 先冻结契约；新增 Core 类型只负责身份、状态转换和并�
 - RunInstanceTimeoutTracker 在首次 worker-ready / Running 时记录 TimeProvider monotonic timestamp；runtime coordinator 用相同 TimeProvider 的 cancellable delay 计时。Pause 不暂停 timer；自然结束/用户 Stop/StopAll 会取消 timeout watcher；timeout 与 user Stop 在 _sync 下由最先提交到 Core coordinator 的转换获胜。
 - 手动播放 timeout 分钟项持久化在 settings.json；定时任务可独立配置 1 秒至 7 天 timeout。timeout 通过 RunInstanceCoordinator.RequestTimeout，随即 PlaybackRunner.Stop()，沿用 worker grace、force terminate 和 owner-only held-input cleanup。
 - 停止策略：参数表单取消或权限拒绝属于用户取消，不计入失败；脚本 Failed/TimedOut 进入指定 failure policy；InputArbiter/Cleanup fault 禁止自动重试并禁用任务，需人工核验输入状态。
-- MainForm 隐藏到托盘不停止 Scheduler；明确退出先取消调度投递，再 StopAll 所有运行实例，最后释放 service/coordinator。完整运行实例列表/筛选/日志浏览仍留 M13-04；真实桌面验收留 M14。
+- MainForm 隐藏到托盘不停止 Scheduler；明确退出先取消调度投递，再 StopAll 所有运行实例，最后释放 service/coordinator。M13-04 的非模态实例管理窗口在协调器释放前关闭；真实桌面验收留 M14。
 
 
 ### 19.8 M13-03 最终验证记录
@@ -511,3 +511,11 @@ M13-01 先冻结契约；新增 Core 类型只负责身份、状态转换和并�
 - 最终代码 HEAD 69febaab37857fbe9186157a4725d52c193ce539 的 Windows Actions [43470648199](https://github.com/xiaobei206/anjian/actions/runs/43470648199) SUCCESS：Restore、Release Build 0 warnings / 0 errors、218/218 Core tests、API handbook 103/103、自包含 win-x64 publish、Sprite/Plugin/MultiInstance smoke 3/3、ZIP/SHA256 和 artifact upload。
 - Artifact ID 14061576124，87,351,703 bytes，archive SHA-256 1f917e68c0ac35291884d8e747e680814b3cca3884aa6669f76951eb6a4e8a85；临时 Actions artifact，不是正式 Release。
 - Local .NET SDK 不存在，因此本地 Restore/Build/Test NOT RUN。Windows 10/11 桌面实机仍归 M14。
+
+### 19.9 M13-04 实例监控、结构化日志与故障恢复
+
+- `RunInstanceListQuery` 是实例列表排序/筛选契约：所有非终态实例始终可见，已终态只取最近 500 条；按脚本名/路径和状态组合过滤，不按脚本路径合并不同 instanceId。WinForms 以 750ms Timer 批量读取状态，不在 Worker 高频事件中同步重绘表格。
+- `RunInstanceLogStore` 是进程内有界缓存，最多 10,000 条；单条消息最多 4,096 字符，查询结果默认/最大 1,000/10,000。字段包括 UTC timestamp、level、eventCode、instanceId（全局事件可为空）、workerAttemptId、iteration 与安全消息。该缓存不落盘，用户显式导出当前筛选 JSONL/JSON。
+- 日志入缓存、送 UI、复制和导出前均经过敏感参数脱敏及控制字符/长度清洗。运行参数的 Sensitive 属性来自脚本参数 schema；若 schema 存在但解析失败，采用更保守的参数值脱敏。权限 sidecar 与 HTTP header/body 不写入实例日志。
+- 独立 Pause/Resume/Stop 经 coordinator 的同步状态转换并使用所选 instanceId；排队 Stop 取消队列项。日志仅观察状态，不是状态写回通道。清理失败保留 CleanupStatus=Failed；人工确认只恢复 InputArbiter 的全局输入故障锁定。
+- 最终自动化验证见 Windows Actions [43517955937](https://github.com/xiaobei206/anjian/actions/runs/43517955937)：228/228 Core tests、Release Build 0 warnings/errors、自包含发布、monitor + Sprite/Plugin/MultiInstance package smoke 4/4；artifact ID 14081741612。Windows 10/11 真实键鼠/WinForms/DPI/多屏/恢复/托盘实测仍 NOT RUN（M14）。
