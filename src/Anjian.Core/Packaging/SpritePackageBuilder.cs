@@ -431,6 +431,12 @@ public static class SpritePackageBuilder
                 warnings.Add($"已按用户显式选择包含 OCR {language} 模型；运行时仍应使用离线模式。");
             }
 
+            if (ocrModels.Count > 0)
+            {
+                var languages = ocrModels.Select(x => x.Language).OrderBy(x => x, StringComparer.Ordinal).ToArray();
+                entryManifests = entryManifests.Select(entry => entry with { OcrLanguages = languages }).ToList();
+            }
+
             string? iconRelative = null;
             if (!string.IsNullOrWhiteSpace(options.IconPath))
             {
@@ -548,6 +554,7 @@ public static class SpritePackageBuilder
         }
 
         var issues = new List<string>();
+        var manifestFiles = manifest.Files ?? [];
         if (manifest.SchemaVersion != CurrentManifestVersion)
             issues.Add($"不支持 manifest schema 版本 {manifest.SchemaVersion}。");
         if (string.IsNullOrWhiteSpace(manifest.PackageId) || string.IsNullOrWhiteSpace(manifest.ProductName))
@@ -559,7 +566,7 @@ public static class SpritePackageBuilder
 
         var declared = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         long totalBytes = 0;
-        foreach (var file in manifest.Files ?? [])
+        foreach (var file in manifestFiles)
         {
             if (!IsSafeRelativePath(file.Path) || !declared.Add(file.Path))
             {
@@ -586,7 +593,7 @@ public static class SpritePackageBuilder
 
         if (totalBytes > MaximumPackageBytes)
             issues.Add("已验证文件总大小超过限制。");
-        if (manifest.Files.Count > MaximumPackageFiles)
+        if (manifestFiles.Count > MaximumPackageFiles)
             issues.Add("manifest 文件数超过限制。");
 
         var manifestRelative = ManifestFileName;

@@ -20,8 +20,8 @@ public sealed class SpritePackageBuilderTests
 
         var result = LuaStaticDependencyScanner.Scan(source);
 
-        Assert.Equal(["automation.mouse"], result.RequiredModules);
-        Assert.Equal(["images/button.png"], result.ImagePaths);
+        Assert.Equal(new[] { "automation.mouse" }, result.RequiredModules);
+        Assert.Equal(new[] { "images/button.png" }, result.ImagePaths);
         Assert.False(result.HasDynamicRequire);
         Assert.False(result.HasDynamicImageLoad);
     }
@@ -55,7 +55,11 @@ public sealed class SpritePackageBuilderTests
 
         File.WriteAllText(Path.Combine(project, "main.lua"),
             "local helper = require(\"lib.helper\")\nLoadImage(\"images/button.png\")\nLog(Args.message)\n");
-        File.WriteAllText(Path.Combine(project, "lib", "helper.lua"), "return { value = 42 }\n");
+        File.WriteAllText(Path.Combine(project, "lib", "helper.lua"), "LoadImage(\"images/button.png\")\nreturn { value = 42 }\n");
+        File.WriteAllText(Path.Combine(project, "secondary.lua"), "Log(\"secondary entry\")\n");
+        var ocrModels = Path.Combine(root, "ocr-models");
+        Directory.CreateDirectory(ocrModels);
+        File.WriteAllText(Path.Combine(ocrModels, "en-det.onnx"), "explicitly selected model");
         File.WriteAllText(Path.Combine(project, "images", "button.png"), "test image bytes");
         var schema = new ScriptParameterSchema
         {
@@ -83,20 +87,23 @@ public sealed class SpritePackageBuilderTests
             {
                 RuntimeDirectory = runtime,
                 ProjectRoot = project,
-                EntryScriptPaths = [Path.Combine(project, "main.lua")],
+                EntryScriptPaths = [Path.Combine(project, "main.lua"), Path.Combine(project, "secondary.lua")],
                 OutputDirectory = output,
                 ProductName = "订单助手",
                 Version = "1.2.3",
                 Description = "自动化订单处理",
                 Author = "测试作者",
                 MinimumApiVersion = "0.7",
-                MinimumRuntimeVersion = "10.0"
+                MinimumRuntimeVersion = "10.0",
+                OcrModelDirectories = new Dictionary<string, string> { ["en"] = ocrModels }
             });
 
             Assert.True(Directory.Exists(result.PackageDirectory));
             Assert.True(File.Exists(result.LauncherZip));
             Assert.True(File.Exists(Path.Combine(result.PackageDirectory, result.Manifest.LauncherExecutable)));
-            Assert.Single(result.Manifest.Entries);
+            Assert.Equal(2, result.Manifest.Entries.Count);
+            Assert.Single(result.Manifest.OcrModels);
+            Assert.Contains(result.Manifest.Files, f => f.Path.EndsWith("en-det.onnx", StringComparison.Ordinal));
             Assert.NotNull(result.Manifest.Entries[0].ParameterSchemaPath);
 
             var manifest = result.Manifest;
@@ -143,7 +150,8 @@ public sealed class SpritePackageBuilderTests
             File.WriteAllText(Path.Combine(result.PackageDirectory, "unexpected.dll"), "not declared");
 
             var issues = SpritePackageBuilder.Verify(result.PackageDirectory);
-            Assert.Contains(issues, issue => issue.Contains("SHA-256 不一致", StringComparison.Ordinal));
+            Assert.Contains(issues, issue => issue.Contains("文件大小不一致", StringComparison.Ordinal)
+                || issue.Contains("SHA-256 不一致", StringComparison.Ordinal));
             Assert.Contains(issues, issue => issue.Contains("checksum", StringComparison.OrdinalIgnoreCase)
                 || issue.Contains("SHA256SUMS", StringComparison.Ordinal));
             Assert.Contains(issues, issue => issue.Contains("未登记", StringComparison.Ordinal));
@@ -178,6 +186,49 @@ public sealed class SpritePackageBuilderTests
                 Version = "1.0.0"
             }));
             Assert.Contains("动态 require", exception.Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            try { Directory.Delete(root, recursive: true); } catch (IOException) { }
+        }
+    }
+
+    [Fact]
+    public void BuilderRejectsUnresolvedModulesAndImagePathsOutsideProjectRoot()
+    {
+        var root = CreateTemporaryDirectory();
+        var runtime = Path.Combine(root, "runtime");
+        var project = Path.Combine(root, "project");
+        var output = Path.Combine(root, "output");
+        Directory.CreateDirectory(runtime);
+        Directory.CreateDirectory(project);
+        WriteSelfContainedRuntime(runtime);
+        File.WriteAllText(Path.Combine(project, "main.lua"), "require(\"missing.module\")\n");
+
+        try
+        {
+            var missingModule = Assert.Throws<FileNotFoundException>(() => SpritePackageBuilder.Build(new SpritePackageBuildOptions
+            {
+                RuntimeDirectory = runtime,
+                ProjectRoot = project,
+                EntryScriptPaths = [Path.Combine(project, "main.lua")],
+                OutputDirectory = output,
+                ProductName = "Invalid",
+                Version = "1.0.0"
+            }));
+            Assert.Contains("找不到 require 模块", missingModule.Message, StringComparison.Ordinal);
+
+            File.WriteAllText(Path.Combine(project, "main.lua"), "LoadImage(\"../outside.png\")\n");
+            var traversal = Assert.Throws<InvalidDataException>(() => SpritePackageBuilder.Build(new SpritePackageBuildOptions
+            {
+                RuntimeDirectory = runtime,
+                ProjectRoot = project,
+                EntryScriptPaths = [Path.Combine(project, "main.lua")],
+                OutputDirectory = Path.Combine(root, "output-traversal"),
+                ProductName = "Invalid",
+                Version = "1.0.0"
+            }));
+            Assert.Contains("越过工程根目录", traversal.Message, StringComparison.Ordinal);
         }
         finally
         {
