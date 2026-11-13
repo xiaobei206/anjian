@@ -7,6 +7,7 @@ using Anjian.Core;
 using Anjian.Core.Api;
 using Anjian.Core.Packaging;
 using Anjian.Core.Parameters;
+using Anjian.Core.Permissions;
 
 namespace Anjian.App.Controls;
 
@@ -251,11 +252,29 @@ internal sealed class SpriteLauncherForm : Form
         SetRunningState(true);
         try
         {
+            var scriptPath = ResolvePackagePath(choice.Entry.ScriptPath);
+            var sidecarIssues = SpritePackageBuilder.VerifyEntryPermissionSidecar(_packageRoot, _manifest, choice.Entry);
+            if (sidecarIssues.Count > 0)
+                throw new InvalidDataException("小精灵入口权限 sidecar 校验失败，未启动脚本：" +
+                    string.Join("；", sidecarIssues));
+
+            if (!ScriptPermissionService.TryReviewPackagedEntry(
+                    this, scriptPath,
+                    choice.Entry.PermissionManifestPath is null
+                        ? null
+                        : ResolvePackagePath(choice.Entry.PermissionManifestPath),
+                    out var permissions))
+            {
+                AppendLog("本次权限审阅被拒绝或取消；入口未启动。");
+                return;
+            }
+            if (launchCts.IsCancellationRequested)
+                return;
+
             var parameters = LoadAndCollectParameters(choice.Entry);
             if (parameters is null || launchCts.IsCancellationRequested)
                 return;
 
-            var scriptPath = ResolvePackagePath(choice.Entry.ScriptPath);
             var moduleRoot = ResolvePackagePath(choice.Entry.ModuleRootPath);
             var ocrRoot = _manifest.OcrModels.Count > 0
                 ? ResolvePackagePath(_manifest.OcrModels[0].RelativePath)
@@ -267,7 +286,7 @@ internal sealed class SpriteLauncherForm : Form
                 IntervalMilliseconds = (int)_interval.Value
             };
 
-            await RunWithRetriesAsync(scriptPath, playback, parameters, runtimeOptions, launchCts.Token);
+            await RunWithRetriesAsync(scriptPath, playback, parameters, runtimeOptions, permissions, launchCts.Token);
         }
         catch (OperationCanceledException)
         {
@@ -319,6 +338,7 @@ internal sealed class SpriteLauncherForm : Form
         PlaybackOptions playback,
         IReadOnlyDictionary<string, JsonElement> parameters,
         SpriteWorkerRuntimeOptions runtimeOptions,
+        ScriptPermissionGrant permissions,
         CancellationToken token)
     {
         var retries = _manifest.RuntimeOptions.MaximumRetries;
@@ -329,7 +349,7 @@ internal sealed class SpriteLauncherForm : Form
                 token.ThrowIfCancellationRequested();
                 if (attempt > 0)
                     AppendLog($"运行失败后重试，第 {attempt}/{retries} 次。");
-                await _runner.RunAsync(scriptPath, playback, parameters: parameters, spriteRuntimeOptions: runtimeOptions);
+                await _runner.RunAsync(scriptPath, playback, parameters: parameters, spriteRuntimeOptions: runtimeOptions, permissions: permissions);
                 token.ThrowIfCancellationRequested();
                 return;
             }

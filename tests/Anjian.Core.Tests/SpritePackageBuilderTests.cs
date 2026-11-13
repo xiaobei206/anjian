@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Security.Cryptography;
 using System.Text.Json;
 using Anjian.Core.Packaging;
 using Anjian.Core.Parameters;
@@ -321,7 +322,13 @@ public sealed class SpritePackageBuilderTests
         Directory.CreateDirectory(Path.Combine(project, "lib"));
         Directory.CreateDirectory(Path.Combine(project, "images"));
         File.WriteAllText(Path.Combine(project, "main.lua"),
-            "local function unusedImageProbe() return LoadImage(\"images/smoke.png\") end\nlocal moduleMessage = require(\"lib.helper\")\nLog(moduleMessage .. \":\" .. Args.message)\n");
+            "local function unusedImageProbe() return LoadImage(\"images/smoke.png\") end\n" +
+            "local moduleMessage = require(\"lib.helper\")\n" +
+            "local writeCallSucceeded = pcall(function() WriteTextFile(\"permission-smoke-marker.txt\", \"unexpected\") end)\n" +
+            "if writeCallSucceeded then error(\"sidecar request must not auto-grant write access\") end\n" +
+            "Log(moduleMessage .. \":\" .. Args.message .. \":permissions-default-deny\")\n");
+        File.WriteAllText(Path.Combine(project, "main.lua.permissions.json"),
+            "{\"schemaVersion\":1,\"fileWriteRoots\":[\".\"]}");
         File.WriteAllText(Path.Combine(project, "lib", "helper.lua"), "return \"module-ok\"\n");
         File.WriteAllText(Path.Combine(project, "images", "smoke.png"), "included resource");
         var schema = new ScriptParameterSchema
@@ -362,6 +369,9 @@ public sealed class SpritePackageBuilderTests
             Assert.True(File.Exists(result.LauncherZip));
             Assert.True(File.Exists(result.LauncherZipChecksumPath));
             Assert.Contains(result.Manifest.Files, file => file.Path.EndsWith("/images/smoke.png", StringComparison.Ordinal));
+            var smokeEntry = result.Manifest.Entries.Single();
+            Assert.NotNull(smokeEntry.PermissionManifestPath);
+            Assert.Contains(result.Manifest.Files, file => file.Path == smokeEntry.PermissionManifestPath);
 
             var executable = Path.Combine(result.PackageDirectory, result.Manifest.LauncherExecutable);
             Assert.True(File.Exists(executable));
@@ -386,7 +396,103 @@ public sealed class SpritePackageBuilderTests
             }
             var log = File.Exists(logPath) ? File.ReadAllText(logPath) : "";
             Assert.True(process.ExitCode == 0, $"Packaged sprite smoke test failed ({process.ExitCode}). {log}");
-            Assert.Contains("module-ok:parameter-ok", log, StringComparison.Ordinal);
+            Assert.Contains("module-ok:parameter-ok:permissions-default-deny", log, StringComparison.Ordinal);
+        }
+        finally
+        {
+            try { Directory.Delete(root, recursive: true); } catch (IOException) { }
+        }
+    }
+
+    [Fact]
+    public void BuilderBindsPermissionSidecarsPerEntryAndDetectsTamperingOrMissingFiles()
+    {
+        var root = CreateTemporaryDirectory();
+        var runtime = Path.Combine(root, "runtime");
+        var project = Path.Combine(root, "project");
+        var output = Path.Combine(root, "output");
+        Directory.CreateDirectory(runtime);
+        Directory.CreateDirectory(project);
+        WriteSelfContainedRuntime(runtime);
+        File.WriteAllText(Path.Combine(project, "main.lua"), "Log(\"main\")\n");
+        File.WriteAllText(Path.Combine(project, "secondary.lua"), "Log(\"secondary\")\n");
+        File.WriteAllText(Path.Combine(project, "main.lua.permissions.json"),
+            "{\"schemaVersion\":1,\"fileWriteRoots\":[\"output\"]}");
+        File.WriteAllText(Path.Combine(project, "secondary.lua.permissions.json"),
+            "{\"schemaVersion\":1,\"fileWriteRoots\":[\"secondary-output\"]}");
+
+        try
+        {
+            var result = SpritePackageBuilder.Build(new SpritePackageBuildOptions
+            {
+                RuntimeDirectory = runtime,
+                ProjectRoot = project,
+                EntryScriptPaths = [Path.Combine(project, "main.lua"), Path.Combine(project, "secondary.lua")],
+                OutputDirectory = output,
+                ProductName = "PermissionSidecar",
+                Version = "1.0.0"
+            });
+            var mainEntry = result.Manifest.Entries.Single(entry => entry.DisplayName == "main");
+            var secondaryEntry = result.Manifest.Entries.Single(entry => entry.DisplayName == "secondary");
+            Assert.Equal(mainEntry.ScriptPath + ".permissions.json", mainEntry.PermissionManifestPath);
+            Assert.Equal(secondaryEntry.ScriptPath + ".permissions.json", secondaryEntry.PermissionManifestPath);
+            Assert.NotEqual(mainEntry.PermissionManifestPath, secondaryEntry.PermissionManifestPath);
+            Assert.Empty(SpritePackageBuilder.Verify(result.PackageDirectory));
+
+            var mainSidecar = Path.Combine(result.PackageDirectory, mainEntry.PermissionManifestPath!.Replace('/', Path.DirectorySeparatorChar));
+            var mainRecord = result.Manifest.Files.Single(file => file.Path == mainEntry.PermissionManifestPath);
+            Assert.Equal(new FileInfo(mainSidecar).Length, mainRecord.Size);
+            var actualHash = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(mainSidecar))).ToLowerInvariant();
+            Assert.Equal(mainRecord.Sha256, actualHash);
+            Assert.Empty(SpritePackageBuilder.VerifyEntryPermissionSidecar(result.PackageDirectory, result.Manifest, mainEntry));
+            Assert.Contains(
+                SpritePackageBuilder.VerifyEntryPermissionSidecar(result.PackageDirectory, result.Manifest,
+                    mainEntry with { PermissionManifestPath = null }),
+                issue => issue.Contains("未将它绑定", StringComparison.Ordinal));
+
+            // Same-length edit keeps manifest size valid and proves SHA-256 is enforced.
+            File.WriteAllText(mainSidecar, "{\"schemaVersion\":1,\"fileWriteRoots\":[\"Output\"]}");
+            var tamperedIssues = SpritePackageBuilder.VerifyEntryPermissionSidecar(result.PackageDirectory, result.Manifest, mainEntry);
+            Assert.Contains(tamperedIssues, issue => issue.Contains("SHA-256 不一致", StringComparison.Ordinal));
+            Assert.Contains(SpritePackageBuilder.Verify(result.PackageDirectory),
+                issue => issue.Contains("SHA-256 不一致", StringComparison.Ordinal));
+
+            File.Delete(mainSidecar);
+            var missingIssues = SpritePackageBuilder.VerifyEntryPermissionSidecar(result.PackageDirectory, result.Manifest, mainEntry);
+            Assert.Contains(missingIssues, issue => issue.Contains("文件缺失", StringComparison.Ordinal));
+            Assert.Contains(SpritePackageBuilder.Verify(result.PackageDirectory),
+                issue => issue.Contains("文件缺失", StringComparison.Ordinal));
+        }
+        finally
+        {
+            try { Directory.Delete(root, recursive: true); } catch (IOException) { }
+        }
+    }
+
+    [Fact]
+    public void BuilderRejectsMalformedPermissionSidecar()
+    {
+        var root = CreateTemporaryDirectory();
+        var runtime = Path.Combine(root, "runtime");
+        var project = Path.Combine(root, "project");
+        Directory.CreateDirectory(runtime);
+        Directory.CreateDirectory(project);
+        WriteSelfContainedRuntime(runtime);
+        File.WriteAllText(Path.Combine(project, "main.lua"), "Log(\"main\")\n");
+        File.WriteAllText(Path.Combine(project, "main.lua.permissions.json"), "{\"schemaVersion\":2}");
+
+        try
+        {
+            var exception = Assert.Throws<InvalidDataException>(() => SpritePackageBuilder.Build(new SpritePackageBuildOptions
+            {
+                RuntimeDirectory = runtime,
+                ProjectRoot = project,
+                EntryScriptPaths = [Path.Combine(project, "main.lua")],
+                OutputDirectory = Path.Combine(root, "output"),
+                ProductName = "MalformedPermission",
+                Version = "1.0.0"
+            }));
+            Assert.Contains("schemaVersion", exception.Message, StringComparison.Ordinal);
         }
         finally
         {

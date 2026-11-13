@@ -5,6 +5,7 @@ using System.Text.Json;
 using Anjian.Core;
 using Anjian.Core.Imaging;
 using Anjian.Core.Parameters;
+using Anjian.Core.Permissions;
 
 namespace Anjian.Core.Packaging;
 
@@ -41,7 +42,8 @@ public sealed record SpritePackageEntry(
     string? ParameterSchemaPath,
     string ModuleRootPath,
     string? ImageManifestPath,
-    IReadOnlyList<string> OcrLanguages);
+    IReadOnlyList<string> OcrLanguages,
+    string? PermissionManifestPath = null);
 
 public sealed record SpritePackageOcrModel(string Language, string RelativePath, IReadOnlyList<string> Files);
 
@@ -402,6 +404,24 @@ public static class SpritePackageBuilder
                     packagedParameterPath = ToPackagePath(Path.GetRelativePath(staging, destination));
                 }
 
+                var permissionSourcePath = entryScript + ".permissions.json";
+                string? packagedPermissionManifestPath = null;
+                if (File.Exists(permissionSourcePath))
+                {
+                    EnsureInside(projectRoot, permissionSourcePath, "权限 sidecar 必须位于所选工程目录中。");
+                    if (HasReparsePointOnPath(projectRoot, ToPackagePath(Path.GetRelativePath(projectRoot, permissionSourcePath))))
+                        throw new InvalidDataException("不允许通过符号链接/重解析点打包权限 sidecar：" + permissionSourcePath);
+                    var permissionInfo = new FileInfo(permissionSourcePath);
+                    if (permissionInfo.Length > ScriptPermissionPolicy.MaximumManifestBytes)
+                        throw new InvalidDataException($"权限 sidecar 超过 {ScriptPermissionPolicy.MaximumManifestBytes} 字节上限：{permissionSourcePath}");
+                    _ = ScriptPermissionPolicy.ParseRequest(
+                        File.ReadAllText(permissionSourcePath),
+                        Path.GetDirectoryName(entryScript)!);
+                    var destination = ResolveWithin(entryOutputRoot, Path.GetRelativePath(projectRoot, permissionSourcePath));
+                    CopyFile(permissionSourcePath, destination);
+                    packagedPermissionManifestPath = ToPackagePath(Path.GetRelativePath(staging, destination));
+                }
+
                 var imageCatalog = new ImageResourceCatalog(entryScript);
                 var imageManifestPath = imageCatalog.ManifestPath;
                 string? packagedImageManifest = null;
@@ -430,7 +450,8 @@ public static class SpritePackageBuilder
                     packagedParameterPath,
                     ToPackagePath(Path.GetRelativePath(staging, modulesRoot)),
                     packagedImageManifest,
-                    []));
+                    [],
+                    packagedPermissionManifestPath));
                 warnings.AddRange(context.Warnings);
             }
 
@@ -556,6 +577,95 @@ public static class SpritePackageBuilder
             try { if (File.Exists(launcherZip + ".sha256")) File.Delete(launcherZip + ".sha256"); } catch (IOException) { }
             throw;
         }
+    }
+
+    /// <summary>
+    /// Revalidates the selected entry's optional permission sidecar against the loaded package manifest.
+    /// The sidecar is a request only; this method never creates an authorization grant.
+    /// </summary>
+    public static IReadOnlyList<string> VerifyEntryPermissionSidecar(
+        string packageDirectory,
+        SpritePackageManifest manifest,
+        SpritePackageEntry entry)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(packageDirectory);
+        ArgumentNullException.ThrowIfNull(manifest);
+        ArgumentNullException.ThrowIfNull(entry);
+        var issues = new List<string>();
+        try
+        {
+            var root = Path.GetFullPath(packageDirectory);
+            if (!IsSafeRelativePath(entry.ScriptPath))
+                return ["入口脚本路径无效，无法绑定权限 sidecar：" + entry.ScriptPath];
+
+            var expectedPath = ToPackagePath(entry.ScriptPath) + ".permissions.json";
+            var expectedFullPath = ResolveWithin(root, expectedPath);
+            var records = (manifest.Files ?? [])
+                .Where(file => string.Equals(ToPackagePath(file.Path), expectedPath, StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+
+            if (entry.PermissionManifestPath is null)
+            {
+                if (File.Exists(expectedFullPath) || records.Length > 0)
+                    issues.Add("入口存在权限 sidecar，但 manifest 未将它绑定到该入口：" + expectedPath);
+                return issues;
+            }
+
+            var boundPath = entry.PermissionManifestPath;
+            if (!IsSafeRelativePath(boundPath) ||
+                !string.Equals(ToPackagePath(boundPath), expectedPath, StringComparison.OrdinalIgnoreCase))
+            {
+                issues.Add("权限 sidecar 路径与入口不匹配：" + boundPath);
+                return issues;
+            }
+            if (records.Length != 1)
+                issues.Add("权限 sidecar 必须在 manifest files 中唯一登记：" + expectedPath);
+            if (!File.Exists(expectedFullPath))
+            {
+                issues.Add("权限 sidecar 文件缺失：" + expectedPath);
+                return issues;
+            }
+            if (HasReparsePointOnPath(root, expectedPath))
+            {
+                issues.Add("权限 sidecar 路径包含符号链接/重解析点：" + expectedPath);
+                return issues;
+            }
+
+            var info = new FileInfo(expectedFullPath);
+            if (info.Length > ScriptPermissionPolicy.MaximumManifestBytes)
+            {
+                issues.Add($"权限 sidecar 超过 {ScriptPermissionPolicy.MaximumManifestBytes} 字节上限：" + expectedPath);
+                return issues;
+            }
+
+            if (records.Length == 1)
+            {
+                var record = records[0];
+                if (info.Length != record.Size)
+                    issues.Add("权限 sidecar 文件大小与 manifest 不一致：" + expectedPath);
+                var actualHash = HashFile(expectedFullPath);
+                if (!string.Equals(actualHash, record.Sha256, StringComparison.OrdinalIgnoreCase))
+                    issues.Add("权限 sidecar SHA-256 不一致：" + expectedPath);
+            }
+
+            try
+            {
+                var scriptFullPath = ResolveWithin(root, entry.ScriptPath);
+                ScriptPermissionPolicy.ParseRequest(
+                    File.ReadAllText(expectedFullPath),
+                    Path.GetDirectoryName(scriptFullPath)!);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or InvalidDataException or ArgumentException or NotSupportedException)
+            {
+                issues.Add("权限 sidecar 无效：" + expectedPath + "：" + ex.Message);
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or InvalidDataException or NotSupportedException or PathTooLongException)
+        {
+            issues.Add("无法安全验证权限 sidecar：" + ex.Message);
+        }
+
+        return issues.Distinct(StringComparer.Ordinal).ToArray();
     }
 
     public static IReadOnlyList<string> Verify(string packageDirectory)
@@ -699,6 +809,7 @@ public static class SpritePackageBuilder
 
         foreach (var entry in manifest.Entries ?? [])
         {
+            issues.AddRange(VerifyEntryPermissionSidecar(root, manifest, entry));
             if (!IsSafeRelativePath(entry.ScriptPath) || !File.Exists(ResolveWithin(root, entry.ScriptPath)))
                 issues.Add("入口脚本缺失或路径无效：" + entry.ScriptPath);
             if (!IsSafeRelativePath(entry.ModuleRootPath) || !Directory.Exists(ResolveWithin(root, entry.ModuleRootPath)))
@@ -765,6 +876,24 @@ public static class SpritePackageBuilder
         }
 
         return issues;
+    }
+
+    private static bool HasReparsePointOnPath(string root, string relativePath)
+    {
+        var current = Path.GetFullPath(root);
+        if ((File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)
+            return true;
+
+        foreach (var segment in relativePath.Split('/', StringSplitOptions.RemoveEmptyEntries))
+        {
+            current = Path.Combine(current, segment);
+            if (!File.Exists(current) && !Directory.Exists(current))
+                return false;
+            if ((File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)
+                return true;
+        }
+
+        return false;
     }
 
     private static void ValidateOptions(SpritePackageBuildOptions options)

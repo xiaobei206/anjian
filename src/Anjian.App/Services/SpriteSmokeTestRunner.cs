@@ -2,6 +2,7 @@ using System.Text.Json;
 using Anjian.Core;
 using Anjian.Core.Packaging;
 using Anjian.Core.Parameters;
+using Anjian.Core.Permissions;
 
 namespace Anjian.App.Services;
 
@@ -30,6 +31,17 @@ internal static class SpriteSmokeTestRunner
             var entry = manifest.Entries.FirstOrDefault()
                 ?? throw new InvalidDataException("manifest 没有入口脚本。");
             var scriptPath = Resolve(packageRoot, entry.ScriptPath);
+            var sidecarIssues = SpritePackageBuilder.VerifyEntryPermissionSidecar(packageRoot, manifest, entry);
+            if (sidecarIssues.Count > 0)
+                throw new InvalidDataException("Sprite smoke sidecar validation failed: " + string.Join("; ", sidecarIssues));
+            if (entry.PermissionManifestPath is null)
+                throw new InvalidDataException("Sprite smoke fixture must carry a permission request sidecar.");
+            var permissionSidecarPath = Resolve(packageRoot, entry.PermissionManifestPath);
+            var permissionRequest = ScriptPermissionPolicy.ParseRequest(
+                File.ReadAllText(permissionSidecarPath),
+                Path.GetDirectoryName(scriptPath)!);
+            if (permissionRequest.FileWriteRoots.Count == 0)
+                throw new InvalidDataException("Sprite smoke sidecar does not request file-write access.");
             var moduleRoot = Resolve(packageRoot, entry.ModuleRootPath);
             var ocrRoot = manifest.OcrModels.Count > 0 ? Resolve(packageRoot, manifest.OcrModels[0].RelativePath) : null;
 
@@ -56,11 +68,15 @@ internal static class SpriteSmokeTestRunner
                 scriptPath,
                 new PlaybackOptions(),
                 parameters: parameters,
-                spriteRuntimeOptions: new SpriteWorkerRuntimeOptions(moduleRoot, ocrRoot))
+                spriteRuntimeOptions: new SpriteWorkerRuntimeOptions(moduleRoot, ocrRoot),
+                permissions: ScriptPermissionGrant.Empty)
                 .GetAwaiter().GetResult();
 
-            if (!messages.Any(message => message.Contains("module-ok:parameter-ok", StringComparison.Ordinal)))
-                throw new InvalidOperationException("Worker 未返回预期的模块/参数组合结果。");
+            if (!messages.Any(message => message.Contains("module-ok:parameter-ok:permissions-default-deny", StringComparison.Ordinal)))
+                throw new InvalidOperationException("Worker 未确认模块、参数与权限默认拒绝 smoke 契约。");
+            var permissionMarker = Path.Combine(Path.GetDirectoryName(scriptPath)!, "permission-smoke-marker.txt");
+            if (File.Exists(permissionMarker))
+                throw new InvalidOperationException("未批准的 sidecar 写入请求错误地创建了文件。");
 
             WriteLog(logPath, "PASS", messages);
             return 0;
