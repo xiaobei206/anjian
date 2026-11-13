@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using Anjian.Core.Packaging;
 using Anjian.Core.Parameters;
@@ -280,6 +281,94 @@ public sealed class SpritePackageBuilderTests
                 Version = "1.0.0"
             }));
             Assert.Contains("工程目录", pathError.Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            try { Directory.Delete(root, recursive: true); } catch (IOException) { }
+        }
+    }
+
+
+    [Fact]
+    public void PublishedRuntimeBuildsAndRunsAnIndependentSpriteWorker()
+    {
+        var runtime = Environment.GetEnvironmentVariable("ANJIAN_PUBLISHED_RUNTIME");
+        if (string.IsNullOrWhiteSpace(runtime))
+            return; // The workflow repeats this test after publishing the actual self-contained runtime.
+        Assert.True(Directory.Exists(runtime), "Published runtime directory does not exist: " + runtime);
+
+        var root = CreateTemporaryDirectory();
+        var project = Path.Combine(root, "project");
+        var output = Path.Combine(root, "output");
+        Directory.CreateDirectory(Path.Combine(project, "lib"));
+        Directory.CreateDirectory(Path.Combine(project, "images"));
+        File.WriteAllText(Path.Combine(project, "main.lua"),
+            "local function unusedImageProbe() return LoadImage(\"images/smoke.png\") end\nlocal moduleMessage = require(\"lib.helper\")\nLog(moduleMessage .. \":\" .. Args.message)\n");
+        File.WriteAllText(Path.Combine(project, "lib", "helper.lua"), "return \"module-ok\"\n");
+        File.WriteAllText(Path.Combine(project, "images", "smoke.png"), "included resource");
+        var schema = new ScriptParameterSchema
+        {
+            ScriptId = "main",
+            Parameters =
+            [
+                new()
+                {
+                    Id = "message",
+                    Name = "message",
+                    Label = "消息",
+                    Type = "text",
+                    Required = true,
+                    DefaultValue = Json("\"parameter-ok\"")
+                }
+            ]
+        };
+        File.WriteAllText(
+            Path.Combine(project, "main.params.json"),
+            JsonSerializer.Serialize(schema, new JsonSerializerOptions(JsonSerializerDefaults.Web)));
+
+        try
+        {
+            var result = SpritePackageBuilder.Build(new SpritePackageBuildOptions
+            {
+                RuntimeDirectory = runtime,
+                ProjectRoot = project,
+                EntryScriptPaths = [Path.Combine(project, "main.lua")],
+                OutputDirectory = output,
+                ProductName = "CI-Sprite",
+                Version = "1.0.0",
+                MinimumApiVersion = "0.7",
+                MinimumRuntimeVersion = "10.0"
+            });
+
+            Assert.Empty(SpritePackageBuilder.Verify(result.PackageDirectory));
+            Assert.True(File.Exists(result.LauncherZip));
+            Assert.True(File.Exists(result.LauncherZipChecksumPath));
+            Assert.Contains(result.Manifest.Files, file => file.Path.EndsWith("/images/smoke.png", StringComparison.Ordinal));
+
+            var executable = Path.Combine(result.PackageDirectory, result.Manifest.LauncherExecutable);
+            Assert.True(File.Exists(executable));
+            var logPath = Path.Combine(root, "sprite-smoke.log");
+            using var process = Process.Start(new ProcessStartInfo
+            {
+                FileName = executable,
+                WorkingDirectory = result.PackageDirectory,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                Environment =
+                {
+                    ["ANJIAN_SPRITE_SMOKE_LOG"] = logPath
+                },
+                ArgumentList = { "--sprite-smoke-test" }
+            });
+            Assert.NotNull(process);
+            if (!process!.WaitForExit(90_000))
+            {
+                process.Kill(entireProcessTree: true);
+                Assert.True(false, "Packaged sprite launcher did not finish its Worker smoke test within 90 seconds.");
+            }
+            var log = File.Exists(logPath) ? File.ReadAllText(logPath) : "";
+            Assert.True(process.ExitCode == 0, $"Packaged sprite smoke test failed ({process.ExitCode}). {log}");
+            Assert.Contains("module-ok:parameter-ok", log, StringComparison.Ordinal);
         }
         finally
         {

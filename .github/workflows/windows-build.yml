@@ -30,6 +30,11 @@ jobs:
         run: dotnet run --project tools/Anjian.ApiDocsGenerator/Anjian.ApiDocsGenerator.csproj -c Release --no-build -- --check
       - name: Publish portable Windows x64
         run: dotnet publish src/Anjian.App/Anjian.App.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -o artifacts/publish/win-x64
+      - name: Test packaged sprite runtime and Worker
+        shell: pwsh
+        run: |
+          $env:ANJIAN_PUBLISHED_RUNTIME = (Resolve-Path "artifacts/publish/win-x64").Path
+          dotnet test tests/Anjian.Core.Tests/Anjian.Core.Tests.csproj -c Release --no-build --filter "FullyQualifiedName~PublishedRuntimeBuildsAndRunsAnIndependentSpriteWorker" --logger "console;verbosity=normal"
       - name: Package and checksum
         shell: pwsh
         run: |

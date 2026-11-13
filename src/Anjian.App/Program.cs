@@ -11,6 +11,8 @@ internal static class Program
     {
         if (args.Length > 0 && args[0].Equals("--worker", StringComparison.OrdinalIgnoreCase))
             return WorkerProgram.Run(args);
+        if (args.Length > 0 && args[0].Equals("--sprite-smoke-test", StringComparison.OrdinalIgnoreCase))
+            return SpriteSmokeTestRunner.Run();
 
         ApplicationConfiguration.Initialize();
         if (args.Length > 0 && args[0].Equals("--automation-probe", StringComparison.OrdinalIgnoreCase))
