@@ -337,7 +337,7 @@ M4 基础调试器已在 main 实现并通过 Windows CI。具体实现提交与
 用户最新决策：M1–M13 的 Windows 桌面实机验收统一延期至 M14 全部功能开发完成后集中执行。不得再要求先完成 M8 桌面验收才进入 M9/M10。未执行的 M8-01..18、M9-01..08 等验收行继续保持 NOT RUN；CI 不等于桌面 PASS。M14 正式 1.0.0 发布仍必须等待用户集中实机验收及缺陷修复。
 
 ## 当前代码和 CI 状态
-- 最终 main 代码基线：`41e6d56a6485114e44cc9453b97ce05dd04f4c5d`。
+- M9 最终代码基线：`41e6d56a6485114e44cc9453b97ce05dd04f4c5d`；本轮状态文档提交：`c4482bf315178daf1886b83af2299e7d5ddaa3fd`。接手仍须重新查询当前 main HEAD。
 - M9 OCR 已完成实现与 Windows CI：run [43363150335](https://github.com/xiaobei206/anjian/actions/runs/43363150335) SUCCESS（Windows Server 2025）：Restore PASS；Release Build 0 warnings/0 errors；90/90 Core tests；API handbook `--check` PASS；win-x64 self-contained publish、ZIP/SHA256、artifact upload 全 PASS。
 - 临时 artifact：ID `14008744436`，87,078,010 bytes，30 天保留；不是 GitHub Release。没有修改 VERSION，preview.4 正式 ZIP/SHA256 不变。
 - M9 核心：API 0.7 / 81 项；新增 `OCR`、`FindText`、`WaitText`；PaddleOcrNet 2.4.0 CPU adapter；用户显式下载 ch/en/japan 模型；Worker 识别严格离线；16 MP/64 MiB 输入上限；文本置信度/矩形/polygon/屏幕绝对坐标；WaitText 使用 ExecutionGate 可暂停/取消 delay，F12 Stop 终止 Worker；模型管理窗下载取消后安全关闭。

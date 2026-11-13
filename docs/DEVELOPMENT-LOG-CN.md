@@ -573,9 +573,9 @@ M4 基础调试器与 M5 可视化录制/动作列表均已完成 Windows CI 验
 - 模型只有通过用户点击“OCR 模型”后下载；识别服务的 `Offline=true`，CPU provider，不要求用户安装 GPU Runtime。模型/语言的完整许可和分发清单仍需在 M14 发布审查时最终确认。
 - 上游项目规模较小，使用适配层隔离并锁定版本；如 Windows CI/许可/质量不达标，可替换引擎但不改变 Core DTO 与 Lua API。
 
-### 验证状态
+### 验证状态（最终结果已确认）
 - 当前会话本地环境为 Debian 13，无 .NET SDK；本地 Restore/Build/Test：NOT RUN。
-- Windows Actions 当前 M9 提交结果尚待检查；在实际获取到 Restore/Build/Test/API handbook/self-contained publish 结果前，不将其标为 PASS。
+- Windows Actions 最终 run [43363150335](https://github.com/xiaobei206/anjian/actions/runs/43363150335) SUCCESS：Restore PASS；Release Build 0 warnings / 0 errors；90/90 Core tests；API handbook `--check`；self-contained win-x64 publish；ZIP/SHA256 与 artifact upload 全 PASS。Artifact ID 14008744436。
 - M9-01..M9-08 真实 Windows 桌面验收均 NOT RUN，延后至 M14 功能开发结束后的统一验收；M8-01..M8-18 状态也不改变。
 - 未修改 VERSION、AssemblyVersion、FileVersion；未创建 Release，preview.4 正式 ZIP/SHA256 不变。
 
