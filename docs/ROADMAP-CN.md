@@ -238,26 +238,26 @@ M7 实现/CI 已完成不代表 M7-01..M7-10 Windows 桌面验收通过；这些
 ## M12–M13 — 扩展 API、插件和自动运行
 
 
-### M12 当前进度（2026-11-13；M12-02 首批文件 API 已实现，整体仍进行中）
+### M12 当前进度（2026-11-13；M12-02 文件/目录 API 已实现，M12 整体仍进行中）
 
 - M12-01 已完成并进入 main：Core 权限请求/批准/Grant 数据模型、schema v1 解析和范围校验；每脚本可选 sidecar 为脚本文件全名后缀 .permissions.json，最大 256 KiB，声明本身不代表授权。
 - 主程序普通播放/调试启动前逐项审阅本次请求，默认全不勾选、取消不启动 Worker；缺少 sidecar 使用空 Grant，损坏/未来 schema/重解析点 sidecar 拒绝启动。
-- M12-02 主机边界已接通：WorkerLuaApi 文件 bridge 发 IPC 前检查 Grant；PlaybackRunner 在每条文件/目录 IPC 上使用本轮 Grant 再检查，未知命令默认拒绝。SpriteLauncherForm 复用 PlaybackRunner；未提供 sidecar 的小精灵运行路径保持 Empty Grant，不会继承桌面主程序授权。
-- 第一批 8 个公开 Lua API：ReadTextFile、WriteTextFile、AppendTextFile、FileExists、DirectoryExists、ListFiles、ListDirectories、CreateDirectory。API registry 由 0.7/81 项升级为 main 开发版 0.8/89 项；FUNCTION-REFERENCE 已由注册表生成并通过一致性检查，IDE 补全/签名继续读取相同注册表。
-- Windows 文件适配：相对路径按脚本目录解析；拒绝设备/扩展设备路径、盘符相对路径与 NTFS ADS；使用 Windows OPEN_REPARSE_POINT 句柄逐级校验目录链和最终文件，目录句柄不共享删除以阻止路径链被重命名替换；拒绝 reparse point/符号链接及多硬链接文件。文本使用严格 UTF-8，单文件/写入文本上限 4 MiB；目录枚举非递归，最多检查 1000 项；目录创建只允许一级，父目录必须已存在；写入同目录临时文件、flush 后原子替换。该实现不是恶意同用户进程的完整 OS 沙箱。
-- Windows Actions run [237](https://github.com/xiaobei206/anjian/actions/runs/43379800469) 先验证主机文件适配与链接防护：Build 0 warnings/0 errors、132/132 Core tests、API handbook、自包含 win-x64、包内 Worker smoke、ZIP/SHA256 和 artifact upload 全 PASS（artifact ID 14015698410）。
-- Windows Actions run [241](https://github.com/xiaobei206/anjian/actions/runs/43381018127) 对最终首批 Lua API 代码 HEAD fdfa70db62870502d2d4a8211cc7d525effef3dc 全 PASS：Restore、Release Build 0 warnings/0 errors、134/134 Core tests、API handbook check、自包含 win-x64 publish、包内 Sprite/Worker smoke、ZIP/SHA256 和 artifact upload；artifact ID 14016840736，87,187,479 bytes，SHA-256 db2b6ac754543d9ca821434bb3f3edc98b4735e58359ebe843a1c25d9a692534。
-- 当前仍未实现文件复制/移动/重命名和受控临时路径；剪贴板/对话框、进程、HTTP 和插件系统都未开放。主程序权限窗口实际交互、小精灵逐次权限审阅以及 M1–M13 其他桌面验收继续 NOT RUN，统一留到 M14。没有改变 VERSION/AssemblyVersion/FileVersion，没有创建 tag/Release；v0.1.0-preview.4 发布资产保持不变。
+- M12-02 已完成文件 API 首批 8 项与补齐 5 项：ReadTextFile、WriteTextFile、AppendTextFile、FileExists、DirectoryExists、ListFiles、ListDirectories、CreateDirectory、CopyFile、MoveFile、RenameFile、CreateTempFile、CreateTempDirectory。Worker bridge 发 IPC 前校验 Grant；PlaybackRunner 对每条文件 IPC 再次检查；未知命令 fail-closed。SpriteLauncherForm 复用同一 PlaybackRunner，未提供授权时仍使用 Empty Grant。
+- API registry 从 0.8/89 项升至 main 开发版 0.9/94 项；FUNCTION-REFERENCE 由同一注册表生成，IDE 补全/签名继续读取 LuaApiRegistry，不另建函数表。CopyFile/MoveFile/RenameFile 的 overwrite 参数默认 false。
+- Windows 文件适配按相对路径以脚本入口目录解析；拒绝设备/扩展设备路径、盘符相对路径、NTFS ADS、reparse point/符号链接和多硬链接文件。文本严格 UTF-8、4 MiB；目录枚举非递归、最多 1000 项。普通文件复制/跨卷移动最大 64 MiB；复制使用目标同目录随机临时文件、64 KiB 分块、磁盘 flush、SHA-256/长度校验后句柄级原子提交；Stop 在循环与提交前检查，取消/校验失败不会替换已有目标。同卷移动/重命名使用源文件句柄级 rename；跨卷移动只在目标校验提交后删除源，删除失败会报告并保留源/目标可恢复状态。
+- CreateTempFile / CreateTempDirectory 必须显式提供已批准写入目录/父目录，随机名称配合 CREATE_NEW/单级目录创建，返回完整路径；不自动访问或扩大系统 TEMP 授权。首轮只支持普通文件，目录复制/移动/重命名不支持。
+- Windows Actions run 43384232623 和 43384744116 均在 Core tests 发现 Windows FileRenameInfo 行为问题（先是非空 RootDirectory，后是目标路径格式）；分别修复为 RootDirectory=NULL、完全限定 verbatim 路径并加入 UTF-16 终止符。最终 run [43385033936](https://github.com/xiaobei206/anjian/actions/runs/43385033936) 对 HEAD 057f400657c8ebaf673eeefae17030476d71789b 全 PASS：Restore；Release Build 0 warnings/0 errors；142/142 Core tests、0 skipped；94 个公开函数的 API handbook check；自包含 win-x64 publish；包内 Sprite/Worker smoke；ZIP/SHA256；artifact upload。Artifact ID 14018690914，87,196,057 bytes，上传 artifact SHA-256 5ebc2dae013634a0018f1ffed5c0e74e49d7cef253f9e33bc0f4e630452fe431。本地容器没有 .NET SDK，local Restore/Build/Test 为 NOT RUN。
+- Windows 桌面权限窗口、小精灵逐次 sidecar 审阅和 Windows 10/11 真实桌面文件操作均 NOT RUN，统一留到 M14；CI PASS 不代表实机验收。
+- 未修改 VERSION / AssemblyVersion / FileVersion；不创建 tag/Release；已发布的 v0.1.0-preview.4 资产保持不变。
 
 ### M12 后续实施顺序（必须按安全依赖推进）
 
-1. M12-02B：补齐文件复制/移动/重命名与受控临时文件/目录 API。源路径必须读取授权、目标路径必须写入授权；跨卷移动需先复制到目标目录临时文件、flush/校验成功后再删除源；所有路径继续拒绝 reparse point、符号链接和多硬链接文件，定义覆盖/同卷原子性/跨卷失败与取消语义；临时对象必须由调用者指定并获批的写入根创建，禁止未经授权直接暴露系统临时目录。
-2. 再做剪贴板与消息/输入/确认对话框，明确文本长度、STA/主 UI 线程调度、取消语义，并由 host 再检查权限。
-3. 再做精确 EXE 启动/等待/查询与 HTTP(S)/JSON；设置超时、响应大小上限、Stop 取消、重定向重新授权和不继承敏感代理凭据。
-4. 建立本地插件目录/ZIP manifest、稳定 ID、版本和 API 兼容、文件清单/hash、权限与脚本声明取交集、启停/卸载及错误隔离；不加载任意 DLL，不在主 UI 执行插件 Lua。
-5. 每批功能完成后同步 registry/API version、中文函数手册、IDE 提示/命令面板和契约测试；小精灵包构建与 Launcher 必须沿用同一 host Grant 校验策略，sidecar 逐次审阅仍需后续实现。
-6. Windows CI 覆盖授权和撤销、越界/链接路径、取消、超时、重定向、插件兼容和损坏包拒绝；桌面交互仍只记录在 M14 集中验收。
-
+1. M12-07：剪贴板读写与消息/输入/确认对话框，明确长度限制、STA/主 UI 线程调度、暂停/取消和主进程二次权限检查。
+2. M12-08：精确 EXE 启动/等待/查询及退出状态，严格按批准路径，不开放任意 Shell。
+3. M12-09：HTTP(S)/JSON，精确主机/方法授权，HTTPS 默认，HTTP 单独审批，重定向重新授权、超时、响应上限和 Stop 取消。
+4. M12-10：本地插件目录/ZIP manifest、稳定 ID、版本/API 兼容、文件清单/hash、脚本声明/插件声明/用户批准权限取交集，启停/卸载及错误隔离；不加载任意 DLL，不在主 UI 执行插件 Lua。
+5. M12-11：小精灵包构建/manifest 收集 permissions sidecar，Launcher 复用逐次权限审阅；不得在缺少批准时扩大 Grant。
+6. 每批功能完成后同步 registry/API version、中文函数手册、IDE 提示和契约测试；Windows CI 不替代 M14 桌面验收。
 
 - 增加有边界的文件/目录、剪贴板、对话框、进程、HTTP(S)/JSON 等常用 API。
 - 插件 manifest、权限提示、版本兼容、启停/卸载、错误隔离和文档注册。

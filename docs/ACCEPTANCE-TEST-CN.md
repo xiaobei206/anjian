@@ -365,7 +365,7 @@ M1–M13 的桌面实测不再作为进入下一开发阶段的前置条件，�
 | M12-03 | 播放/调试前权限审阅 | sidecar 请求逐项显示；默认不勾选；确认批准本次子集；取消不启动 Worker | 代码已接入主程序播放/调试；Build PASS（run 233/234）；WinForms 实际交互 NOT RUN（M14） |
 | M12-04 | Worker 授权传递 | worker-ready 将 Grant 序列化并注入 WorkerLuaApi；无审批使用 Empty | PASS（run 241：文件 API 实际使用本次 Grant；小精灵未提供权限对象时为空 Grant；Sprite/Worker 包内 smoke PASS） |
 | M12-05 | 主进程 IPC 二次检查 | 文件类 IPC 每次在 PlaybackRunner 再检查 Grant；未知/伪造 IPC 默认拒绝 | PASS（ScriptFileSystemTests 覆盖空 Grant 拒绝、只读 Grant 拒绝写入、伪造/未知命令拒绝；Windows CI run 241） |
-| M12-06 | 文件/目录 API | 文本读/写/追加、存在性、列文件/目录、单级创建；路径越界、reparse/symlink/hardlink、大小、取消和替换行为 | PARTIAL（8 个 API 已注册；复制/移动/重命名/临时文件/目录仍待 M12-02B；Windows CI run 241 134/134 tests） |
+| M12-06 | 文件/目录 API | 文本读/写/追加、存在性、列文件/目录、单级创建、复制/移动/重命名与受控临时文件/目录；授权、链接/硬链接、上限、取消、覆盖/提交行为 | PASS（13 个 API 已注册；Windows CI run 43385033936：142/142 tests，0 warnings/0 errors，API handbook、win-x64 publish、Sprite/Worker smoke 和 artifact upload 全 PASS；M14 桌面实机仍 NOT RUN） |
 | M12-07 | 剪贴板/对话框 API | 读写剪贴板；消息/输入/确认对话框；主线程调度和取消 | NOT IMPLEMENTED |
 | M12-08 | 进程 API | 精确 EXE 白名单、启动/等待/查询/退出状态、超时与取消；不开放任意 Shell | NOT IMPLEMENTED |
 | M12-09 | HTTP/JSON API | 精确主机/方法；HTTPS 默认；可选明文 HTTP 单独审批；重定向重新授权、超时/响应上限/取消 | NOT IMPLEMENTED |
@@ -391,3 +391,17 @@ M1–M13 的桌面实测不再作为进入下一开发阶段的前置条件，�
 - Run 241（最终首批 API 代码 HEAD fdfa70db62870502d2d4a8211cc7d525effef3dc）SUCCESS：Restore、Release Build 0 warnings / 0 errors、134/134 Core tests、API handbook check、自包含 win-x64 publish、包内 Sprite/Worker smoke、ZIP/SHA256 和 artifact upload 全 PASS。Artifact ID 14016840736，87,187,479 bytes，SHA-256 db2b6ac754543d9ca821434bb3f3edc98b4735e58359ebe843a1c25d9a692534。
 - 本会话未运行本地 dotnet Restore/Build/Test；可复核的构建与测试证据来自 Windows GitHub Actions。M12 权限窗体的 Windows 10/11 实机交互、真实用户授权与小精灵 sidecar 审阅仍 NOT RUN，属于 M14/后续 M12 项目。
 - 未改 VERSION、AssemblyVersion、FileVersion；未创建 tag/Release；v0.1.0-preview.4 发布资产不变。
+
+
+### M12-02B 文件复制/移动/重命名与受控临时路径（2026-11-13）
+
+| 场景 | 自动化/手工验收 | 当前状态 |
+|---|---|---|
+| CopyFile 普通文件复制、默认不覆盖、overwrite=true | Core 测试验证内容、覆盖开关和原子提交路径；API registry/Worker bridge 契约 | Windows CI run 43385033936：通过。runner 提供 C:/D: 两卷，跨卷移动成功路径和超限拒绝路径实际执行 |
+| MoveFile / RenameFile | 同卷句柄级重命名；移动和重命名同时要求源读取/写入授权，目标写入授权 | 自动化测试已加入；跨卷路径仅在 Windows runner 具备第二个可写卷时执行 |
+| 临时文件/目录 | 用户显式指定批准写入根，安全随机名、CreateNew/单级创建、碰撞后不覆盖旧条目、返回完整路径 | 已加入确定性碰撞与越权测试 |
+| 路径安全 | reparse/symlink、硬链接源与目标、兄弟目录、`..`、设备路径、未知/伪造 IPC | Worker 与 host dispatcher 两层断言已加入 |
+| 上限与取消 | 64 MiB 上限、64 KiB 分块取消、提交前取消保留目标旧内容、临时文件清理 | 自动化测试已加入 |
+| 目录复制/移动/重命名 | 明确不在本批能力范围，仅普通文件 API | 不支持（按本 handoff 约定） |
+
+Windows Actions run [43385033936](https://github.com/xiaobei206/anjian/actions/runs/43385033936) 最终全 PASS：Build 0 warnings/0 errors，142/142 Core tests、0 skipped，API 文档生成区一致（94 函数）、win-x64 publish、包内 Sprite/Worker smoke、ZIP/SHA256 和 artifact upload。Artifact ID 14018690914，87,196,057 bytes，artifact archive SHA-256 5ebc2dae013634a0018f1ffed5c0e74e49d7cef253f9e33bc0f4e630452fe431。本地 .NET SDK 缺失，本地 Restore/Build/Test NOT RUN。Windows 10/11 桌面实机仍 NOT RUN（M14）；CI 不等于实机验收。

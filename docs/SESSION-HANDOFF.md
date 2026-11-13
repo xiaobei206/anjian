@@ -546,3 +546,38 @@ M12-02 验收前不做剪贴板、对话框、进程、HTTP 或插件加载。�
 8. 完成这批 API 后把 registry 从 0.8 递增为 0.9，自动重生成 FUNCTION-REFERENCE 并验证 IDE 仍读取同一注册表。只改 main，小步提交；不创建分支/PR、不改产品 VERSION、不建 tag/Release。
 
 验收完成后，本任务再交给下一 M12 子任务；在此之前禁止启动剪贴板、对话框、进程、HTTP 或插件功能。
+
+
+---
+
+# 2026-11-13 最新交接覆盖：M12-02B 已实现并通过 Windows CI
+
+本节优先于上述历史 M12 handoff。当前唯一任务 M12-02B 已按 handoff 范围完成并通过最终 Windows Actions。下一会话唯一任务转为 M12-07。
+
+## 当前 main
+- 初始 HEAD：`484cbe941258de8b12fd924f00d89d1a54e3bdc3`。
+- 功能提交：`3a2f23ab66a06491fe5cbf3ca16696751fc8b860`，修复提交：`32d28073ca1bc1030f49f1d7d86d344d7791a788`、`057f400657c8ebaf673eeefae17030476d71789b`。
+- API registry 为 0.9 / 94 项，新增 CopyFile、MoveFile、RenameFile、CreateTempFile、CreateTempDirectory；函数手册生成区与 API registry 同步；IDE 补全/签名继续读同一 registry。
+- Copy/Move/Rename 仅支持普通文件，不支持目录。Copy/跨卷 Move 限 64 MiB；复制临时文件位于目标目录，分块写入、flush、SHA-256/长度复核后提交。默认不覆盖，overwrite? 默认 false。
+- Move/Rename 源文件必须同时获读取和写入授权；目标获写入授权。Copy 源获读取、目标获写入。临时对象只允许调用者指定的已批准写入目录，不自动开放系统 TEMP。
+- 新增操作 Worker bridge 与 PlaybackRunner dispatcher 双层 Grant 检查；目录父链持有 no-delete-share 句柄；源/已有目标文件 no-follow 并拒绝 reparse/symlink/多硬链接。
+- Windows FileRenameInfo 经过两轮 CI 发现的问题后，当前使用 RootDirectory=NULL + Windows verbatim 完整目标路径 + UTF-16 NUL 终止符；父目录锁仍保持。最终 run [43385033936](https://github.com/xiaobei206/anjian/actions/runs/43385033936) 对 HEAD 057f400657c8ebaf673eeefae17030476d71789b 全 PASS：Release Build 0 warnings/0 errors、142/142 Core tests（0 skipped）、94 个公开函数的 API handbook check、自包含 win-x64 publish、Sprite/Worker 包内 smoke、ZIP/SHA256 和 artifact upload。Artifact ID 14018690914，87,196,057 bytes，上传 artifact archive SHA-256 `5ebc2dae013634a0018f1ffed5c0e74e49d7cef253f9e33bc0f4e630452fe431`。CI 日志显示 runner 具备 D: 测试卷，跨卷移动成功与超限路径已实际执行并通过。
+- 本地 .NET SDK 不存在，本地 Restore/Build/Test NOT RUN；Windows Actions 是本轮自动化构建/测试的来源。
+- Windows 10/11 桌面实机权限 UI、文件操作、DPI/多显示器和小精灵逐次 sidecar 审阅仍 NOT RUN，统一留 M14。
+- 未修改 VERSION/AssemblyVersion/FileVersion；没有 tag/Release/PR；v0.1.0-preview.4 官方资产不变。
+
+## M12-02B 范围完成情况
+- [x] CopyFile(sourcePath, destinationPath, overwrite?)。
+- [x] MoveFile(sourcePath, destinationPath, overwrite?)。
+- [x] RenameFile(path, newName, overwrite?)。
+- [x] CreateTempFile(directoryPath)。
+- [x] CreateTempDirectory(parentDirectoryPath)。
+- [x] Worker/host 双层授权、暂停 checkpoint 复用、Stop token 分块取消和提交边界检查。
+- [x] 注册表 0.8 → 0.9，FUNCTION-REFERENCE 由注册表生成；契约测试检查公开 API 名称/签名和 Lua bridge。
+- [x] 覆盖/链接/硬链接/临时名称碰撞/路径越界/64 MiB 上限/取消/未知 IPC 测试已加入。
+- [x] Windows Actions Build/Test/API handbook/self-contained package smoke 全绿：run 43385033936，142/142 tests，0 warnings/errors，artifact 14018690914。
+- [ ] M14 Windows 10/11 桌面验收（不属于本任务 CI 阻塞项，继续 NOT RUN）。
+
+## 下一会话唯一任务：M12-07 — 剪贴板与对话框 API
+
+严格只做剪贴板读写与消息/输入/确认对话框，沿用 default-deny + Worker/host 双层 Grant。先读取 PRD、权限 schema、MainForm 审阅、PlaybackRunner dispatcher 和当前 API registry；定义 clipboardRead/clipboardWrite、dialogs 资源权限语义，STA 与 WinForms 主 UI thread 调度，输入/返回值长度限制，取消/暂停/Stop 语义和错误处理。未授权/伪造 IPC 必须 fail closed。不得顺带启动进程 API、HTTP/JSON、插件 manifest 或小精灵 sidecar 审阅。

@@ -720,3 +720,23 @@ M4 基础调试器与 M5 可视化录制/动作列表均已完成 Windows CI 验
 - Run 240（HEAD e020f2a）：Build 0 warnings/0 errors；133/134 tests，剩余失败是旧断言 API 数量 81；由 fdfa70d 修复。
 - Run [241](https://github.com/xiaobei206/anjian/actions/runs/43381018127)（最终首批 API HEAD fdfa70d）：SUCCESS，Restore PASS；Release Build 0 warnings / 0 errors；134/134 Core tests；API handbook check；self-contained win-x64 publish；package Sprite/Worker smoke；ZIP/SHA256；artifact upload 全 PASS。Artifact ID 14016840736，87,187,479 bytes，SHA-256 db2b6ac754543d9ca821434bb3f3edc98b4735e58359ebe843a1c25d9a692534。
 - 本会话未在本地执行 dotnet Restore/Build/Test；自动化证据来自 Windows GitHub Actions。Run 241 全绿不代表 WinForms 权限审阅或桌面操作已经实机验收。没有改 VERSION/AssemblyVersion/FileVersion，没有创建 tag/Release，preview.4 发布资产不变。
+
+
+## 2026-11-13 — M12-02B 文件复制/移动/重命名与受控临时路径
+
+### 提交与实现
+- `3a2f23a`：新增 CopyFile、MoveFile、RenameFile、CreateTempFile、CreateTempDirectory 五个 Lua API；Worker bridge 和 PlaybackRunner host dispatcher 分别执行本轮 Grant 校验；Windows ScriptFileSystem 以 no-follow 句柄执行文件操作；API registry 由 0.8/89 项升为 0.9/94 项，更新生成函数手册和契约测试。
+- 首轮 Windows CI run 43384232623：Restore 和 Release Build 通过，Core tests 139/142；3 个测试揭示 SetFileInformationByHandle(FileRenameInfo) 目标目录句柄参数在 Windows runner 上返回 ERROR_INVALID_PARAMETER。已记录为真实失败，没有将其标为通过。
+- `32d2807`：将 FileRenameInfo 改为 RootDirectory=NULL 与完全限定路径，并同步修正 Copy/Move/Rename 的可选 overwrite? 签名和契约断言。
+- 第二轮 Windows CI run 43384744116：Restore / Release Build 通过，Core tests 139/142；FileRenameInfo 调用返回成功但普通 DOS 路径提交后目标路径不存在。随后进一步修正路径格式。
+- `057f400`：FileRenameInfo 目标路径改为 Windows verbatim 完整路径（盘符路径和 UNC 分别规范化），分配 UTF-16 NUL 终止符；仍使用 RootDirectory=NULL。由新 Windows runner 复验。
+- CopyFile：64 MiB 上限，目标同目录安全随机临时文件、64 KiB 分块、flush to disk、SHA-256/长度复核、提交前 Stop 检查和句柄级原子提交；失败或取消不会替换既有目标。默认不覆盖，overwrite=true 才允许替换普通目标文件。
+- MoveFile：源路径必须同时具备读取与写入批准，目标具备写入批准；同卷句柄级 rename；跨卷受限复制并验证目标后标记源删除，失败/取消留下可恢复的源/目标。跨卷仅支持 64 MiB 以下普通文件。
+- RenameFile：在同一获批父目录重命名普通文件，不跟随链接；源路径要求读/写两类授权，目标名不接受目录分隔符、盘符或 ADS。
+- 临时文件/目录仅在调用者显式指定的已批准写入目录创建；随机名称和 CreateNew/单级创建，碰撞时重试且不打开覆盖已有项目；不自动授权/使用系统 TEMP。返回完整路径。目录复制/移动/重命名不在本批范围。
+- 新增测试包括源/目标 Grant 分离、同名兄弟目录和越界、默认/显式覆盖、符号链接与硬链接源/目标拒绝、临时名碰撞、64 MiB 上限、提交前取消保留旧目标、dispatcher 实际执行新操作、未知 IPC fail-closed、Lua registry 与 bridge 调用。
+- 本地容器无 .NET SDK：本地 Restore/Build/Test 均 NOT RUN；Windows runner 是构建与测试证据来源。跨卷成功测试会检查 runner 是否有第二个可写卷；无第二卷时分支不执行，不得把它报告为已实测。
+
+### 最终 Windows CI
+- 最终代码 HEAD `057f400657c8ebaf673eeefae17030476d71789b` 对应 Windows Actions [run 43385033936](https://github.com/xiaobei206/anjian/actions/runs/43385033936) 全 PASS：Restore；Release Build 0 warnings/0 errors；142/142 Core tests、0 skipped；API handbook check（94 个函数）；自包含 win-x64 publish；包内 Sprite/Worker smoke；ZIP/SHA256；artifact upload。Artifact ID 14018690914，87,196,057 bytes，GitHub 上传 artifact archive SHA-256 `5ebc2dae013634a0018f1ffed5c0e74e49d7cef253f9e33bc0f4e630452fe431`。runner 提供 C: 与 D:，CrossVolumeMove 测试实际进入跨卷成功与超上限拒绝场景。
+- M14 Windows 10/11 桌面实机验收继续 NOT RUN；CI 不等于实机通过。未修改 VERSION、AssemblyVersion、FileVersion；没有创建 tag/Release；preview.4 正式资产不变。

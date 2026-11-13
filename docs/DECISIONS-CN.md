@@ -175,6 +175,20 @@
 - 授权：WorkerLuaApi 在构造时持有本次 ScriptPermissionGrant 与当前脚本目录；每个文件桥接函数先规范化路径并检查读取/写入根，再通过 Worker IPC 请求主机执行。PlaybackRunner 从当前运行载荷持有的 Grant 对每条文件 IPC 再检查，不能信任 Worker 传来的权限声明、路径类别或命令名。缺少 Grant 一律 ScriptPermissionGrant.Empty，未知命令拒绝。
 - 路径语义：相对路径以入口脚本目录为基准；绝对路径只有处于对应批准根中才可使用；拒绝扩展设备路径、盘符相对路径、NTFS ADS 和超长路径。路径边界使用 Path.GetRelativePath，不做字符串前缀判断。
 - Windows 句柄防护：祖先目录逐级以 OPEN_REPARSE_POINT 打开，确认目录属性且不共享删除；最终文件同样以 OPEN_REPARSE_POINT 打开并在句柄上检查 reparse point 与硬链接数。操作期间保留目录/文件句柄，缩小路径替换竞态。目录枚举仅一层，且逐项验证；符号链接/reparse point 与多硬链接普通文件不返回。
-- 首批 API：ReadTextFile / WriteTextFile / AppendTextFile / FileExists / DirectoryExists / ListFiles / ListDirectories / CreateDirectory。严格 UTF-8，4 MiB 文本上限，1000 项枚举上限，单级目录创建。WriteTextFile 使用同目录临时文件、flush 和覆盖替换；AppendTextFile 直接追加，不承诺事务原子性。Stop token 在 IPC/枚举/读写边界检查；写入在原子替换前检查取消。
-- 限制：这是受控文件 API，不是恶意同用户进程的完整 OS 沙箱；当前未覆盖复制/移动/重命名/临时目录与文件，也未接入小精灵 sidecar 审阅（缺失授权时仍为空 Grant）。这些项目进入 M12-02B，不应通过放宽 Grant 先行开放。
-- 验证：Windows Actions run 237 验证主机文件安全适配，run 241 验证 API 0.8/89 项的 Build、134/134 tests、手册一致性、自包含包和 Sprite/Worker smoke；Windows 桌面权限审阅仍由 M14 实机执行。
+- API 范围：首批 ReadTextFile / WriteTextFile / AppendTextFile / FileExists / DirectoryExists / ListFiles / ListDirectories / CreateDirectory；M12-02B 再加入 CopyFile / MoveFile / RenameFile / CreateTempFile / CreateTempDirectory。严格 UTF-8，文本 4 MiB，目录枚举 1000 项；Copy/跨卷 Move 限 64 MiB。Copy 写目标同目录临时文件、flush + SHA-256/长度验证后原子提交；同卷 Move/Rename 用源文件句柄级 rename；跨卷 Move 验证目标后才删除源。Stop 在复制分块和提交前检查。
+- 临时路径：只接受调用者显式给出的已批准写入目录，使用随机名称与 CREATE_NEW/单级目录创建，不自动授权或使用系统 TEMP。
+- 限制：仍不是恶意同用户进程的完整 OS 沙箱；只支持普通文件，不支持目录复制/移动/重命名；小精灵缺失授权时仍为空 Grant。
+- 验证：Windows Actions run 237 验证主机文件安全适配，run 241 验证首批 API 0.8/89 项；M12-02B 最新 Windows Actions [run 43385033936](https://github.com/xiaobei206/anjian/actions/runs/43385033936) 对 registry 0.9/94 项执行 0 warnings/0 errors Build、142/142 tests、手册一致性、自包含包和 Sprite/Worker smoke 全通过。Windows 桌面权限审阅仍由 M14 实机执行。
+
+
+## ADR-026：普通文件传输采用验证后提交与受控临时路径
+
+- 状态：ACCEPTED（M12-02B；Windows Actions run 43385033936 全 PASS，桌面实机留 M14）。
+- 公开 API：CopyFile(sourcePath,destinationPath,overwrite?)、MoveFile(sourcePath,destinationPath,overwrite?)、RenameFile(path,newName,overwrite?)、CreateTempFile(directoryPath)、CreateTempDirectory(parentDirectoryPath)。overwrite 默认为 false。
+- 对象边界：只接受普通文件；目录复制/移动/重命名不在本批范围。源文件路径先校验当前 Grant：Copy 要读取授权，Move/Rename 要同时读取和写入授权；目标文件/父目录必须写入授权。Worker 和 host dispatcher 分别重新校验，不信任 Worker 传入的路径类别或权限声明。
+- CopyFile：最多 64 MiB；同目标目录创建安全随机临时文件（CREATE_NEW），分块复制并计算 SHA-256，flush 到磁盘后重新读取验证长度/hash，最后通过源临时文件句柄执行 FileRenameInfo 提交。Stop 在每个数据块、验证过程和提交前检查；提交边界后不再报告取消。默认不覆盖；覆盖时也必须先 no-follow 打开并拒绝 reparse point、符号链接和多硬链接目标。
+- MoveFile：同卷直接对已打开源文件句柄执行 rename；跨卷先完成受限 Copy、SHA-256 验证和目标提交，随后对原源句柄标记删除。若 Stop 在目标提交后到达，则保留两个副本；若源删除失败则报告错误并保留源文件与已验证目标副本供恢复。
+- RenameFile：只允许同一已批准父目录，使用 no-follow 源句柄；源路径要求读/写授权，覆盖目标先按 no-follow 验证。
+- 临时 API：仅在调用者明确指定且已批准写入的目录中创建随机名称文件/目录，返回完整路径；通过 CREATE_NEW/单级目录创建处理竞态，名称碰撞只重试，不打开或覆盖既有对象。不会自动使用或授权系统 TEMP。
+- 句柄边界：父目录链在操作期间以 OPEN_REPARSE_POINT 打开且不共享删除；源/已有目标以 no-follow 句柄验证 reparse 属性与硬链接数。FileRenameInfo 使用 RootDirectory=NULL 和 Windows verbatim 完整目标路径，补充 UTF-16 NUL 终止符，父目录句柄仍用于锁定路径链。
+- 限制：此设计降低路径替换竞态，但不是对恶意同用户进程的完整 OS 沙箱；本批不提供递归目录操作，也不提供临时对象自动清理 API。
