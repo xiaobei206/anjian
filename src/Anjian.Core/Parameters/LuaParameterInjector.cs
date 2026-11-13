@@ -13,7 +13,15 @@ public static class LuaParameterInjector
             return setmetatable(proxy, {
                 __index = function(_, key) return readonly(value[key]) end,
                 __newindex = function() error("Args 参数表是只读的", 2) end,
-                __pairs = function() return next, value, nil end,
+                __pairs = function()
+                    local function iterator(_, key)
+                        local nextKey, nextValue = next(value, key)
+                        if nextKey ~= nil then
+                            return nextKey, readonly(nextValue)
+                        end
+                    end
+                    return iterator, nil, nil
+                end,
                 __len = function() return #value end,
                 __metatable = false
             })
