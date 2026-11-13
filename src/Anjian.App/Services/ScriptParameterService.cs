@@ -40,12 +40,20 @@ internal static class ScriptParameterService
         var issues = ScriptParameterValidator.ValidateSchema(schema);
         if (issues.Count > 0)
             throw new InvalidDataException(string.Join(Environment.NewLine, issues.Select(x => $"{x.Label}：{x.Message}")));
+        if (File.Exists(path))
+            _ = LoadSchema(path); // refuse to overwrite malformed or future schema versions
+
         var directory = Path.GetDirectoryName(Path.GetFullPath(path))!;
         Directory.CreateDirectory(directory);
         var temp = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
         try
         {
-            File.WriteAllText(temp, JsonSerializer.Serialize(schema, JsonOptions), new UTF8Encoding(false));
+            var bytes = new UTF8Encoding(false).GetBytes(JsonSerializer.Serialize(schema, JsonOptions));
+            using (var stream = new FileStream(temp, FileMode.CreateNew, FileAccess.Write, FileShare.None, 4096, FileOptions.WriteThrough))
+            {
+                stream.Write(bytes);
+                stream.Flush(flushToDisk: true);
+            }
             if (File.Exists(path)) File.Copy(path, path + ".bak", overwrite: true);
             File.Move(temp, path, overwrite: true);
         }
