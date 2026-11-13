@@ -248,7 +248,12 @@ internal sealed class PlaybackRunner : IDisposable
             startupCts.CancelAfter(RunInstanceLimits.WorkerStartupTimeoutMilliseconds);
             try
             {
-                await server.WaitForConnectionAsync(startupCts.Token).ConfigureAwait(false);
+                var connectTask = server.WaitForConnectionAsync(startupCts.Token);
+                var connectOrExit = await Task.WhenAny(connectTask, workerExitTask).ConfigureAwait(false);
+                if (connectOrExit == workerExitTask)
+                    throw new InvalidOperationException(
+                        $"Worker 在建立 named pipe 前意外退出（exitCode={(worker.HasExited ? worker.ExitCode : -1)}）。");
+                await connectTask.ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (!token.IsCancellationRequested)
             {
@@ -274,9 +279,19 @@ internal sealed class PlaybackRunner : IDisposable
                 string? line;
                 try
                 {
-                    line = _workerReadyReceived
-                        ? await reader.ReadLineAsync(token).ConfigureAwait(false)
-                        : await reader.ReadLineAsync(startupCts.Token).ConfigureAwait(false);
+                    if (_workerReadyReceived)
+                    {
+                        line = await reader.ReadLineAsync(token).ConfigureAwait(false);
+                    }
+                    else
+                    {
+                        var readyReadTask = reader.ReadLineAsync(startupCts.Token).AsTask();
+                        var readyOrExit = await Task.WhenAny(readyReadTask, workerExitTask).ConfigureAwait(false);
+                        if (readyOrExit == workerExitTask)
+                            throw new InvalidOperationException(
+                                $"Worker 在完成身份握手前意外退出（exitCode={(worker.HasExited ? worker.ExitCode : -1)}）。");
+                        line = await readyReadTask.ConfigureAwait(false);
+                    }
                 }
                 catch (OperationCanceledException) when (!token.IsCancellationRequested && !_workerReadyReceived)
                 {
