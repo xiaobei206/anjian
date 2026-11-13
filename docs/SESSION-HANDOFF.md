@@ -997,3 +997,9 @@ M13-01..04 的代码与 Windows 自动化工作已收尾。下一会话不再重
 6. WinForms：Windows 10/11 build/版本，100/125/150/200% DPI、多显示器/负坐标、长脚本路径、最小化/隐藏到托盘、监视窗口重复打开/关闭、日志大容量滚动、权限弹窗。
 7. 生命周期与稳定性：主窗口关闭隐藏后运行和 Scheduler 保持；托盘明确退出先停止新 scheduler 投递，再 StopAll、清理 Worker/InputArbiter 并退出；重复启动/停止和至少 2 小时长时运行。
 8. 每项记录 OS build、DPI、屏幕拓扑、测试脚本、步骤、结果、日志/截图和实际失败；失败需先修复再重复对应项。Release 1.0.0 仍需完整必需功能、许可/离线文档与测试全 PASS 才可考虑发布。
+
+### 文档 HEAD 的 Windows Actions 复核（2026-11-14）
+
+- 纯文档 HEAD `e5d1b9b22f028ad5fb4a8c938c35d1d7f1a1f55d` 的 Actions [43518513568](https://github.com/xiaobei206/anjian/actions/runs/43518513568) SUCCESS：228/228 tests、Build 0 warnings/errors、API check、win-x64 publish、package smoke 4/4 与 ZIP/SHA/artifact upload PASS。
+- 随后修正文档筛选契约的 HEAD `a2edd7fdc6176c7963a815d1939a522ef7c84262` 的 Actions [43518664871](https://github.com/xiaobei206/anjian/actions/runs/43518664871) SUCCESS：同样 228/228、0 warnings/errors、完整发布与 4/4 package smoke PASS。
+- 这两次 workflow 是对各自真实文档 HEAD 的验证；不能代替本记录之后任何新 HEAD 的 CI，也不能代替 M14 Windows 10/11 桌面手测。

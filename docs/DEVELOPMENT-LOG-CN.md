@@ -937,3 +937,12 @@ M4 基础调试器与 M5 可视化录制/动作列表均已完成 Windows CI 验
 
 ### 下一会话
 M13-04 已结束；唯一下一任务为 M14：集中执行 Windows 10/11 桌面实机验收（见最新 `docs/SESSION-HANDOFF.md`）。
+
+### M13-04 文档 HEAD 的 Windows Actions 复核（2026-11-14）
+
+代码 HEAD 的最终验证仍以 [43517955937](https://github.com/xiaobei206/anjian/actions/runs/43517955937)（`6d9513bec5de35ed8f20f656d8520217d949733a`）为准：228/228 Core tests、0 warnings/errors、API handbook、self-contained win-x64、package smoke 4/4 及 artifact upload 全 PASS。
+
+为遵循“纯文档提交也要核对实际 HEAD 与 CI”的交接规则，另记录两次文档提交自身的全 Windows workflow：
+- 文档 HEAD `e5d1b9b22f028ad5fb4a8c938c35d1d7f1a1f55d` 对应 Actions [43518513568](https://github.com/xiaobei206/anjian/actions/runs/43518513568) SUCCESS；228/228 Core tests、Build 0 warnings/errors、package smoke 4/4、API check、win-x64 publish、ZIP/SHA 和 artifact upload 全 PASS。Artifact ID `14082790280`，87,373,820 bytes，digest `sha256:3f3382057cd78c44557562cbca4ca7e1666b08de60512c850986f170b81573fa`。
+- 修正文档过滤器描述后的文档 HEAD `a2edd7fdc6176c7963a815d1939a522ef7c84262` 对应 Actions [43518664871](https://github.com/xiaobei206/anjian/actions/runs/43518664871) SUCCESS；228/228 Core tests、Build 0 warnings/errors、API check、self-contained publish、package smoke 4/4、ZIP/SHA 和 artifact upload 全 PASS。Artifact ID `14081447842`，87,373,913 bytes，digest `sha256:a702a44769706fd06dbbc197aa3f34f83cd6fe1dc9f550930326359239e34897`。
+- 上述均为临时 Actions artifacts，不是 Releases；这两次文档提交没有改应用代码或版本。最终真实 `main` 仍需在本轮最新提交后重新核对。
