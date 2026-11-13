@@ -32,8 +32,9 @@ internal static class WorkerProgram
 
             try
             {
+                using var automation = new WindowsControlAutomationProvider(client);
                 using var lua = new NLua.Lua(openLibs: true);
-                var api = new WorkerLuaApi(client, lua);
+                var api = new WorkerLuaApi(client, lua, automation);
                 LuaApiRuntime.Register(lua, api);
                 var fullPath = Path.GetFullPath(scriptPath);
                 if (debugOptions is null)

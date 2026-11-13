@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using NLua;
+using Anjian.Core.Windows;
 
 namespace Anjian.Core.Api;
 
@@ -124,7 +125,7 @@ public static class LuaApiRuntime
  }
 }
 public interface ILuaCommandPipe{void Send(string type,string? name=null,double x=0,double y=0,int milliseconds=0,string? text=null);string? Request(string type,string? name=null,double x=0,double y=0,int milliseconds=0,string? text=null);}
-public sealed partial class WorkerLuaApi(ILuaCommandPipe pipe, Lua? lua = null)
+public sealed partial class WorkerLuaApi(ILuaCommandPipe pipe, Lua? lua = null, IWindowAutomationService? automation = null)
 {
  public void MoveTo(double x,double y)=>pipe.Send("move",x:Coord(x),y:Coord(y));
  public void LeftClick(double ms)=>pipe.Send("click","left",milliseconds:Duration(ms));public void RightClick(double ms)=>pipe.Send("click","right",milliseconds:Duration(ms));public void MiddleClick(double ms)=>pipe.Send("click","middle",milliseconds:Duration(ms));
