@@ -78,6 +78,7 @@ public sealed class RunInstanceCoordinatorTests
         Assert.Equal(4, coordinator.ActiveCount);
         Assert.Equal(2, coordinator.QueuedCount);
 
+        Assert.True(coordinator.TryMarkRunning(admissions[0].InstanceId, out _));
         var completed = coordinator.Complete(
             admissions[0].InstanceId, RunInstanceOutcome.Succeeded, RunInstanceCleanupStatus.Succeeded);
         Assert.Equal(admissions[4].InstanceId, completed.Promoted!.InstanceId);
