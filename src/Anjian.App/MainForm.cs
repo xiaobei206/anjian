@@ -1161,11 +1161,7 @@ internal sealed class MainForm : Form
         _scripts.Enabled = !_recordSessionActive;
         _clickOnlyCheck.Enabled = !_recordSessionActive;
         _playButton.Enabled = !_recordSessionActive && _playback.CanAccept;
-        _status.Text = !_recordSessionActive
-            ? (_playback.HasActiveInstances || _playback.QueuedCount > 0
-                ? $"运行中 {_playback.ActiveCount} 个实例，排队 {_playback.QueuedCount} 个"
-                : "未运行")
-            : _recordingPaused ? "录制已暂停" : "正在录制…";
+        UpdateInstanceStatus();
         UpdateFloatingState();
         UpdateDebuggerButtons(isPaused: false);
         UpdateActionEditorButton();
@@ -1258,15 +1254,6 @@ internal sealed class MainForm : Form
         _pauseButton.Enabled = !_recordSessionActive && _playback.SelectedCanPause;
         _stopButton.Enabled = !_recordSessionActive && _playback.IsRunning;
         _pauseButton.Text = _playback.IsPaused ? "继续" : "暂停";
-        _recoverInputButton.Visible = _playback.InputFaulted;
-        _recoverInputButton.Enabled = _playback.InputFaulted;
-        _status.Text = _playback.InputFaulted
-            ? "键鼠输入已锁定：请人工检查并释放所有键鼠状态"
-            : !_recordSessionActive
-                ? (_playback.HasActiveInstances
-                    ? $"运行中 {_playback.ActiveCount} 个实例，排队 {_playback.QueuedCount} 个"
-                    : "未运行")
-                : _recordingPaused ? "正在录制…" : "录制已暂停";
         _progress.Text = "";
         _scripts.Enabled = !_recordSessionActive;
         _editorTabs.Enabled = true;
@@ -1275,6 +1262,19 @@ internal sealed class MainForm : Form
         UpdateActionEditorButton();
     }
 
+
+    private void UpdateInstanceStatus()
+    {
+        _recoverInputButton.Visible = _playback.InputFaulted;
+        _recoverInputButton.Enabled = _playback.InputFaulted;
+        _status.Text = _playback.InputFaulted
+            ? "键鼠输入已锁定：请人工检查并释放所有键鼠状态"
+            : !_recordSessionActive
+                ? (_playback.HasActiveInstances || _playback.QueuedCount > 0
+                    ? $"运行中 {_playback.ActiveCount} 个实例，排队 {_playback.QueuedCount} 个"
+                    : "未运行")
+                : _recordingPaused ? "录制已暂停" : "正在录制…";
+    }
 
     private void RecoverInputAfterManualCheck()
     {
