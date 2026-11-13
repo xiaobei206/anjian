@@ -7,6 +7,9 @@ public readonly record struct ImageSearchRegion(int Left, int Top, int Width, in
 public readonly record struct ImageColorProbe(int OffsetX, int OffsetY, uint Color);
 public sealed record ImageMatchPoint(
     int X, int Y, int ScreenX, int ScreenY, bool HasScreenCoordinates, double Similarity = 1.0);
+public sealed record ImageColorBlock(
+    int X, int Y, int Width, int Height, int PixelCount, double CenterX, double CenterY,
+    int ScreenX, int ScreenY, bool HasScreenCoordinates);
 
 /// <summary>Deterministic RGB comparisons and template matching, independent of Windows/GDI.</summary>
 public static class ImageSearchEngine
@@ -252,6 +255,103 @@ public static class ImageSearchEngine
         if (probes.Count == 0)
             throw new FormatException("多点颜色模式至少需要一个相对采样点。");
         return probes;
+    }
+
+    public static IReadOnlyList<ImageColorBlock> FindColorBlocks(
+        PixelImage image, uint expected, int tolerance = 0, int minPixels = 2,
+        int left = 0, int top = 0, int width = 0, int height = 0, int step = 1,
+        int maxResults = 100, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(image);
+        ValidateTolerance(tolerance);
+        ValidateStep(step);
+        if (minPixels is < 1 or > 1_000_000)
+            throw new ArgumentOutOfRangeException(nameof(minPixels), "minPixels 必须在 1 到 1000000 之间。");
+        if (maxResults is < 1 or > 100)
+            throw new ArgumentOutOfRangeException(nameof(maxResults), "maxResults 必须在 1 到 100 之间。");
+
+        var region = NormalizeRegion(image, left, top, width, height);
+        var columns = (region.Width + step - 1) / step;
+        var rows = (region.Height + step - 1) / step;
+        var sampleCount = checked((long)columns * rows);
+        if (sampleCount > 4_000_000)
+            throw new InvalidOperationException("颜色块识别最多处理 4000000 个采样点；请缩小区域或增大 step。");
+
+        var visited = new byte[checked((int)sampleCount)];
+        var queue = new int[checked((int)sampleCount)];
+        var blocks = new List<ImageColorBlock>();
+        for (var gy = 0; gy < rows; gy++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            for (var gx = 0; gx < columns; gx++)
+            {
+                var start = gy * columns + gx;
+                if (visited[start] != 0)
+                    continue;
+                visited[start] = 1;
+                var px = region.Left + gx * step;
+                var py = region.Top + gy * step;
+                if (!ColorsMatch(image.GetPixelColor(px, py), expected, tolerance))
+                    continue;
+
+                var read = 0;
+                var write = 0;
+                queue[write++] = start;
+                var minX = gx;
+                var maxX = gx;
+                var minY = gy;
+                var maxY = gy;
+                long sumX = 0;
+                long sumY = 0;
+                while (read < write)
+                {
+                    if ((read & 511) == 0)
+                        cancellationToken.ThrowIfCancellationRequested();
+                    var index = queue[read++];
+                    var cx = index % columns;
+                    var cy = index / columns;
+                    var sx = region.Left + cx * step;
+                    var sy = region.Top + cy * step;
+                    sumX += sx;
+                    sumY += sy;
+                    minX = Math.Min(minX, cx);
+                    maxX = Math.Max(maxX, cx);
+                    minY = Math.Min(minY, cy);
+                    maxY = Math.Max(maxY, cy);
+
+                    for (var oy = -1; oy <= 1; oy++)
+                    for (var ox = -1; ox <= 1; ox++)
+                    {
+                        if (ox == 0 && oy == 0) continue;
+                        var nx = cx + ox;
+                        var ny = cy + oy;
+                        if ((uint)nx >= (uint)columns || (uint)ny >= (uint)rows) continue;
+                        var next = ny * columns + nx;
+                        if (visited[next] != 0) continue;
+                        visited[next] = 1;
+                        var x = region.Left + nx * step;
+                        var y = region.Top + ny * step;
+                        if (ColorsMatch(image.GetPixelColor(x, y), expected, tolerance))
+                            queue[write++] = next;
+                    }
+                }
+
+                if (write < minPixels) continue;
+                var blockX = region.Left + minX * step;
+                var blockY = region.Top + minY * step;
+                var screenX = image.HasScreenCoordinates ? checked(image.ScreenOriginX + blockX) : blockX;
+                var screenY = image.HasScreenCoordinates ? checked(image.ScreenOriginY + blockY) : blockY;
+                var centerX = (double)sumX / write;
+                var centerY = (double)sumY / write;
+                blocks.Add(new ImageColorBlock(
+                    blockX, blockY,
+                    (maxX - minX) * step + 1, (maxY - minY) * step + 1,
+                    write, centerX, centerY, screenX, screenY, image.HasScreenCoordinates));
+            }
+        }
+
+        return blocks.OrderByDescending(x => x.PixelCount)
+            .ThenBy(x => x.Y).ThenBy(x => x.X).Take(maxResults).ToArray();
     }
 
     public static bool ColorsMatch(uint actual, uint expected, int tolerance, bool grayscale = false)

@@ -23,3 +23,7 @@ public sealed record ImageWaitColorRequest(
     uint Color, int Tolerance, int TimeoutMilliseconds, int IntervalMilliseconds, int StableCount);
 public sealed record ImageSizeInfo(
     int Width, int Height, bool HasScreenCoordinates, int ScreenOriginX, int ScreenOriginY);
+
+public sealed record ImageColorBlocksRequest(
+    string ImageId, uint Color, int Tolerance, int MinPixels,
+    int Left, int Top, int Width, int Height, int Step, int MaxResults);

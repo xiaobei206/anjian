@@ -20,9 +20,15 @@ internal sealed class PlaybackRunner : IDisposable
     private LuaDebugLaunchOptions? _debugLaunchOptions;
     private TaskCompletionSource<LuaDebugCommand>? _debugCommandSource;
 
-    public PlaybackRunner() => _images = new WindowsImageService(_windows);
+    public PlaybackRunner()
+    {
+        _images = new WindowsImageService(_windows);
+        _images.VisualDebugUpdated += value => VisualDebugUpdated?.Invoke(value);
+    }
 
     public event Action<string>? Log;
+    public event Action<ImageVisualDebugEvent>? VisualDebugUpdated;
+    public bool VisualDebugEnabled { get => _images.VisualDebugEnabled; set => _images.VisualDebugEnabled = value; }
     public event Action<int, int>? IterationChanged;
     public event Action<LuaDebugSnapshot>? DebugPaused;
     public event Action? DebugSessionCompleted;
@@ -109,6 +115,7 @@ internal sealed class PlaybackRunner : IDisposable
         CancellationToken token)
     {
         _images.Clear();
+        _images.ScriptDirectory = Path.GetDirectoryName(Path.GetFullPath(scriptPath))!;
         var pipeName = "Anjian2026_" + Guid.NewGuid().ToString("N");
         await using var server = new NamedPipeServerStream(pipeName, PipeDirection.InOut, 1,
             PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
@@ -318,6 +325,8 @@ internal sealed class PlaybackRunner : IDisposable
                 return JsonSerializer.Serialize(_images.FindColor(ReadWindowPayload<ImageColorSearchRequest>(message.Text), token), WindowApiJson.Options);
             case "image-find-multi-color":
                 return JsonSerializer.Serialize(_images.FindMultiColor(ReadWindowPayload<ImageMultiColorSearchRequest>(message.Text), token), WindowApiJson.Options);
+            case "image-find-color-blocks":
+                return JsonSerializer.Serialize(_images.FindColorBlocks(ReadWindowPayload<ImageColorBlocksRequest>(message.Text), token), WindowApiJson.Options);
             case "image-count-colors":
                 return JsonSerializer.Serialize(_images.CountColors(ReadWindowPayload<ImageColorSearchRequest>(message.Text), token));
             case "image-find-image":

@@ -273,11 +273,28 @@ M4 基础调试器已在 main 实现并通过 Windows CI。具体实现提交与
 - F17 剩余规格：RGB/十六进制辅助转换、颜色差值、颜色块识别及测试。
 - M8-01..M8-14 实机验收与相关 Windows 边界测试。
 
-## 下一会话唯一开发任务：M8-CLOSE — 完成图像资源管理与视觉调试闭环
 
-开始时重新核对 main 最新 HEAD，并读取 AGENTS.md、README.md、本 handoff、docs/ROADMAP-CN.md、docs/PRD-CN.md、docs/FEATURE-MATRIX-CN.md、docs/ACCEPTANCE-TEST-CN.md 与 M8 源码。范围严格限于完成 M8，不进入 M9 OCR：
-1. 实现模板资源列表/预览/命名、路径与版本校验及资源依赖关系；明确图像资源 UI 不直接持有 GDI Bitmap。
-2. 实现视觉调试层，能显示截图区域框、找色/找图命中位置、相似度、RGB 值和检测耗时，关闭时不拦截用户输入。
-3. 补齐 F17 的 RGB/十六进制辅助转换、颜色差值与颜色块识别规格/API/测试；更新 registry、函数手册、编辑器提示/面板消费、用户指南。
-4. 更新 M8 UI/集成测试与 docs/ACCEPTANCE-TEST-CN.md；所有实际 Windows 10/11 桌面检查在有真实验收证据之前保持 NOT RUN，不能拿 CI 替代。
-5. 更新 Feature Matrix、Roadmap、Architecture、Development Log 和本 handoff；直接在 main 小步提交，不建长期分支/PR，不创建 Release，继续保持 preview.4 官方资产不变。
+## M8-CLOSE 本次实施结果（2026-11-13；提交与 CI 待核实）
+
+### 已实施
+- Lua API registry 从 0.5/74 项升至 0.6/78 项，新增 RgbToHex、HexToRgb、ColorDifference、FindColorBlocks；编辑器补全/签名提示消费同一 registry，函数手册由 registry 生成。
+- 新增 RGB/hex 解析与格式化、通道差/最大通道/Manhattan/Euclidean 距离、八邻域颜色块识别。颜色块最多扫描 4,000,000 个采样点、最多返回 100 项，支持取消。
+- 新增脚本级 .images.json 清单和同名 .assets PNG 目录；提供 PNG 导入、列表、预览、命名、移除、相对路径复制、schema/路径/尺寸/文件大小/SHA-256 校验。PNG 文件上限 128 MiB；像素上限遵循 32,000,000。未知 schema 不覆盖。
+- 图像资源 UI 只保留 PixelImage 不可变像素数据；Bitmap 仅在读取/绘制时临时创建并释放。静态 LoadImage 字面路径扫描与动态调用统计；资源仍被静态引用时禁止移除，移除条目不会删除 PNG 源文件。
+- LoadImage 相对路径以脚本目录为基准。脚本重命名/复制/删除同步管理清单和资产目录，重命名/复制时更新静态资产目录引用并重基 manifest。
+- 新增置顶透明点击穿透视觉调试覆盖层，事件显示截图区域、像素 RGB、FindColor/FindImage 命中框、颜色块、相似度和耗时。通过 SetWindowDisplayAffinity 尝试排除截图，并在 API 不支持/失败时向日志警告。
+- 已更新 PRD、Feature Matrix、Roadmap、Architecture、Acceptance、Lua API、Function Reference、User Guide、README、Development Log 和本 handoff。没有进入 M9 OCR。
+
+### 验证边界
+- 本地容器未提供 dotnet SDK，不能进行本地 Restore/Build/Test；以本次 main 提交触发的 Windows Actions 结果为准，CI 完成前不得标 PASS。
+- M8-01..M8-18 Windows 10/11 桌面验收全部 NOT RUN。CI 不等于用户桌面验收。尤其需要验证多显示器/负坐标、资源 rename/duplicate 路径、点击穿透和 SetWindowDisplayAffinity 实际截图隔离。
+- 未修改 VERSION/csproj 预览版本；没有创建 Release；v0.1.0-preview.4 官方 Release ZIP/SHA256 不变。
+
+## 下一会话唯一开发任务：M8-DESKTOP-ACCEPTANCE — 完成 Windows 10/11 实机验收
+
+开始前重新核对 main 最新 HEAD，读取 AGENTS.md、README.md、本 handoff、docs/ROADMAP-CN.md、docs/ACCEPTANCE-TEST-CN.md 与 M8 源码；先核实本次 M8-CLOSE Windows Actions 最终结果。若 CI 失败，先根据真实失败日志修复并复验，不进入新功能，不建长期分支/PR。
+1. 使用最新 main 的 Windows x64 CI artifact，在真实 Windows 10/11 桌面逐项执行 M8-01..M8-18；记录 OS build、DPI、显示器布局/负坐标、步骤、结果与日志。
+2. 实测资源 UI 的 PNG 导入/预览/重命名/校验/依赖扫描；测试脚本重命名/复制/删除后资源路径和 manifest；覆盖未知 schema、路径穿越、文件大小/尺寸/hash 损坏。
+3. 实测视觉调试覆盖层置顶、点击穿透、关闭后不拦截输入、截图区域/像素颜色/命中相似度/耗时、多屏负坐标；核实 SetWindowDisplayAffinity 返回值与实际截图内容，失败要记录。
+4. 实测 RgbToHex、HexToRgb、ColorDifference、FindColorBlocks 八邻域/step/minPixels/maxResults/取消，并回归 Capture/FindColor/FindImage/Wait 相关 API。
+5. 只有通过真实桌面验收的项目才可标 PASS；失败项记 FAIL，未测项保持 NOT RUN。全部关键范围通过后才可把 M8 标 DONE，再由后续 handoff 决定是否进入 M9。不要修改 VERSION，不创建 Release，preview.4 官方资产保持不变。

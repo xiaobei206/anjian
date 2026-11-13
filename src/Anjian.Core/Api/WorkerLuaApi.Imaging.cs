@@ -65,6 +65,52 @@ public sealed partial class WorkerLuaApi
             Integer(tolerance, 0, 255, "颜色容差"), RegionValue(left, "区域左边"), RegionValue(top, "区域上边"),
             RegionDimension(width, "区域宽度"), RegionDimension(height, "区域高度"), Integer(step, 1, 64, "step")));
 
+    public string RgbToHex(double red, double green, double blue)
+    {
+        var r = Integer(red, 0, 255, "R");
+        var g = Integer(green, 0, 255, "G");
+        var b = Integer(blue, 0, 255, "B");
+        return $"#{r:X2}{g:X2}{b:X2}";
+    }
+
+    public LuaTable HexToRgb(string hex)
+    {
+        var (red, green, blue) = RgbColor.ParseHex(hex);
+        var result = NewLuaTable();
+        result["red"] = red;
+        result["green"] = green;
+        result["blue"] = blue;
+        result["hex"] = RgbColor.ToHex(red, green, blue);
+        result["color"] = (int)RgbColor.Pack(red, green, blue);
+        return result;
+    }
+
+    public LuaTable ColorDifference(double first, double second)
+    {
+        var result = RgbColor.Difference(RgbColor.PackValue(first), RgbColor.PackValue(second));
+        var table = NewLuaTable();
+        table["red"] = result.Red;
+        table["green"] = result.Green;
+        table["blue"] = result.Blue;
+        table["maxChannel"] = result.MaxChannel;
+        table["manhattan"] = result.Manhattan;
+        table["euclidean"] = result.Euclidean;
+        return table;
+    }
+
+    public LuaTable FindColorBlocks(string imageId, double color, double tolerance,
+        double minPixels, double left, double top, double width, double height, double step, double maxResults)
+    {
+        var request = new ImageColorBlocksRequest(
+            RequiredId(imageId), RgbColor.PackValue(color), Integer(tolerance, 0, 255, "颜色容差"),
+            Integer(minPixels, 1, 1_000_000, "最小像素数"), RegionValue(left, "区域左边"),
+            RegionValue(top, "区域上边"), RegionDimension(width, "区域宽度"),
+            RegionDimension(height, "区域高度"), Integer(step, 1, 64, "step"),
+            Integer(maxResults, 1, 100, "maxResults"));
+        return RequestTable("image-find-color-blocks", request)
+            ?? throw new InvalidDataException("FindColorBlocks 没有返回结果表。");
+    }
+
     public int CountColors(string imageId, double color, double tolerance,
         double left, double top, double width, double height, double step) =>
         ImageInteger("image-count-colors", ColorRequest(imageId, color, tolerance, left, top, width, height, step));

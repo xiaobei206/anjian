@@ -62,6 +62,8 @@ internal sealed class MainForm : Form
     private bool _allowExit;
     private bool _refreshingScripts;
     private bool _suppressTabSelection;
+    private VisualDebugOverlayForm? _visualDebugOverlay;
+    private Button? _visualDebugButton;
 
     private sealed class ScriptTab(ScriptEntry entry, TabPage page, LuaEditorControl editor)
     {
@@ -98,6 +100,7 @@ internal sealed class MainForm : Form
         _playback.IterationChanged += (current, total) => Ui(() =>
             _progress.Text = total == 0 ? $"正在执行第 {current} 轮（无限）" : $"正在执行第 {current}/{total} 轮");
         _playback.DebugPaused += snapshot => Ui(() => ShowDebugSnapshot(snapshot));
+        _playback.VisualDebugUpdated += value => Ui(() => _visualDebugOverlay?.Add(value));
         _playback.DebugSessionCompleted += () => Ui(ClearDebuggerView);
         _scripts.SelectedIndexChanged += (_, _) => SelectScript();
         _editorTabs.SelectedIndexChanged += (_, _) => HandleEditorTabSelectionChanged();
@@ -228,6 +231,9 @@ internal sealed class MainForm : Form
         toolbar.Controls.Add(_clickOnlyCheck);
         _alwaysOnTopCheck.Margin = new Padding(4, 7, 4, 0);
         toolbar.Controls.Add(_alwaysOnTopCheck);
+        toolbar.Controls.Add(MakeButton("图像资源", (_, _) => OpenImageResources()));
+        _visualDebugButton = MakeButton("视觉调试：关", (_, _) => ToggleVisualDebug());
+        toolbar.Controls.Add(_visualDebugButton);
         toolbar.Controls.Add(MakeButton("返回悬浮窗", (_, _) => HideMainWindow(showFloatingWindow: true)));
         _fullModePanel.Controls.Add(toolbar);
 
@@ -1536,6 +1542,41 @@ internal sealed class MainForm : Form
         catch { return path; }
     }
 
+    private void OpenImageResources()
+    {
+        if (_recordSessionActive || _playback.IsRunning || _current is null || _activeTab is null)
+        {
+            AppendLog("请先选择一个空闲脚本，再打开图像资源管理。");
+            return;
+        }
+        if (!SaveCurrent()) return;
+        using var manager = new ImageResourceManagerForm(_current.FullPath, _editor.Text);
+        manager.ShowDialog(this);
+        if (manager.HasChanges)
+            AppendLog($"图像资源清单已更新：{Path.GetFileName(_current.FullPath)}");
+    }
+
+    private void ToggleVisualDebug()
+    {
+        var enable = !_playback.VisualDebugEnabled;
+        _playback.VisualDebugEnabled = enable;
+        if (enable)
+        {
+            _visualDebugOverlay ??= new VisualDebugOverlayForm();
+            _visualDebugOverlay.ShowOverlay();
+            _visualDebugButton!.Text = "视觉调试：开";
+            AppendLog("视觉调试已开启；标注层为点击穿透窗口，关闭后不占用输入。");
+            if (!_visualDebugOverlay.CaptureExclusionSupported)
+                AppendLog("警告：Windows 未确认覆盖层截图排除成功；截图可能包含标注层，请在本机验收确认。");
+        }
+        else
+        {
+            _visualDebugOverlay?.HideOverlay();
+            _visualDebugButton!.Text = "视觉调试：关";
+            AppendLog("视觉调试已关闭。");
+        }
+    }
+
     private void AppendLog(string text)
     {
         if (IsDisposed) return;
@@ -1626,6 +1667,10 @@ internal sealed class MainForm : Form
         SaveSettings();
         SaveCurrent();
         _playback.Stop();
+        _playback.VisualDebugEnabled = false;
+        _visualDebugOverlay?.Close();
+        _visualDebugOverlay?.Dispose();
+        _visualDebugOverlay = null;
         _playback.Dispose();
         _recorder.Dispose();
 

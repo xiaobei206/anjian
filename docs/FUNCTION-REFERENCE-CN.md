@@ -2,6 +2,7 @@
 
 - 目标读者：脚本编写者与自动化工程维护者
 - 对应运行时：Lua 5.4
+- 当前 API 注册表版本：0.6（main 开发版，尚未进入已发布的 preview.4）
 - 当前产品版本：v0.1.0-preview.4
 - 文档状态：当前公开 API 第 2 节由机器可读注册表生成；其他目标设计章节与当前 API 明确分开。
 - 当前坐标规则：已实现函数仍使用虚拟桌面绝对物理像素坐标
@@ -1643,6 +1644,98 @@ local hit = WaitColor(0x00FF00, 8, 3000, 100, 2)
 **示例：**
 ```lua
 if WaitColorGone(0x00FF00, 8, 3000, 100, 2) then Log("颜色已稳定消失") end
+```
+
+#### `RgbToHex(red, green, blue)` — RGB 转十六进制
+
+- **稳定 ID：** `anjian.imaging.rgbToHex`
+- **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
+- **说明：** 将三个 0–255 RGB 通道转为 #RRGGBB。
+
+| 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
+|---|---|---|---|---|---|
+| `red` | `integer` | 是 | — | 0–255 | 红色通道。 |
+| `green` | `integer` | 是 | — | 0–255 | 绿色通道。 |
+| `blue` | `integer` | 是 | — | 0–255 | 蓝色通道。 |
+
+**返回值：** `string` — #RRGGBB 大写十六进制颜色。
+**错误：** 参数、颜色或图像资源不合法时产生 Lua 错误。
+**执行/取消语义：** 在主进程图像操作命令边界遵循暂停状态。 Stop 可取消颜色块扫描；图像资源在本轮结束时统一释放。
+**坐标/权限：** 坐标空间：RGB 使用 0xRRGGBB；FindColorBlocks 返回图像局部零基坐标，截图还提供 screenX/screenY。。不新增第三方图像引擎依赖；截图依赖当前 Windows 交互桌面的可见合成画面。
+
+**示例：**
+```lua
+local hex = RgbToHex(255, 128, 0) -- #FF8000
+```
+
+#### `HexToRgb(hex)` — 十六进制转 RGB
+
+- **稳定 ID：** `anjian.imaging.hexToRgb`
+- **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
+- **说明：** 将六位十六进制颜色解析为 RGB 通道。
+
+| 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
+|---|---|---|---|---|---|
+| `hex` | `string` | 是 | — | — | RRGGBB、#RRGGBB 或 0xRRGGBB。 |
+
+**返回值：** `table` — 包含 red、green、blue、hex 和 color 字段的表。
+**错误：** 参数、颜色或图像资源不合法时产生 Lua 错误。
+**执行/取消语义：** 在主进程图像操作命令边界遵循暂停状态。 Stop 可取消颜色块扫描；图像资源在本轮结束时统一释放。
+**坐标/权限：** 坐标空间：RGB 使用 0xRRGGBB；FindColorBlocks 返回图像局部零基坐标，截图还提供 screenX/screenY。。不新增第三方图像引擎依赖；截图依赖当前 Windows 交互桌面的可见合成画面。
+
+**示例：**
+```lua
+local rgb = HexToRgb('#FF8000') -- rgb.red=255
+```
+
+#### `ColorDifference(first, second)` — 计算颜色差值
+
+- **稳定 ID：** `anjian.imaging.colorDifference`
+- **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
+- **说明：** 计算两种颜色的各通道绝对差及 Max/Manhattan/Euclidean 距离。
+
+| 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
+|---|---|---|---|---|---|
+| `first` | `integer` | 是 | — | 0–16777215 | 第一个 0xRRGGBB 颜色。 |
+| `second` | `integer` | 是 | — | 0–16777215 | 第二个 0xRRGGBB 颜色。 |
+
+**返回值：** `table` — 包含 RGB 各通道绝对差、maxChannel、manhattan 与 euclidean。
+**错误：** 参数、颜色或图像资源不合法时产生 Lua 错误。
+**执行/取消语义：** 在主进程图像操作命令边界遵循暂停状态。 Stop 可取消颜色块扫描；图像资源在本轮结束时统一释放。
+**坐标/权限：** 坐标空间：RGB 使用 0xRRGGBB；FindColorBlocks 返回图像局部零基坐标，截图还提供 screenX/screenY。。不新增第三方图像引擎依赖；截图依赖当前 Windows 交互桌面的可见合成画面。
+
+**示例：**
+```lua
+local d = ColorDifference(0x102030, 0x132638)
+```
+
+#### `FindColorBlocks(imageId, color, tolerance?, minPixels?, left?, top?, width?, height?, step?, maxResults?)` — 识别颜色块
+
+- **稳定 ID：** `anjian.imaging.findColorBlocks`
+- **状态：** 当前已实现；自动化 API 契约测试覆盖，Windows 桌面实机验收待完成。
+- **说明：** 用八邻域连通分量识别颜色区域，按采样点数从大到小返回；最大 100 个结果和 400 万采样点。
+
+| 参数 | Lua 类型 | 必填 | 默认值 | 范围/单位/选项 | 说明 |
+|---|---|---|---|---|---|
+| `imageId` | `string` | 是 | — | — | 图像资源 ID。 |
+| `color` | `integer` | 是 | — | 0–16777215 | 目标 0xRRGGBB。 |
+| `tolerance` | `integer` | 否 | `0` | 0–255 | RGB 各通道最大差。 |
+| `minPixels` | `integer` | 否 | `2` | 1–1000000 | 最小连通采样点数。 |
+| `left` | `integer` | 否 | `0` | 0–32767 | 局部区域左边。 |
+| `top` | `integer` | 否 | `0` | 0–32767 | 局部区域上边。 |
+| `width` | `integer` | 否 | `0` | 0–32768 | 区域宽；0 到图像右边界。 |
+| `height` | `integer` | 否 | `0` | 0–32768 | 区域高；0 到图像下边界。 |
+| `step` | `integer` | 否 | `1` | 1–64 | 采样步长。 |
+| `maxResults` | `integer` | 否 | `100` | 1–100 | 最大返回块数，按面积降序。 |
+
+**返回值：** `table` — 颜色块数组；每项包含 x、y、width、height、pixelCount、centerX/centerY 以及可用 screenX/screenY。
+**错误：** 参数、颜色或图像资源不合法时产生 Lua 错误。
+**执行/取消语义：** 在主进程图像操作命令边界遵循暂停状态。 Stop 可取消颜色块扫描；图像资源在本轮结束时统一释放。
+**坐标/权限：** 坐标空间：RGB 使用 0xRRGGBB；FindColorBlocks 返回图像局部零基坐标，截图还提供 screenX/screenY。。不新增第三方图像引擎依赖；截图依赖当前 Windows 交互桌面的可见合成画面。
+
+**示例：**
+```lua
+local blocks = FindColorBlocks(screen, 0xFF0000, 8, 4, 0, 0, 800, 600, 2, 20)
 ```
 
 <!-- END GENERATED API REFERENCE -->

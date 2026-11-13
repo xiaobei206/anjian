@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "apiVersion": "0.5",
+  "apiVersion": "0.6",
   "product": "按键精灵 2026",
   "categories": [
     {
@@ -31,7 +31,7 @@
     {
       "id": "imaging",
       "title": "截图与图像识别",
-      "description": "截图资源、RGB 颜色搜索、模板匹配与可取消等待。"
+      "description": "截图资源、RGB/十六进制颜色工具、颜色块识别、模板匹配与可取消等待。"
     }
   ],
   "apis": [
@@ -4807,6 +4807,290 @@
         ],
         "coordinateSpace": "搜索范围为当前虚拟桌面。",
         "permissionNotes": "不新增第三方图像引擎依赖。截图依赖当前 Windows 交互桌面的可见合成画面；不保证被遮挡/最小化窗口、硬件加速表面或受保护内容的真实后台像素。不绕过 UIPI/UAC/安全桌面。每张图像最多 32,000,000 像素；单轮最多 128 个资源与 256 MiB 像素缓存。"
+      }
+    },
+    {
+      "name": "RgbToHex",
+      "title": "RGB 转十六进制",
+      "category": "imaging",
+      "signature": "RgbToHex(red, green, blue)",
+      "description": "将三个 0–255 RGB 通道转为 #RRGGBB。",
+      "parameters": [
+        {
+          "name": "red",
+          "type": "integer",
+          "required": true,
+          "description": "红色通道。",
+          "minimum": 0,
+          "maximum": 255
+        },
+        {
+          "name": "green",
+          "type": "integer",
+          "required": true,
+          "description": "绿色通道。",
+          "minimum": 0,
+          "maximum": 255
+        },
+        {
+          "name": "blue",
+          "type": "integer",
+          "required": true,
+          "description": "蓝色通道。",
+          "minimum": 0,
+          "maximum": 255
+        }
+      ],
+      "returns": {
+        "type": "string",
+        "description": "#RRGGBB 大写十六进制颜色。"
+      },
+      "errors": [
+        "参数、颜色或图像资源不合法时产生 Lua 错误。"
+      ],
+      "example": "local hex = RgbToHex(255, 128, 0) -- #FF8000",
+      "runtime": {
+        "definition": "function(red, green, blue) return __AnjianBridge_RgbToHex(red, green, blue) end",
+        "bindings": [
+          {
+            "name": "__RgbToHex",
+            "method": "RgbToHex",
+            "localName": "__AnjianBridge_RgbToHex"
+          }
+        ]
+      },
+      "id": "anjian.imaging.rgbToHex",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.6.0-dev.1",
+      "behavior": {
+        "pauseBehavior": "在主进程图像操作命令边界遵循暂停状态。",
+        "cancellationBehavior": "Stop 可取消颜色块扫描；图像资源在本轮结束时统一释放。",
+        "sideEffects": [],
+        "coordinateSpace": "RGB 使用 0xRRGGBB；FindColorBlocks 返回图像局部零基坐标，截图还提供 screenX/screenY。",
+        "permissionNotes": "不新增第三方图像引擎依赖；截图依赖当前 Windows 交互桌面的可见合成画面。"
+      }
+    },
+    {
+      "name": "HexToRgb",
+      "title": "十六进制转 RGB",
+      "category": "imaging",
+      "signature": "HexToRgb(hex)",
+      "description": "将六位十六进制颜色解析为 RGB 通道。",
+      "parameters": [
+        {
+          "name": "hex",
+          "type": "string",
+          "required": true,
+          "description": "RRGGBB、#RRGGBB 或 0xRRGGBB。"
+        }
+      ],
+      "returns": {
+        "type": "table",
+        "description": "包含 red、green、blue、hex 和 color 字段的表。"
+      },
+      "errors": [
+        "参数、颜色或图像资源不合法时产生 Lua 错误。"
+      ],
+      "example": "local rgb = HexToRgb('#FF8000') -- rgb.red=255",
+      "runtime": {
+        "definition": "function(hex) return __AnjianBridge_HexToRgb(hex) end",
+        "bindings": [
+          {
+            "name": "__HexToRgb",
+            "method": "HexToRgb",
+            "localName": "__AnjianBridge_HexToRgb"
+          }
+        ]
+      },
+      "id": "anjian.imaging.hexToRgb",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.6.0-dev.1",
+      "behavior": {
+        "pauseBehavior": "在主进程图像操作命令边界遵循暂停状态。",
+        "cancellationBehavior": "Stop 可取消颜色块扫描；图像资源在本轮结束时统一释放。",
+        "sideEffects": [],
+        "coordinateSpace": "RGB 使用 0xRRGGBB；FindColorBlocks 返回图像局部零基坐标，截图还提供 screenX/screenY。",
+        "permissionNotes": "不新增第三方图像引擎依赖；截图依赖当前 Windows 交互桌面的可见合成画面。"
+      }
+    },
+    {
+      "name": "ColorDifference",
+      "title": "计算颜色差值",
+      "category": "imaging",
+      "signature": "ColorDifference(first, second)",
+      "description": "计算两种颜色的各通道绝对差及 Max/Manhattan/Euclidean 距离。",
+      "parameters": [
+        {
+          "name": "first",
+          "type": "integer",
+          "required": true,
+          "description": "第一个 0xRRGGBB 颜色。",
+          "minimum": 0,
+          "maximum": 16777215
+        },
+        {
+          "name": "second",
+          "type": "integer",
+          "required": true,
+          "description": "第二个 0xRRGGBB 颜色。",
+          "minimum": 0,
+          "maximum": 16777215
+        }
+      ],
+      "returns": {
+        "type": "table",
+        "description": "包含 RGB 各通道绝对差、maxChannel、manhattan 与 euclidean。"
+      },
+      "errors": [
+        "参数、颜色或图像资源不合法时产生 Lua 错误。"
+      ],
+      "example": "local d = ColorDifference(0x102030, 0x132638)",
+      "runtime": {
+        "definition": "function(first, second) return __AnjianBridge_ColorDifference(first, second) end",
+        "bindings": [
+          {
+            "name": "__ColorDifference",
+            "method": "ColorDifference",
+            "localName": "__AnjianBridge_ColorDifference"
+          }
+        ]
+      },
+      "id": "anjian.imaging.colorDifference",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.6.0-dev.1",
+      "behavior": {
+        "pauseBehavior": "在主进程图像操作命令边界遵循暂停状态。",
+        "cancellationBehavior": "Stop 可取消颜色块扫描；图像资源在本轮结束时统一释放。",
+        "sideEffects": [],
+        "coordinateSpace": "RGB 使用 0xRRGGBB；FindColorBlocks 返回图像局部零基坐标，截图还提供 screenX/screenY。",
+        "permissionNotes": "不新增第三方图像引擎依赖；截图依赖当前 Windows 交互桌面的可见合成画面。"
+      }
+    },
+    {
+      "name": "FindColorBlocks",
+      "title": "识别颜色块",
+      "category": "imaging",
+      "signature": "FindColorBlocks(imageId, color, tolerance?, minPixels?, left?, top?, width?, height?, step?, maxResults?)",
+      "description": "用八邻域连通分量识别颜色区域，按采样点数从大到小返回；最大 100 个结果和 400 万采样点。",
+      "parameters": [
+        {
+          "name": "imageId",
+          "type": "string",
+          "required": true,
+          "description": "图像资源 ID。"
+        },
+        {
+          "name": "color",
+          "type": "integer",
+          "required": true,
+          "description": "目标 0xRRGGBB。",
+          "minimum": 0,
+          "maximum": 16777215
+        },
+        {
+          "name": "tolerance",
+          "type": "integer",
+          "required": false,
+          "description": "RGB 各通道最大差。",
+          "defaultValue": 0,
+          "minimum": 0,
+          "maximum": 255
+        },
+        {
+          "name": "minPixels",
+          "type": "integer",
+          "required": false,
+          "description": "最小连通采样点数。",
+          "defaultValue": 2,
+          "minimum": 1,
+          "maximum": 1000000
+        },
+        {
+          "name": "left",
+          "type": "integer",
+          "required": false,
+          "description": "局部区域左边。",
+          "defaultValue": 0,
+          "minimum": 0,
+          "maximum": 32767
+        },
+        {
+          "name": "top",
+          "type": "integer",
+          "required": false,
+          "description": "局部区域上边。",
+          "defaultValue": 0,
+          "minimum": 0,
+          "maximum": 32767
+        },
+        {
+          "name": "width",
+          "type": "integer",
+          "required": false,
+          "description": "区域宽；0 到图像右边界。",
+          "defaultValue": 0,
+          "minimum": 0,
+          "maximum": 32768
+        },
+        {
+          "name": "height",
+          "type": "integer",
+          "required": false,
+          "description": "区域高；0 到图像下边界。",
+          "defaultValue": 0,
+          "minimum": 0,
+          "maximum": 32768
+        },
+        {
+          "name": "step",
+          "type": "integer",
+          "required": false,
+          "description": "采样步长。",
+          "defaultValue": 1,
+          "minimum": 1,
+          "maximum": 64
+        },
+        {
+          "name": "maxResults",
+          "type": "integer",
+          "required": false,
+          "description": "最大返回块数，按面积降序。",
+          "defaultValue": 100,
+          "minimum": 1,
+          "maximum": 100
+        }
+      ],
+      "returns": {
+        "type": "table",
+        "description": "颜色块数组；每项包含 x、y、width、height、pixelCount、centerX/centerY 以及可用 screenX/screenY。"
+      },
+      "errors": [
+        "参数、颜色或图像资源不合法时产生 Lua 错误。"
+      ],
+      "example": "local blocks = FindColorBlocks(screen, 0xFF0000, 8, 4, 0, 0, 800, 600, 2, 20)",
+      "runtime": {
+        "definition": "function(imageId, color, tolerance, minPixels, left, top, width, height, step, maxResults) return __AnjianBridge_FindColorBlocks(imageId, color, (tolerance == nil and 0 or tolerance), (minPixels == nil and 2 or minPixels), (left == nil and 0 or left), (top == nil and 0 or top), (width == nil and 0 or width), (height == nil and 0 or height), (step == nil and 1 or step), (maxResults == nil and 100 or maxResults)) end",
+        "bindings": [
+          {
+            "name": "__FindColorBlocks",
+            "method": "FindColorBlocks",
+            "localName": "__AnjianBridge_FindColorBlocks"
+          }
+        ]
+      },
+      "id": "anjian.imaging.findColorBlocks",
+      "implementationStatus": "implemented",
+      "verificationStatus": "automated-contract-test;desktop-unverified",
+      "introducedIn": "0.6.0-dev.1",
+      "behavior": {
+        "pauseBehavior": "在主进程图像操作命令边界遵循暂停状态。",
+        "cancellationBehavior": "Stop 可取消颜色块扫描；图像资源在本轮结束时统一释放。",
+        "sideEffects": [],
+        "coordinateSpace": "RGB 使用 0xRRGGBB；FindColorBlocks 返回图像局部零基坐标，截图还提供 screenX/screenY。",
+        "permissionNotes": "不新增第三方图像引擎依赖；截图依赖当前 Windows 交互桌面的可见合成画面。"
       }
     }
   ],

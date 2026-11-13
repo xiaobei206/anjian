@@ -1,5 +1,6 @@
 using System.Drawing;
 using System.Drawing.Imaging;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Anjian.Core.Imaging;
 using Anjian.Core.Windows;
@@ -17,8 +18,19 @@ internal sealed class WindowsImageService(WindowsWindowManager windows)
     private readonly object _sync = new();
     private readonly Dictionary<string, PixelImage> _resources = new(StringComparer.Ordinal);
     private long _storedBytes;
+    public string ScriptDirectory { get; set; } = Environment.CurrentDirectory;
+    public bool VisualDebugEnabled { get; set; }
+    public event Action<ImageVisualDebugEvent>? VisualDebugUpdated;
 
-    public string CaptureScreen() => Add(CaptureScreenPixels());
+    public string CaptureScreen()
+    {
+        var timer = Stopwatch.StartNew();
+        var rect = SystemInformation.VirtualScreen;
+        var id = Add(CaptureScreenPixels());
+        Publish(new ImageVisualDebugEvent("capture", "虚拟桌面截图", rect.Left, rect.Top, rect.Width, rect.Height,
+            null, null, timer.ElapsedMilliseconds, true));
+        return id;
+    }
 
     public PixelImage CaptureScreenPixels()
     {
@@ -33,14 +45,22 @@ internal sealed class WindowsImageService(WindowsWindowManager windows)
     {
         var info = windows.GetInfo(RequiredId(windowId));
         EnsureCapturable(info);
-        return Add(CaptureRectangle(info.WindowRect));
+        var timer = Stopwatch.StartNew();
+        var id = Add(CaptureRectangle(info.WindowRect));
+        Publish(new ImageVisualDebugEvent("capture", "窗口截图", info.WindowRect.Left, info.WindowRect.Top,
+            info.WindowRect.Width, info.WindowRect.Height, null, null, timer.ElapsedMilliseconds, true));
+        return id;
     }
 
     public string CaptureClient(string windowId)
     {
         var info = windows.GetInfo(RequiredId(windowId));
         EnsureCapturable(info);
-        return Add(CaptureRectangle(info.ClientRect));
+        var timer = Stopwatch.StartNew();
+        var id = Add(CaptureRectangle(info.ClientRect));
+        Publish(new ImageVisualDebugEvent("capture", "客户区截图", info.ClientRect.Left, info.ClientRect.Top,
+            info.ClientRect.Width, info.ClientRect.Height, null, null, timer.ElapsedMilliseconds, true));
+        return id;
     }
 
     public string CaptureRegion(ImageCaptureRegionRequest request)
@@ -86,12 +106,19 @@ internal sealed class WindowsImageService(WindowsWindowManager windows)
                 throw new ArgumentOutOfRangeException(nameof(request), "转换后的截图区域必须至少覆盖一个物理像素。");
         }
 
-        return Add(CaptureRectangle(new PixelRect(left, top, right, bottom)));
+        var timer = Stopwatch.StartNew();
+        var imageId = Add(CaptureRectangle(new PixelRect(left, top, right, bottom)));
+        Publish(new ImageVisualDebugEvent("capture", "自定义区域截图", left, top, right - left, bottom - top,
+            null, null, timer.ElapsedMilliseconds, true));
+        return imageId;
     }
 
     public string LoadImage(string path)
     {
-        var fullPath = Path.GetFullPath(RequiredText(path, "图像路径"));
+        var suppliedPath = RequiredText(path, "图像路径");
+        var fullPath = Path.GetFullPath(Path.IsPathRooted(suppliedPath)
+            ? suppliedPath
+            : Path.Combine(ScriptDirectory, suppliedPath));
         using var loaded = Image.FromFile(fullPath, useEmbeddedColorManagement: false);
         ValidateDimensions(loaded.Width, loaded.Height);
         using var normalized = new Bitmap(loaded.Width, loaded.Height, PixelFormat.Format32bppArgb);
@@ -165,25 +192,52 @@ internal sealed class WindowsImageService(WindowsWindowManager windows)
     public uint GetPixelColor(ImagePixelRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
-        return Get(request.ImageId).GetPixelColor(
-            Integer(request.X, 0, PixelImage.MaximumDimension - 1, "像素 X"),
-            Integer(request.Y, 0, PixelImage.MaximumDimension - 1, "像素 Y"));
+        var image = Get(request.ImageId);
+        var x = Integer(request.X, 0, PixelImage.MaximumDimension - 1, "像素 X");
+        var y = Integer(request.Y, 0, PixelImage.MaximumDimension - 1, "像素 Y");
+        var color = image.GetPixelColor(x, y);
+        Publish(new ImageVisualDebugEvent("pixel", $"像素 {x},{y}", ScreenX(image, x), ScreenY(image, y),
+            1, 1, color, null, 0, image.HasScreenCoordinates));
+        return color;
     }
 
     public bool CompareColor(ImageCompareColorRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
-        return ImageSearchEngine.CompareColor(Get(request.ImageId),
-            Integer(request.X, 0, PixelImage.MaximumDimension - 1, "像素 X"),
-            Integer(request.Y, 0, PixelImage.MaximumDimension - 1, "像素 Y"),
-            request.Color, request.Tolerance);
+        var image = Get(request.ImageId);
+        var x = Integer(request.X, 0, PixelImage.MaximumDimension - 1, "像素 X");
+        var y = Integer(request.Y, 0, PixelImage.MaximumDimension - 1, "像素 Y");
+        var actual = image.GetPixelColor(x, y);
+        var matched = ImageSearchEngine.CompareColor(image, x, y, request.Color, request.Tolerance);
+        Publish(new ImageVisualDebugEvent("pixel", $"颜色比较 {(matched ? "命中" : "未命中")}",
+            ScreenX(image, x), ScreenY(image, y), 1, 1, actual, null, 0, image.HasScreenCoordinates));
+        return matched;
     }
 
     public ImageMatchPoint? FindColor(ImageColorSearchRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
-        return ImageSearchEngine.FindColor(Get(request.ImageId), request.Color, request.Tolerance,
+        var image = Get(request.ImageId);
+        var timer = Stopwatch.StartNew();
+        var match = ImageSearchEngine.FindColor(image, request.Color, request.Tolerance,
             request.Left, request.Top, request.Width, request.Height, request.Step, cancellationToken);
+        if (match is not null)
+            Publish(new ImageVisualDebugEvent("hit", $"找色 0x{request.Color:X6}", match.ScreenX, match.ScreenY,
+                8, 8, request.Color, 1.0, timer.ElapsedMilliseconds, match.HasScreenCoordinates));
+        return match;
+    }
+
+    public IReadOnlyList<ImageColorBlock> FindColorBlocks(ImageColorBlocksRequest request, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var image = Get(request.ImageId);
+        var timer = Stopwatch.StartNew();
+        var blocks = ImageSearchEngine.FindColorBlocks(image, request.Color, request.Tolerance, request.MinPixels,
+            request.Left, request.Top, request.Width, request.Height, request.Step, request.MaxResults, cancellationToken);
+        foreach (var block in blocks)
+            Publish(new ImageVisualDebugEvent("block", $"颜色块 {block.PixelCount} 点", block.ScreenX, block.ScreenY,
+                block.Width, block.Height, request.Color, null, timer.ElapsedMilliseconds, block.HasScreenCoordinates));
+        return blocks;
     }
 
     public ImageMatchPoint? FindMultiColor(ImageMultiColorSearchRequest request, CancellationToken cancellationToken = default)
@@ -204,17 +258,58 @@ internal sealed class WindowsImageService(WindowsWindowManager windows)
     public ImageMatchPoint? FindImage(ImageTemplateSearchRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
-        return ImageSearchEngine.FindImage(Get(request.ImageId), Get(request.TemplateId),
+        var image = Get(request.ImageId);
+        var template = Get(request.TemplateId);
+        var timer = Stopwatch.StartNew();
+        var match = ImageSearchEngine.FindImage(image, template,
             request.Similarity, request.Tolerance, request.Left, request.Top, request.Width, request.Height, request.Step,
             request.Grayscale, request.Scale, cancellationToken);
+        if (match is not null)
+            Publish(new ImageVisualDebugEvent("hit", $"找图 相似度 {match.Similarity:P1}", match.ScreenX, match.ScreenY,
+                Math.Max(1, (int)Math.Round(template.Width * request.Scale)),
+                Math.Max(1, (int)Math.Round(template.Height * request.Scale)), null, match.Similarity,
+                timer.ElapsedMilliseconds, match.HasScreenCoordinates));
+        return match;
     }
 
     public IReadOnlyList<ImageMatchPoint> FindImages(ImageTemplateSearchRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
-        return ImageSearchEngine.FindImages(Get(request.ImageId), Get(request.TemplateId),
-            request.Similarity, request.Tolerance, request.MaxResults, request.Left, request.Top,
-            request.Width, request.Height, request.Step, request.Grayscale, request.Scale, cancellationToken);
+        var image = Get(request.ImageId);
+        var template = Get(request.TemplateId);
+        var timer = Stopwatch.StartNew();
+        var matches = ImageSearchEngine.FindImages(image, template, request.Similarity, request.Tolerance,
+            request.MaxResults, request.Left, request.Top, request.Width, request.Height, request.Step,
+            request.Grayscale, request.Scale, cancellationToken);
+        foreach (var match in matches)
+            Publish(new ImageVisualDebugEvent("hit", $"找图 相似度 {match.Similarity:P1}", match.ScreenX, match.ScreenY,
+                Math.Max(1, (int)Math.Round(template.Width * request.Scale)),
+                Math.Max(1, (int)Math.Round(template.Height * request.Scale)), null, match.Similarity,
+                timer.ElapsedMilliseconds, match.HasScreenCoordinates));
+        return matches;
+    }
+
+    public static PixelImage ReadPreviewPixels(string path)
+    {
+        var fullPath = Path.GetFullPath(path);
+        using var loaded = Image.FromFile(fullPath, useEmbeddedColorManagement: false);
+        ValidateDimensions(loaded.Width, loaded.Height);
+        using var normalized = new Bitmap(loaded.Width, loaded.Height, PixelFormat.Format32bppArgb);
+        using (var graphics = Graphics.FromImage(normalized))
+        {
+            graphics.Clear(Color.Transparent);
+            graphics.DrawImage(loaded, new Rectangle(0, 0, loaded.Width, loaded.Height));
+        }
+        return ReadBitmap(normalized, 0, 0, hasScreenCoordinates: false);
+    }
+
+    private static int ScreenX(PixelImage image, int x) => image.HasScreenCoordinates ? checked(image.ScreenOriginX + x) : x;
+    private static int ScreenY(PixelImage image, int y) => image.HasScreenCoordinates ? checked(image.ScreenOriginY + y) : y;
+
+    private void Publish(ImageVisualDebugEvent value)
+    {
+        if (VisualDebugEnabled)
+            VisualDebugUpdated?.Invoke(value);
     }
 
     private string Add(PixelImage image)

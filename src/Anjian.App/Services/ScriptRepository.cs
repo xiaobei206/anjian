@@ -66,13 +66,21 @@ public sealed class ScriptRepository
             var newBackup = newSidecar + ".bak";
             var oldScriptBackup = entry.FullPath + ".bak";
             var newScriptBackup = target + ".bak";
-            if (File.Exists(newSidecar) || File.Exists(newBackup) || File.Exists(newScriptBackup))
+            var oldImageManifest = Path.ChangeExtension(entry.FullPath, ".images.json");
+            var newImageManifest = Path.ChangeExtension(target, ".images.json");
+            var oldAssetDirectory = Path.ChangeExtension(entry.FullPath, null) + ".assets";
+            var newAssetDirectory = Path.ChangeExtension(target, null) + ".assets";
+            if (File.Exists(newSidecar) || File.Exists(newBackup) || File.Exists(newScriptBackup)
+                || File.Exists(newImageManifest) || Directory.Exists(newAssetDirectory))
                 throw new IOException("目标名称对应的脚本、录制动作文件或备份已经存在，拒绝覆盖。");
 
             var scriptMoved = false;
             var sidecarMoved = false;
             var backupMoved = false;
             var scriptBackupMoved = false;
+            var imageManifestMoved = false;
+            var assetDirectoryMoved = false;
+            var assetReferencesRewritten = false;
             try
             {
                 File.Move(entry.FullPath, target);
@@ -92,11 +100,29 @@ public sealed class ScriptRepository
                     File.Move(oldScriptBackup, newScriptBackup);
                     scriptBackupMoved = true;
                 }
+                if (File.Exists(oldImageManifest))
+                {
+                    File.Move(oldImageManifest, newImageManifest);
+                    imageManifestMoved = true;
+                }
+                if (Directory.Exists(oldAssetDirectory))
+                {
+                    Directory.Move(oldAssetDirectory, newAssetDirectory);
+                    assetDirectoryMoved = true;
+                    RewriteAssetReferences(target, Path.GetFileName(oldAssetDirectory), Path.GetFileName(newAssetDirectory));
+                    assetReferencesRewritten = true;
+                }
             }
             catch
             {
                 if (scriptBackupMoved && File.Exists(newScriptBackup))
                     File.Move(newScriptBackup, oldScriptBackup);
+                if (assetReferencesRewritten && File.Exists(target))
+                    RewriteAssetReferences(target, Path.GetFileName(newAssetDirectory), Path.GetFileName(oldAssetDirectory));
+                if (assetDirectoryMoved && Directory.Exists(newAssetDirectory))
+                    Directory.Move(newAssetDirectory, oldAssetDirectory);
+                if (imageManifestMoved && File.Exists(newImageManifest))
+                    File.Move(newImageManifest, oldImageManifest);
                 if (backupMoved && File.Exists(newBackup))
                     File.Move(newBackup, oldBackup);
                 if (sidecarMoved && File.Exists(newSidecar))
@@ -117,6 +143,20 @@ public sealed class ScriptRepository
             File.Copy(entry.FullPath, copy.FullPath, overwrite: true);
             var sourceSidecar = RecorderDocumentStore.GetSidecarPath(entry.FullPath);
             var copySidecar = RecorderDocumentStore.GetSidecarPath(copy.FullPath);
+            var sourceImageManifest = Path.ChangeExtension(entry.FullPath, ".images.json");
+            var copyImageManifest = Path.ChangeExtension(copy.FullPath, ".images.json");
+            var sourceAssetDirectory = Path.ChangeExtension(entry.FullPath, null) + ".assets";
+            var copyAssetDirectory = Path.ChangeExtension(copy.FullPath, null) + ".assets";
+            if (Directory.Exists(sourceAssetDirectory))
+                RewriteAssetReferences(copy.FullPath, Path.GetFileName(sourceAssetDirectory), Path.GetFileName(copyAssetDirectory));
+            if (File.Exists(sourceImageManifest))
+            {
+                File.Copy(sourceImageManifest, copyImageManifest, overwrite: true);
+                RebaseImageManifest(copyImageManifest, Path.GetFileName(sourceAssetDirectory),
+                    Path.GetFileName(copyAssetDirectory));
+            }
+            if (Directory.Exists(sourceAssetDirectory))
+                CopyDirectory(sourceAssetDirectory, copyAssetDirectory);
             if (File.Exists(sourceSidecar))
             {
                 File.Copy(sourceSidecar, copySidecar, overwrite: true);
@@ -140,6 +180,10 @@ public sealed class ScriptRepository
         {
             var copySidecar = RecorderDocumentStore.GetSidecarPath(copy.FullPath);
             if (File.Exists(copySidecar)) File.Delete(copySidecar);
+            var failedManifest = Path.ChangeExtension(copy.FullPath, ".images.json");
+            var failedAssets = Path.ChangeExtension(copy.FullPath, null) + ".assets";
+            if (File.Exists(failedManifest)) File.Delete(failedManifest);
+            if (Directory.Exists(failedAssets)) Directory.Delete(failedAssets, recursive: true);
             if (File.Exists(copy.FullPath)) File.Delete(copy.FullPath);
             throw;
         }
@@ -154,6 +198,61 @@ public sealed class ScriptRepository
             File.Delete(sidecar);
         if (File.Exists(sidecar + ".bak"))
             File.Delete(sidecar + ".bak");
+        var imageManifest = Path.ChangeExtension(entry.FullPath, ".images.json");
+        var assetDirectory = Path.ChangeExtension(entry.FullPath, null) + ".assets";
+        if (File.Exists(imageManifest)) File.Delete(imageManifest);
+        if (File.Exists(imageManifest + ".bak")) File.Delete(imageManifest + ".bak");
+        if (Directory.Exists(assetDirectory)) Directory.Delete(assetDirectory, recursive: true);
+    }
+
+    private static void RewriteAssetReferences(string scriptPath, string oldFolder, string newFolder)
+    {
+        var original = File.ReadAllText(scriptPath);
+        var updated = original
+            .Replace(oldFolder + "/", newFolder + "/", StringComparison.OrdinalIgnoreCase)
+            .Replace(oldFolder + "\\", newFolder + "\\", StringComparison.OrdinalIgnoreCase);
+        if (string.Equals(original, updated, StringComparison.Ordinal)) return;
+        var temporary = scriptPath + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        try
+        {
+            File.WriteAllText(temporary, updated, new UTF8Encoding(false));
+            File.Move(temporary, scriptPath, overwrite: true);
+        }
+        finally
+        {
+            if (File.Exists(temporary)) File.Delete(temporary);
+        }
+    }
+
+    private static void RebaseImageManifest(string manifestPath, string oldAssetName, string newAssetName)
+    {
+        var root = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(manifestPath))?.AsObject()
+            ?? throw new InvalidDataException("复制的图像资源清单不是有效 JSON。");
+        var scriptIdKey = root.Select(x => x.Key).FirstOrDefault(x => string.Equals(x, "ScriptId", StringComparison.OrdinalIgnoreCase));
+        if (scriptIdKey is not null)
+            root[scriptIdKey] = Guid.NewGuid().ToString("N");
+        var resourcesKey = root.Select(x => x.Key).FirstOrDefault(x => string.Equals(x, "Resources", StringComparison.OrdinalIgnoreCase));
+        if (resourcesKey is not null && root[resourcesKey] is System.Text.Json.Nodes.JsonArray resources)
+        {
+            foreach (var resource in resources.OfType<System.Text.Json.Nodes.JsonObject>())
+            {
+                var pathKey = resource.Select(x => x.Key).FirstOrDefault(x => string.Equals(x, "RelativePath", StringComparison.OrdinalIgnoreCase));
+                if (pathKey is null || resource[pathKey]?.GetValue<string>() is not { } path) continue;
+                var prefix = oldAssetName + "/";
+                if (path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                    resource[pathKey] = newAssetName + path[prefix.Length..];
+            }
+        }
+        File.WriteAllText(manifestPath, root.ToJsonString(new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
+    }
+
+    private static void CopyDirectory(string source, string target)
+    {
+        Directory.CreateDirectory(target);
+        foreach (var file in Directory.EnumerateFiles(source))
+            File.Copy(file, Path.Combine(target, Path.GetFileName(file)));
+        foreach (var directory in Directory.EnumerateDirectories(source))
+            CopyDirectory(directory, Path.Combine(target, Path.GetFileName(directory)));
     }
 
     public string Read(ScriptEntry entry) => File.ReadAllText(entry.FullPath);

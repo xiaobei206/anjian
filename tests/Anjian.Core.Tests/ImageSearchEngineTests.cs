@@ -155,6 +155,38 @@ public sealed class ImageSearchEngineTests
     }
 
     [Fact]
+    public void FindColorBlocksGroupsAdjacentSamplesAndPreservesScreenOrigin()
+    {
+        var image = new PixelImage(6, 4,
+        [
+            Rgb(0xFF0000), Rgb(0xFF0000), Rgb(0), Rgb(0), Rgb(0), Rgb(0),
+            Rgb(0xFF0000), Rgb(0xFF0000), Rgb(0), Rgb(0), Rgb(0xFF0000), Rgb(0),
+            Rgb(0), Rgb(0), Rgb(0), Rgb(0), Rgb(0), Rgb(0),
+            Rgb(0), Rgb(0), Rgb(0), Rgb(0), Rgb(0), Rgb(0)
+        ], -100, 20, true);
+
+        var blocks = ImageSearchEngine.FindColorBlocks(image, 0xFF0000, minPixels: 1);
+        Assert.Equal(2, blocks.Count);
+        Assert.Equal((0, 0, 2, 2, 4), (blocks[0].X, blocks[0].Y, blocks[0].Width, blocks[0].Height, blocks[0].PixelCount));
+        Assert.Equal((-100, 20), (blocks[0].ScreenX, blocks[0].ScreenY));
+        Assert.Equal(1, blocks[1].PixelCount);
+        Assert.Equal(0, ImageSearchEngine.FindColorBlocks(image, 0xFF0000, minPixels: 2, left: 4, top: 0, width: 2, height: 2).Count);
+    }
+
+    [Fact]
+    public void FindColorBlocksHonorsStepAndCancellation()
+    {
+        var image = new PixelImage(4, 4, Enumerable.Repeat(Rgb(0x00FF00), 16).ToArray());
+        var blocks = ImageSearchEngine.FindColorBlocks(image, 0x00FF00, minPixels: 1, step: 2);
+        Assert.Single(blocks);
+        Assert.Equal(4, blocks[0].PixelCount);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        Assert.Throws<OperationCanceledException>(() =>
+            ImageSearchEngine.FindColorBlocks(image, 0x00FF00, cancellationToken: cancellation.Token));
+    }
+
+    [Fact]
     public void CountColorAndImageRegionsAreValidated()
     {
         var image = new PixelImage(3, 2, [Rgb(1), Rgb(1), Rgb(1), Rgb(2), Rgb(1), Rgb(2)]);

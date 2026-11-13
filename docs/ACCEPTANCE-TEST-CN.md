@@ -274,7 +274,11 @@ M7 使用 Windows 自带 UI Automation Control View / Pattern，不宣称任意�
 | M8-11 | 多结果与性能上限 | 使用多个相隔/相邻图标的模板，设置 maxResults、region、step；构造较大搜索 | 结果按扫描顺序、避免重叠重复；maxResults 上限 1000；超过 50,000,000 次像素比较时明确报错而非无限卡死 | NOT RUN（桌面） |
 | M8-12 | 等待/超时/暂停/停止 | 测试 WaitImage/WaitImageGone/WaitColor/WaitColorGone 的命中、未命中、stableCount、timeout，并在循环中按暂停/Stop | 连续条件重置准确；超时返回 nil/false；Pause 暂停轮询，Stop 能取消并清理资源；不把取消伪装为超时 | NOT RUN（桌面） |
 | M8-13 | 遮挡与保护内容边界 | 部分覆盖目标窗口，尝试对窗口与客户区截图；验证受保护/硬件加速应用 | 结果只承诺桌面合成的可见像素；不可读内容如实失败或显示为桌面实际像素，不尝试绕过安全限制 | NOT RUN（桌面） |
-| M8-14 | 模板资源 UI 与视觉调试层 | 在图像资源管理 UI 中导入/预览/命名模板；开启视觉调试层观察区域框、命中位置、相似度、颜色值与耗时 | 资源路径/版本可校验；可视化命中叠加准确且不会拦截输入；失败路径可诊断 | NOT RUN（UI 尚未实现） |
+| M8-14 | 模板资源 UI 与视觉调试层 | 在图像资源管理 UI 中导入/预览/命名模板；开启视觉调试层观察区域框、命中位置、相似度、颜色值与耗时 | 资源路径/版本可校验；可视化命中叠加准确且不会拦截输入；失败路径可诊断 | NOT RUN（桌面） |
+| M8-15 | 模板清单完整性 | 导入有效/损坏/超大 PNG；修改资源文件字节、文件大小、IHDR 尺寸和 schemaVersion；尝试目录穿越路径 | 仅接受 PNG；最大 128 MiB/32,000,000 像素；manifest 校验 schema、路径根、尺寸、大小、SHA-256；未来 schema 不覆盖原文件 | NOT RUN（桌面 UI） |
+| M8-16 | 资源依赖与脚本生命周期 | 让脚本使用 LoadImage("sample.assets/id.png")；分别重命名、复制、删除脚本；测试静态/动态 LoadImage 参数 | 静态资源路径随脚本重命名/复制更新；manifest 资源路径重基；动态参数报告无法静态解析；被引用资源不能从列表移除；脚本相对路径以脚本目录解析 | NOT RUN（桌面） |
+| M8-17 | RGB/hex/颜色差值/颜色块 | 调用 RgbToHex、HexToRgb、ColorDifference、FindColorBlocks；覆盖 #RRGGBB/0xRRGGBB、非法字符、通道边界、相邻/对角/分离色块、step/minPixels/maxResults | RGB 通道 0–255；差值包含各通道绝对差/最大通道/Manhattan/Euclidean；颜色块按八邻域分组、按采样点数排序，区域/取消/采样上限明确 | NOT RUN（桌面） |
+| M8-18 | 视觉调试覆盖层输入与截图隔离 | 开启覆盖层，移动/点击多个屏幕区域；运行 CaptureScreen 与 FindColor/FindImage；关闭覆盖层后重复输入 | 覆盖层置顶且点击穿透；关闭后不保留窗口、不拦截输入；Windows Display Affinity 排除成功时自身标注不进入截图；多屏负坐标正确 | NOT RUN（桌面） |
 
 ### M8 自动化测试范围
-Windows Actions run [43353801969](https://github.com/xiaobei206/anjian/actions/runs/43353801969) 对 commit 1b87af713ff17c907feac6984bb96aa5dd8e821f 通过：Release Build 0 warnings / 0 errors；73 passed / 0 failed / 0 skipped；API handbook generation --check、self-contained win-x64 publish、ZIP/SHA256 package 与 artifact upload PASS。Pure-Core 自动测试覆盖像素原点/裁剪、颜色区域/容差、多点模式、透明模板、多结果、灰度/缩放、资源/参数边界、取消和连续确认；GDI 与真实桌面行为仍须执行本表手工验收。
+Windows Actions run [43353801969](https://github.com/xiaobei206/anjian/actions/runs/43353801969) 对 commit 1b87af713ff17c907feac6984bb96aa5dd8e821f 通过：Release Build 0 warnings / 0 errors；73 passed / 0 failed / 0 skipped；API handbook generation --check、self-contained win-x64 publish、ZIP/SHA256 package 与 artifact upload PASS。Pure-Core 自动测试原覆盖像素原点/裁剪、颜色区域/容差、多点模式、透明模板、多结果、灰度/缩放、资源/参数边界、取消和连续确认；M8-CLOSE 增加 RGB/hex 差值、颜色块连通分量、PNG 资源清单/路径/SHA 校验和静态 LoadImage 依赖扫描的自动化用例。当前新提交 Windows Actions 结果需以最新 run 为准；GDI、WinForms UI、点击穿透、显示亲和和真实桌面行为仍须执行本表手工验收。

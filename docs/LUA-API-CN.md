@@ -3,7 +3,7 @@
 > 这是当前运行时 API 契约与完整目标 API 设计的技术规格。当前函数与目标函数的状态以 [中文函数/参数参考手册](FUNCTION-REFERENCE-CN.md) 和 [完整功能矩阵](FEATURE-MATRIX-CN.md) 为准。
 
 - Lua 版本：5.4
-- API 版本：0.5（M8 新增截图/图色/模板 API；仅 main 开发版，尚未发布到 preview.4）
+- API 版本：0.6（M8 图像资源与 RGB/颜色块扩展；仅 main 开发版，尚未发布到 preview.4）
 - 命令风格：全局英文函数名 + 标准 Lua 函数调用语法
 - 时间单位：毫秒
 - 坐标单位：虚拟桌面物理像素
@@ -243,3 +243,19 @@ WindowUnbind(binding)
 - CaptureWindow 与 CaptureClient 只接受可见、未最小化的窗口。底层是屏幕区域捕获；窗口被覆盖的部分不能保证得到目标窗口真实后台内容，硬件加速/受保护表面可能不可读。
 - 不绕过 UIPI、UAC、安全桌面或其他访问控制。截图 API 返回结果不代表通用后台输入受到支持。
 - 模板预览/命名/版本校验 UI、视觉调试 overlay、颜色差值/颜色块工具仍为 M8 剩余工作；OCR 不属于本阶段。
+
+
+## 8. M8 RGB、颜色块与图像资源扩展（API 0.6）
+
+| API | 签名 | 返回 |
+|---|---|---|
+| RGB 转十六进制 | RgbToHex(red, green, blue) | #RRGGBB 大写字符串 |
+| 十六进制转 RGB | HexToRgb(hex) | red、green、blue、hex、color 字段的表 |
+| 颜色差值 | ColorDifference(first, second) | 各通道绝对差、maxChannel、manhattan、euclidean |
+| 颜色块 | FindColorBlocks(imageId, color, tolerance?, minPixels?, left?, top?, width?, height?, step?, maxResults?) | 按采样点数排序的八邻域连通块数组 |
+
+ColorDifference 的三类差值分别为：最大单通道绝对差、三个通道差绝对值之和、三个通道差的欧氏距离。颜色通道均为 0–255；十六进制输入只接受 6 位 RRGGBB 以及可选 # / 0x 前缀。
+
+FindColorBlocks 的 step 是采样网格步长，pixelCount 指命中采样点数量，并非原始连续像素面积；块以八邻域（含对角）相连。单次最多扫描 4,000,000 个采样点，最多返回 100 个块；minPixels 和 maxResults 均有范围校验，停止可取消扫描。返回项含局部 x/y/width/height/centerX/centerY、pixelCount，截图还含 screen 绝对坐标。
+
+脚本图像模板 UI 使用与 Lua Worker 相同的相对路径基准：相对 LoadImage 路径以脚本所在目录解析；资源管理器复制的 .assets/... 路径可以直接传入 LoadImage。资源 ID 仍只在当前脚本运行轮次内有效。

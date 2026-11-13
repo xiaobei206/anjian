@@ -525,3 +525,18 @@ M4 基础调试器与 M5 可视化录制/动作列表均已完成 Windows CI 验
 - 尚未实现图像资源管理/模板预览 UI、模板命名及路径/版本校验、工程资源依赖联动、视觉调试 overlay、RGB/十六进制辅助转换、颜色差值和颜色块识别；因此 M8 保持 IN_PROGRESS，不能进入 DONE 状态。
 - docs/ACCEPTANCE-TEST-CN.md M8-01..M8-13 的 Windows 桌面场景尚未执行（NOT RUN）；M8-14 对应 UI 尚未实现。CI PASS 不替代 Windows 10/11 的 DPI/多显示器/负坐标、遮挡、受保护窗口、Stop 与资源清理实测。
 - 未修改 VERSION/csproj 预览版本，没有创建新 Release；v0.1.0-preview.4 官方 Release ZIP/SHA256 未变化。
+ 
+## 2026-11-13 — M8-CLOSE — 图像资源 UI、视觉调试与 RGB/颜色块闭环（Windows CI 待验证）
+
+### 实现
+- API registry 从 0.5 升至 0.6，公开函数总数从 74 升至 78；新增 RgbToHex、HexToRgb、ColorDifference、FindColorBlocks。编辑器补全/签名提示继续使用唯一 registry，函数参考手册同步生成。
+- 新增脚本级 .images.json 与 .assets PNG 资产目录，支持 PNG 导入/列表/预览/命名/移除/路径复制；清单保存 schema、ScriptId、相对路径、尺寸、文件大小、SHA-256 和导入时间。导入限制 128 MiB、32,000,000 像素；未知 schema 不覆盖，路径限制在当前脚本 assets 目录内。
+- 图像资源 UI 保留 PixelImage 像素模型，不在列表/预览状态持有 GDI Bitmap；绘制时只临时创建 Bitmap 并释放。LoadImage 相对路径以脚本目录为基准。静态 LoadImage 字面资源引用可扫描，仍被引用时阻止移除；动态路径报告为无法静态解析。移除清单不删除 PNG 文件。
+- ScriptRepository 的 rename/duplicate/delete 同步管理 manifest 和 assets；rename/duplicate 同步改写脚本中的静态资产目录前缀，duplicate 为清单重新生成 ScriptId 并重基资源相对路径。
+- 增加视觉调试覆盖层，显示截图区域、颜色像素、FindColor/FindImage 命中矩形、颜色块、similarity、RGB 和执行耗时。覆盖层置顶、透明、点击穿透；使用 SetWindowDisplayAffinity 尝试排除自身截图，并在系统返回失败时向用户日志警告。
+- Core 新增 RGB/hex、颜色差值、八邻域色块算法；增加 PNG manifest/path/hash 和 LoadImage 依赖扫描测试；颜色块扫描上限 4,000,000 个采样点、最多 100 个返回项并支持取消。
+
+### 验证
+- 本地执行环境无 .NET SDK，不能本地 Restore/Build/Test。必须以本提交触发的 Windows Actions 结果作为构建/自动化测试证据；在结果返回前不得声称构建成功。
+- M8-01..M8-18 Windows 10/11 桌面人工验收全部 NOT RUN。特别需要真实桌面验证多显示器负坐标、透明 PNG/GDI 预览、脚本资源迁移、点击穿透、SetWindowDisplayAffinity 返回及截图是否含 overlay。
+- 没有修改 VERSION/csproj 版本，没有创建 Release；v0.1.0-preview.4 官方 Release/ZIP/SHA256 不变。

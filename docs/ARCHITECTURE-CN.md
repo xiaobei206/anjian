@@ -1,6 +1,6 @@
 # 技术架构与模块边界
 
-- 版本：Architecture 0.4（追加 M8 图像 API/Core 与 Windows 捕获服务）
+- 版本：Architecture 0.5（追加 M8 图像资源清单、视觉调试覆盖层与颜色工具）
 - 目标框架：net10.0-windows
 - 平台：Windows x64
 - 状态：preview.4 实际实现已确认；后续模块化架构仍按路线图渐进演进。
@@ -246,3 +246,27 @@ preview.4 当前采用低级鼠标/键盘 Hook，已纳入 Windows CI 编译与�
 - PlaybackRunner 在主进程侧执行图像 IPC；Lua worker 只能拿随机资源 ID 和结构化结果，不接收原生 Bitmap/HWND。WaitImage/WaitColor 系列遵循暂停、取消令牌、超时和连续条件跟踪。
 - CaptureWindow/CaptureClient 只对可见且未最小化窗口调用屏幕区域捕获；遮挡区域不保证目标窗口真实后台像素。
 - 没有新增第三方图像识别/OCR 依赖。图像资源预览/管理 UI、模板命名/版本校验、视觉调试 overlay、颜色差值/颜色块检测还未完成，属于 M8 剩余工作。
+
+
+## 11. M8 图像资源与视觉调试边界
+
+### 11.1 图像资源清单
+- 每个脚本可拥有同名的 <script>.images.json 与 <script>.assets/ 目录。清单 schemaVersion 当前为 1，包含 ScriptId、资源显示名称、相对路径、PNG 宽高、文件大小、SHA-256 与加入时间。
+- 资源相对路径固定落在当前脚本对应的 .assets/ 根目录内；路径解析使用 FullPath 前缀边界检查并拒绝目录穿越/非 PNG 后缀。PNG 导入上限为 128 MiB、32,768 单边和 32,000,000 像素。
+- 校验时验证 schema、路径、文件存在、PNG 签名/IHDR 尺寸、字节数与 SHA-256。未知 schema 不回写、不自动迁移，以免覆盖未来版本。
+- UI 只持有不可变 PixelImage 预览数据；从 PNG 载入/绘制时使用局部临时 GDI Bitmap 并立即释放。脚本 Worker 的 WindowsImageService 仍通过每轮资源池限制内存，LoadImage 相对路径以脚本所在目录为基准。
+- ScriptRepository 的重命名/复制/删除同步处理 images manifest/assets；复制时重新生成 ScriptId、重基 manifest 相对路径并改写脚本中静态资产目录前缀。删除脚本是显式破坏性操作，删除其图片 manifest 与资产目录。
+
+### 11.2 依赖扫描
+- ImageResourceDependencyScanner 只识别 LoadImage("literal") 形式的静态首参数，并跳过常见行注释/长注释；动态表达式计数为无法静态解析，不假装知道实际文件依赖。
+- 移除资源前，UI 检查当前脚本文本的静态字面路径；仍被引用时拒绝移除。移除清单条目不删除 PNG 文件，避免不可恢复的数据丢失。
+
+### 11.3 视觉调试覆盖层
+- WindowsImageService 以事件发送截图矩形、像素颜色、FindColor/FindImage 命中矩形、FindColorBlocks 边界、相似度和检测耗时；事件只传数值/标签，不跨模块传递 GDI Bitmap 或 Lua 对象。
+- MainForm 通过 UI 线程调度事件到可选的 VisualDebugOverlayForm。覆盖层为 TopMost、透明键、WS_EX_TRANSPARENT/WS_EX_NOACTIVATE 点击穿透窗口；隐藏/关闭时不参与命中测试。
+- 使用 SetWindowDisplayAffinity(WDA_EXCLUDEFROMCAPTURE) 尝试避免截图包含自身标注。Windows 版本、DWM 与捕获路径影响该能力，失败需要在桌面验收时记录；不能宣称所有截图路径都绝对排除覆盖层。
+- 覆盖层只对带屏幕原点的图像结果绘制。加载的磁盘模板没有屏幕坐标，只参与匹配，不绘制伪造屏幕位置。
+
+### 11.4 RGB 与颜色块算法
+- RGB 颜色统一为 0xRRGGBB；十六进制接受 RRGGBB、#RRGGBB、0xRRGGBB。通道差为绝对值；ColorDifference 返回 R/G/B 差、MaxChannel、Manhattan 与 Euclidean。
+- FindColorBlocks 使用八邻域连通分量；step 是采样网格步长，pixelCount 是命中采样点数，矩形和中心按采样坐标计算。单次最多 4,000,000 个采样点、返回最多 100 块，支持取消。阈值 tolerance 按 RGB 每通道最大差判断。

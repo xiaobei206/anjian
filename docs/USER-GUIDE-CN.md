@@ -137,7 +137,7 @@ UI Automation 的后台 `ValuePattern.SetValue`、`SelectionItem.Select`、`Togg
 
 ## 9. 截图、图色与模板找图（main 开发版，未包含在 preview.4）
 
-M8 的核心 Lua API 已进入 main，但尚未进入已发布的 v0.1.0-preview.4 Release。当前以脚本 API 形式使用；模板资源管理/预览 UI 和视觉调试叠加层还未完成。
+M8 的核心 Lua API、图像资源管理 UI 与视觉调试覆盖层已接入 main，但尚未进入已发布的 v0.1.0-preview.4 Release。使用前需从 main 的 Windows CI 临时构建包体验；资源 UI/覆盖层尚未经过真实 Windows 10/11 桌面验收。
 
 ```lua
 -- 捕获当前虚拟桌面的可见合成画面
@@ -174,6 +174,18 @@ if ready then
     Log("目标连续两次检测命中")
 end
 
+-- RGB/hex 转换与颜色距离
+local hex = RgbToHex(255, 128, 0) -- #FF8000
+local rgb = HexToRgb("0xFF8000")
+local difference = ColorDifference(0xFF0000, 0xF00010)
+Log(hex .. " R差=" .. difference.red .. " 最大通道差=" .. difference.maxChannel)
+
+-- 八邻域颜色块识别；结果按采样点数从大到小
+local blocks = FindColorBlocks(screen, 0xFF0000, 8, 4, 0, 0, 800, 600, 2, 20)
+for _, block in ipairs(blocks) do
+    Log("block=" .. block.x .. "," .. block.y .. " count=" .. block.pixelCount)
+end
+
 ReleaseImage(template)
 ReleaseImage(screen)
 ```
@@ -183,4 +195,6 @@ ReleaseImage(screen)
 - 单图最多 32,000,000 像素；每轮最多 128 个图像资源、256 MiB 缓存；模板单次搜索最多 50,000,000 次像素比较。
 - 找色颜色采用 0xRRGGBB；容差是 R/G/B 各通道独立允许的最大绝对差，并非 RGB 总距离。搜索区域使用图像局部零基像素，截图命中额外返回屏幕绝对坐标。
 - 模板找图默认 similarity 0.95、grayscale=false、scale=1；支持 0.25–4 倍最近邻缩放。Wait 系列支持 timeout、interval 和 stableCount 连续确认。
-- CaptureWindow/CaptureClient 读取的是当前桌面可见合成像素，不保证覆盖窗口的后台内容，也不承诺硬件加速或受保护表面可截图。未实现 OCR；M8 模板管理 UI 和视觉调试层仍待完成。
+- 图像资源 UI 从主窗口工具栏“图像资源”打开：导入 PNG 后可列表、预览、重命名、校验 schema/路径/尺寸/文件大小/SHA-256，并复制相对路径到剪贴板。清单写入脚本旁的 .images.json，图片放在 .assets/；在脚本中使用复制的路径，例如 LoadImage("task.assets/<id>.png")，相对路径以脚本目录为基准。静态字面 LoadImage 依赖仍在时不能移除资源；动态路径仅提示无法静态分析。脚本重命名/复制会同步改写资源目录前缀和清单；删除脚本会删除对应清单与资产目录。移除清单条目不会删除原 PNG。
+- 主窗口工具栏“视觉调试：开/关”控制屏幕覆盖层。它显示截图区域、颜色点/颜色块和找图命中框；标签可含相似度、RGB 与耗时。覆盖层是点击穿透窗口；Windows Display Affinity 排除截图为系统能力，必须在目标 Windows 环境实测。已关闭覆盖层不处理输入。
+- CaptureWindow/CaptureClient 读取当前桌面可见合成像素，不保证覆盖窗口后台内容，也不承诺硬件加速或受保护表面可截图。未实现 OCR；所有 M8 Windows 桌面检查仍需按验收表实测。
